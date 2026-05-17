@@ -1,1 +1,0 @@
-import{Dt as e,Kt as t,Lt as n,dt as r,mt as i,ot as a,vt as o}from"./app-C4fN0hPG.js";var s={class:`text-sm text-red-600 dark:text-red-500`},c=o({__name:`InputError`,props:{message:{}},setup(o){return(c,l)=>n((e(),i(`div`,null,[r(`p`,s,t(o.message),1)],512)),[[a,o.message]])}});export{c as t};
