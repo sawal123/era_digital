@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue';
-import { Head } from '@inertiajs/vue3';
+import { Head, router, usePage } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -71,6 +71,32 @@ const filterLabel = computed(() => {
     if (filterMode.value === 'bulanan') return filterMonth.value;
     return filterYear.value;
 });
+
+// ─── DELETE ───────────────────────────────────────────────────────
+const deleteTarget    = ref(null);
+const deleteConfirmOpen = ref(false);
+const isDeleting      = ref(false);
+
+const openDeleteConfirm = (trx) => {
+    deleteTarget.value = trx;
+    deleteConfirmOpen.value = true;
+};
+
+const confirmDelete = () => {
+    if (!deleteTarget.value) return;
+    isDeleting.value = true;
+    router.delete(`/reports/${deleteTarget.value.id}`, {
+        onSuccess: () => {
+            deleteConfirmOpen.value = false;
+            deleteTarget.value = null;
+            isDeleting.value = false;
+        },
+        onError: () => { isDeleting.value = false; },
+    });
+};
+
+// ─── FLASH ───────────────────────────────────────────────────────
+const flash = computed(() => usePage().props.flash ?? {});
 </script>
 
 <template>
@@ -80,6 +106,20 @@ const filterLabel = computed(() => {
     </Head>
 
     <div class="flex flex-col gap-6 p-4 md:p-6 pb-8 font-inter">
+
+        <!-- Flash Notifications -->
+        <transition enter-active-class="transition duration-300 ease-out" enter-from-class="opacity-0 -translate-y-2" enter-to-class="opacity-100 translate-y-0" leave-active-class="transition duration-200" leave-from-class="opacity-100" leave-to-class="opacity-0">
+            <div v-if="flash.success" class="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 rounded-2xl px-4 py-3 text-sm font-semibold">
+                <i class="fas fa-check-circle text-emerald-500"></i>
+                {{ flash.success }}
+            </div>
+        </transition>
+        <transition enter-active-class="transition duration-300 ease-out" enter-from-class="opacity-0 -translate-y-2" enter-to-class="opacity-100 translate-y-0" leave-active-class="transition duration-200" leave-from-class="opacity-100" leave-to-class="opacity-0">
+            <div v-if="flash.error" class="flex items-center gap-3 bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-400 rounded-2xl px-4 py-3 text-sm font-semibold">
+                <i class="fas fa-exclamation-circle text-red-500"></i>
+                {{ flash.error }}
+            </div>
+        </transition>
 
         <!-- Header + Filter Bar -->
         <div class="flex flex-col gap-4">
@@ -294,6 +334,9 @@ const filterLabel = computed(() => {
                                             class="inline-flex items-center justify-center rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 dark:bg-neutral-800 dark:hover:bg-neutral-700 dark:text-neutral-200 font-bold text-xs h-8 px-3 shadow-xs transition">
                                             <i class="fas fa-print mr-1"></i> Cetak
                                         </a>
+                                        <Button @click="openDeleteConfirm(trx)" variant="ghost" size="xs" class="h-8 rounded-xl text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/30 font-semibold px-2">
+                                            <i class="fas fa-trash-alt mr-1"></i> Hapus
+                                        </Button>
                                     </div>
                                 </td>
                             </tr>
@@ -410,6 +453,44 @@ const filterLabel = computed(() => {
                     <DialogClose as-child>
                         <Button type="button" variant="secondary" class="rounded-xl">Tutup</Button>
                     </DialogClose>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
+        <!-- DIALOG KONFIRMASI HAPUS -->
+        <Dialog :open="deleteConfirmOpen" @update:open="deleteConfirmOpen = $event">
+            <DialogContent class="sm:max-w-[420px] rounded-3xl bg-card border-border text-foreground shadow-2xl p-6">
+                <div class="flex flex-col items-center text-center space-y-4">
+                    <div class="w-16 h-16 rounded-full bg-red-500/10 dark:bg-red-500/20 text-red-500 flex items-center justify-center text-3xl">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="space-y-1.5">
+                        <DialogTitle class="text-lg font-black text-foreground">Hapus Transaksi?</DialogTitle>
+                        <DialogDescription class="text-xs text-muted-foreground leading-relaxed px-2">
+                            Anda akan menghapus nota
+                            <strong class="font-mono text-foreground">{{ deleteTarget?.invoice_number }}</strong>
+                            secara permanen. Stok produk fisik akan dikembalikan. Tindakan ini tidak dapat dibatalkan.
+                        </DialogDescription>
+                    </div>
+                </div>
+                <DialogFooter class="grid grid-cols-2 gap-3 mt-5">
+                    <Button
+                        @click="deleteConfirmOpen = false"
+                        variant="outline"
+                        class="rounded-xl font-bold border-border hover:bg-muted text-foreground"
+                        :disabled="isDeleting"
+                    >
+                        Batal
+                    </Button>
+                    <Button
+                        @click="confirmDelete"
+                        class="rounded-xl font-bold bg-red-600 hover:bg-red-700 text-white shadow-sm flex items-center justify-center gap-2"
+                        :disabled="isDeleting"
+                    >
+                        <i v-if="!isDeleting" class="fas fa-trash-alt text-xs"></i>
+                        <i v-else class="fas fa-circle-notch fa-spin text-xs"></i>
+                        {{ isDeleting ? 'Menghapus...' : 'Ya, Hapus' }}
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

@@ -34,6 +34,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Laporan Penjualan
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+    Route::delete('/reports/{transaction}', [ReportController::class, 'destroy'])->name('reports.destroy');
 
     // Pengeluaran CRUD
     Route::get('/expenses', [ExpenseController::class, 'index'])->name('expenses.index');
