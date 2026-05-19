@@ -148,7 +148,7 @@ const handleMouseLeave = () => {
         </div>
 
         <!-- 1. KARTU STATISTIK (HARI INI) -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
             <!-- Omset Card -->
             <div class="relative overflow-hidden bg-card border border-border p-5 rounded-2xl shadow-xs group transition hover:border-emerald-500/20">
                 <div class="flex justify-between items-start">
@@ -219,6 +219,24 @@ const handleMouseLeave = () => {
                     <span>Omset - Modal - Pengeluaran</span>
                 </div>
                 <div class="absolute bottom-0 left-0 right-0 h-1 bg-cyan-500 opacity-60 group-hover:opacity-100 transition"></div>
+            </div>
+
+            <!-- Admin Fee PPOB Card -->
+            <div class="relative overflow-hidden bg-card border border-border p-5 rounded-2xl shadow-xs group transition hover:border-violet-500/20">
+                <div class="flex justify-between items-start">
+                    <div class="space-y-1">
+                        <span class="text-xs font-bold text-muted-foreground uppercase tracking-wider block">Admin Fee PPOB</span>
+                        <h2 class="text-xl md:text-2xl font-black text-foreground">Rp {{ formatRupiah(stats.keuntungan_ppob ?? 0) }}</h2>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-violet-500/10 text-violet-600 flex items-center justify-center dark:bg-violet-500/20 dark:text-violet-400">
+                        <i class="fas fa-bolt text-lg"></i>
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center gap-1.5 text-xs text-muted-foreground font-semibold">
+                    <span class="text-violet-500 bg-violet-500/10 px-1.5 py-0.5 rounded-md flex items-center gap-0.5 font-bold">Hari Ini</span>
+                    <span>Profit dari biaya admin digital</span>
+                </div>
+                <div class="absolute bottom-0 left-0 right-0 h-1 bg-violet-500 opacity-60 group-hover:opacity-100 transition"></div>
             </div>
         </div>
 
@@ -334,6 +352,7 @@ const handleMouseLeave = () => {
                     >
                         <span class="font-black text-[9px] uppercase tracking-wider text-indigo-400 dark:text-indigo-600">{{ hoveredPoint.day }}, {{ hoveredPoint.date }}</span>
                         <span class="font-black text-[13px] font-mono">Rp {{ formatRupiah(hoveredPoint.profit) }}</span>
+                        <span v-if="hoveredPoint.ppob_profit > 0" class="text-[10px] text-violet-400 dark:text-violet-600 font-semibold">⚡ PPOB: Rp {{ formatRupiah(hoveredPoint.ppob_profit) }}</span>
                     </div>
                 </div>
             </div>

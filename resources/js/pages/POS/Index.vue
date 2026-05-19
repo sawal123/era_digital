@@ -356,7 +356,9 @@ const beliSaldoDigital = () => {
         return;
     }
     
-    saldoDigital.value -= totalHarga;
+    // Saldo toko berkurang HANYA sebesar nominal (modal yang disetor ke distributor)
+    // Admin fee tetap menjadi keuntungan toko, tidak dikeluarkan dari saldo
+    saldoDigital.value -= nominal;
     
     const digitalType = (prod.name?.toLowerCase().includes('token') || 
                          prod.name?.toLowerCase().includes('listrik') || 

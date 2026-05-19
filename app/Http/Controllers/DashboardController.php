@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Transaction;
+use App\Models\TransactionItem;
 use App\Models\Expense;
 use App\Models\Product;
 use Illuminate\Http\Request;
@@ -22,6 +23,13 @@ class DashboardController extends Controller
         $totalProfitToday = (float) Transaction::whereDate('created_at', $today)->sum('total_profit');
         $keuntunganBersih = $totalProfitToday - $totalPengeluaran;
 
+        // Keuntungan dari Biaya Admin PPOB hari ini
+        $keuntunganPpob = (float) TransactionItem::where('type', 'ppob')
+            ->whereHas('transaction', function ($q) use ($today) {
+                $q->whereDate('created_at', $today);
+            })
+            ->sum('profit');
+
         // 2. GRAFIK PERFORMA (7 HARI TERAKHIR)
         $chartData = [];
         for ($i = 6; $i >= 0; $i--) {
@@ -31,6 +39,12 @@ class DashboardController extends Controller
             $profit = Transaction::whereDate('created_at', $dateString)->sum('total_profit');
             $expense = Expense::whereDate('date', $dateString)->sum('amount');
             $netProfit = $profit - $expense;
+
+            $ppobProfit = (float) TransactionItem::where('type', 'ppob')
+                ->whereHas('transaction', function ($q) use ($dateString) {
+                    $q->whereDate('created_at', $dateString);
+                })
+                ->sum('profit');
 
             $dayName = '';
             switch ($date->dayOfWeek) {
@@ -44,9 +58,10 @@ class DashboardController extends Controller
             }
 
             $chartData[] = [
-                'day' => $dayName,
-                'date' => $date->format('d M'),
-                'profit' => (float) $netProfit,
+                'day'         => $dayName,
+                'date'        => $date->format('d M'),
+                'profit'      => (float) $netProfit,
+                'ppob_profit' => $ppobProfit,
             ];
         }
 
@@ -61,12 +76,13 @@ class DashboardController extends Controller
 
         return Inertia::render('Dashboard', [
             'stats' => [
-                'total_omset' => $totalOmset,
-                'total_modal' => $totalModal,
-                'total_pengeluaran' => $totalPengeluaran,
-                'keuntungan_bersih' => $keuntunganBersih,
+                'total_omset'        => $totalOmset,
+                'total_modal'        => $totalModal,
+                'total_pengeluaran'  => $totalPengeluaran,
+                'keuntungan_bersih'  => $keuntunganBersih,
+                'keuntungan_ppob'    => $keuntunganPpob,
             ],
-            'chartData' => $chartData,
+            'chartData'        => $chartData,
             'criticalProducts' => $criticalProducts,
         ]);
     }

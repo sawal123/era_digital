@@ -146,12 +146,17 @@ class PosController extends Controller
                 $basePrice = $product ? $product->base_price : ($item['base_price'] ?? 0);
                 
                 if (isset($item['type']) && $item['type'] === 'cetak') {
+                    // Modal cetak = 77% dari harga jual (estimasi biaya vendor)
                     $basePrice = $item['price'] / 1.3;
+                } elseif (isset($item['type']) && ($item['type'] === 'digital' || $item['type'] === 'ppob')) {
+                    // Modal PPOB = nominal yang dikirim ke pelanggan/distributor
+                    // Keuntungan = admin_fee = total_harga - nominal
+                    $basePrice = $item['nominal'] ?? 0;
                 }
 
                 $subtotalBase = $basePrice * $item['quantity'];
-                $subtotalPrice = $item['price'] * $item['quantity'];
-                $profit = $subtotalPrice - $subtotalBase;
+                $subtotalPrice = $item['price'] * $item['quantity']; // price = nominal + admin_fee
+                $profit = $subtotalPrice - $subtotalBase; // profit = admin_fee ✓
 
                 $itemType = $item['type'] ?? 'fisik';
                 if ($itemType === 'cetak' || $itemType === 'fotokopi') {
@@ -173,7 +178,11 @@ class PosController extends Controller
                     'subtotal_price' => $subtotalPrice,
                     'profit' => $profit,
                     'service_status' => $itemType === 'jasa' ? 'menunggu_file' : 'none',
-                    'metadata' => ['detail' => $item['detail'] ?? '']
+                    'metadata' => [
+                        'detail'    => $item['detail'] ?? '',
+                        'admin_fee' => $item['admin_fee'] ?? 0,
+                        'nominal'   => $item['nominal'] ?? null,
+                    ]
                 ]);
 
                 if ($itemType === 'ppob') {
