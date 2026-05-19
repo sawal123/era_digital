@@ -50,8 +50,21 @@ class PosController extends Controller
 
         try {
             $date = now()->format('Ymd');
-            $countToday = Transaction::whereDate('created_at', now()->toDateString())->count();
-            $increment = str_pad($countToday + 1, 3, '0', STR_PAD_LEFT);
+            
+            $latestTransaction = Transaction::whereDate('created_at', now()->toDateString())
+                ->where('invoice_number', 'like', "TRX-{$date}-%")
+                ->orderBy('invoice_number', 'desc')
+                ->first();
+
+            if ($latestTransaction) {
+                $parts = explode('-', $latestTransaction->invoice_number);
+                $lastSeq = intval(end($parts));
+                $nextSeq = $lastSeq + 1;
+            } else {
+                $nextSeq = 1;
+            }
+            
+            $increment = str_pad($nextSeq, 3, '0', STR_PAD_LEFT);
             $invoiceNumber = "TRX-{$date}-{$increment}";
 
             $customerId = $request->customer_id;

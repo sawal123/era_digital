@@ -484,6 +484,13 @@ const prosesBayar = () => {
         keterangan: keterangan.value || null,
     }, {
         onSuccess: () => {
+            const flashError = usePage().props.flash?.error;
+            if (flashError) {
+                showNotification(flashError, "Simpan Gagal", "error");
+                isProcessing.value = false;
+                return;
+            }
+
             const recentTrx = usePage().props.flash?.recent_transaction;
             if (recentTrx) {
                 successTransaction.value = recentTrx;
