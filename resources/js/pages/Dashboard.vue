@@ -109,6 +109,8 @@ const handleMouseMove = (e) => {
     let closest = chartPoints.value[0];
     let minDist = Math.abs(closest.x - svgX);
     
+    // ─── Flash Notifications ───────────────────────────────────────
+    
     chartPoints.value.forEach(p => {
         const dist = Math.abs(p.x - svgX);
         if (dist < minDist) {

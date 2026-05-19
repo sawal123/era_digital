@@ -16,6 +16,7 @@ class ReportController extends Controller
             'transactions' => $transactions
         ]);
     }
+    
 
     public function destroy(Transaction $transaction)
     {

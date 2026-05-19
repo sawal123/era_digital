@@ -23,6 +23,7 @@ defineOptions({
     },
 });
 
+
 const props = defineProps({ transactions: Array });
 
 // ─── FILTER STATE ───────────────────────────────────────────────
