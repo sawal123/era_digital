@@ -99,8 +99,16 @@ watch(cart, () => {
 let handleOpenMobileCart;
 let handleRequestCartSync;
 
+const jasaDropdownOpen = ref(false);
+const closeJasaDropdown = (e) => {
+    if (jasaDropdownOpen.value && !e.target.closest('.jasa-dropdown-container')) {
+        jasaDropdownOpen.value = false;
+    }
+};
+
 onMounted(() => {
     window.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('click', closeJasaDropdown);
     updateTime();
     timer = setInterval(updateTime, 1000);
 
@@ -117,6 +125,7 @@ onMounted(() => {
 
 onUnmounted(() => {
     window.removeEventListener('keydown', handleKeyDown);
+    document.removeEventListener('click', closeJasaDropdown);
     if (timer) clearInterval(timer);
     if (handleOpenMobileCart) {
         window.removeEventListener('open-mobile-cart', handleOpenMobileCart);
@@ -128,6 +137,16 @@ onUnmounted(() => {
 
 // TAB LOGIC (0 = fisik, 1 = cetak, 2 = digital)
 const activeTab = ref(0);
+const isTabLoading = ref(false);
+const handleTabChange = (idx) => {
+    if (activeTab.value === idx) return;
+    isTabLoading.value = true;
+    setTimeout(() => {
+        activeTab.value = idx;
+        isTabLoading.value = false;
+    }, 250);
+};
+
 const tabs = [
     { name: "Barang Fisik & Fotokopi", icon: "fas fa-box-open" },
     { name: "Jasa Cetak (Vendor)", icon: "fas fa-print" },
@@ -139,6 +158,20 @@ const themeColor = computed(() => {
     if (activeTab.value === 1) return "#f97316"; // Oranye enerjik
     return "#3b82f6"; // Biru elektrik
 });
+
+const selectJasaProduct = (product) => {
+    activeJasaProductId.value = product.id;
+    jasaDropdownOpen.value = false;
+};
+
+const getInitials = (name) => {
+    if (!name) return '??';
+    const words = name.trim().split(/\s+/);
+    if (words.length >= 2) {
+        return (words[0][0] + words[1][0]).toUpperCase();
+    }
+    return words[0].substring(0, 2).toUpperCase();
+};
 
 
 
@@ -585,24 +618,34 @@ const alertFeature = (fitur) => {
             <!-- Area Kiri Dinamis (2/3) -->
             <div class="w-full lg:w-2/3 flex flex-col p-4 md:p-6 relative h-[calc(100vh-14rem)] lg:h-full">
                 <!-- TAB BUTTONS -->
-                <div class="flex gap-2 border-b border-border pb-3 mb-6 overflow-x-auto custom-scroll">
-                    <Button 
+                <div class="flex p-1 bg-muted/40 dark:bg-muted/10 rounded-2xl gap-1 mb-6 border border-border/40 max-w-xl">
+                    <button 
                         v-for="(tab, idx) in tabs" 
                         :key="idx"
-                        @click="activeTab = idx"
-                        :variant="activeTab === idx ? 'default' : 'outline'"
-                        class="px-5 py-2.5 rounded-xl font-semibold transition-all duration-200 text-sm flex items-center gap-2 whitespace-nowrap h-10 border-border/60"
-                        :style="activeTab === idx ? { backgroundColor: themeColor, borderColor: themeColor, color: '#fff' } : {}"
+                        @click="handleTabChange(idx)"
+                        class="flex-1 py-2 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap h-9"
+                        :class="activeTab === idx 
+                            ? 'shadow-sm text-white' 
+                            : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'"
+                        :style="activeTab === idx ? { backgroundColor: themeColor } : {}"
                     >
-                        <i :class="tab.icon"></i>
+                        <i :class="tab.icon" class="text-xs"></i>
                         {{ tab.name }}
-                    </Button>
+                    </button>
                 </div>
 
                 <!-- KONTEN -->
-                <div class="flex-1 overflow-y-auto pr-2 custom-scroll">
-                    <transition name="flip" mode="out-in">
-                        <div :key="activeTab" class="w-full">
+                <div class="flex-1 overflow-y-auto pr-2 custom-scroll relative">
+                    <!-- Tab Loading Overlay -->
+                    <div v-if="isTabLoading" class="absolute inset-0 bg-background/60 backdrop-blur-xs z-30 flex items-center justify-center transition-all duration-200">
+                        <div class="flex flex-col items-center gap-2">
+                            <i class="fas fa-circle-notch fa-spin text-2xl" :style="{ color: themeColor }"></i>
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Memuat Produk...</span>
+                        </div>
+                    </div>
+
+                    <transition name="fade" mode="out-in">
+                        <div v-if="!isTabLoading" :key="activeTab" class="w-full">
                             <!-- TAB 0 : Barang Fisik -->
                             <div v-if="activeTab === 0" class="space-y-6">
                                 <!-- Search Input Dinamis -->
@@ -632,29 +675,27 @@ const alertFeature = (fitur) => {
                                     <p class="text-xs text-muted-foreground mt-1">Coba kata kunci lain atau bersihkan pencarian.</p>
                                 </div>
 
-                                <div v-else class="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                                    <Card 
+                                <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    <div 
                                         v-for="item in filteredFisikItems" 
                                         :key="item.id" 
                                         @click="addToCart({ id: item.id, name: item.name, price: item.selling_price, qty: 1, type: 'fisik' })" 
-                                        class="rounded-2xl p-4 text-center cursor-pointer hover:shadow-md transition hover:border-border/60 flex flex-col items-center justify-between min-h-[165px] bg-muted/20 border-border/40 select-none shadow-sm relative group overflow-hidden"
+                                        class="rounded-xl p-3 cursor-pointer hover:shadow-md transition duration-200 border border-border/50 hover:border-emerald-500/40 flex items-center gap-3 bg-card hover:bg-muted/10 select-none shadow-sm relative group overflow-hidden"
                                     >
-                                        <div class="w-full flex-1 flex items-center justify-center overflow-hidden mb-2 rounded-xl bg-background border border-border/30">
-                                            <img v-if="item.image_path" :src="item.image_path" class="w-full h-20 object-cover rounded-xl" />
-                                            <!-- Simple icon detection based on name if no image -->
-                                            <span v-else class="text-3xl text-foreground">
-                                                <i v-if="item.name.toLowerCase().includes('pulpen')" class="fas fa-pen text-indigo-500"></i>
-                                                <i v-else-if="item.name.toLowerCase().includes('buku')" class="fas fa-book text-indigo-500"></i>
-                                                <i v-else-if="item.name.toLowerCase().includes('kertas')" class="fas fa-copy text-indigo-500"></i>
-                                                <i v-else-if="item.name.toLowerCase().includes('kalkulator')" class="fas fa-calculator text-indigo-500"></i>
-                                                <i v-else class="fas fa-box text-indigo-500"></i>
+                                        <!-- Small image or initial box -->
+                                        <div class="w-10 h-10 rounded-lg overflow-hidden bg-muted/40 flex items-center justify-center shrink-0 border border-border/30">
+                                            <img v-if="item.image_path" :src="item.image_path" class="w-full h-full object-cover" />
+                                            <span v-else class="text-xs font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 w-full h-full flex items-center justify-center">
+                                                {{ getInitials(item.name) }}
                                             </span>
                                         </div>
                                         
-                                        <p class="font-bold text-foreground text-xs line-clamp-1 w-full" :title="item.name">{{ item.name }}</p>
-                                        <p class="text-indigo-600 dark:text-indigo-400 text-xs font-semibold mt-1">Rp {{ formatRupiah(item.selling_price) }}</p>
-                                        <Badge variant="secondary" class="text-[9px] px-1.5 py-0 mt-1 font-normal border-border/30">Stok: {{ parseFloat(item.stock) }} {{ item.unit }}</Badge>
-                                    </Card>
+                                        <div class="flex-1 min-w-0 text-left">
+                                            <p class="font-bold text-foreground text-xs leading-snug line-clamp-2" :title="item.name">{{ item.name }}</p>
+                                            <p class="text-[10px] text-muted-foreground mt-0.5 font-medium">Stok: {{ parseFloat(item.stock) }} {{ item.unit }}</p>
+                                            <p class="text-indigo-600 dark:text-indigo-400 text-xs font-black mt-0.5">Rp {{ formatRupiah(item.selling_price) }}</p>
+                                        </div>
+                                    </div>
                                 </div>
                                 <!-- Layanan Cetak & Fotokopi Instan (Komponen Terintegrasi) -->
                                 <Card class="bg-indigo-50/5 dark:bg-indigo-950/20 rounded-2xl p-5 border-indigo-200/20 dark:border-indigo-900/40 shadow-sm">
@@ -719,13 +760,37 @@ const alertFeature = (fitur) => {
                                         </CardDescription>
                                     </CardHeader>
                                     <CardContent class="p-0 grid grid-cols-1 gap-5">
-                                        <div class="space-y-1.5">
+                                        <div class="space-y-1.5 jasa-dropdown-container relative">
                                             <Label class="text-sm font-semibold text-foreground">Pilih Layanan Jasa</Label>
-                                            <select v-model="activeJasaProductId" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] dark:bg-input/30 text-foreground">
-                                                <option v-for="j in jasaCetakItems" :key="j.id" :value="j.id">
-                                                    {{ j.name }} (Rp {{ formatRupiah(j.selling_price) }} / {{ j.unit }})
-                                                </option>
-                                            </select>
+                                            
+                                            <!-- Elegant custom dropdown select -->
+                                            <div class="relative">
+                                                <button 
+                                                    type="button" 
+                                                    @click="jasaDropdownOpen = !jasaDropdownOpen"
+                                                    class="flex h-11 w-full items-center justify-between rounded-xl border border-input bg-background px-4 py-2 text-sm shadow-sm transition-all outline-none focus-visible:ring-2 focus-visible:ring-orange-500 text-foreground"
+                                                >
+                                                    <span class="font-semibold text-foreground">
+                                                        {{ selectedJasaProduct ? `${selectedJasaProduct.name} (Rp ${formatRupiah(selectedJasaProduct.selling_price)} / ${selectedJasaProduct.unit})` : 'Pilih Layanan Jasa...' }}
+                                                    </span>
+                                                    <i class="fas fa-chevron-down text-muted-foreground transition-transform duration-200" :class="{ 'rotate-180': jasaDropdownOpen }"></i>
+                                                </button>
+                                                <div 
+                                                    v-if="jasaDropdownOpen" 
+                                                    class="absolute left-0 right-0 z-50 mt-1 max-h-60 overflow-y-auto rounded-xl border border-border bg-card p-1.5 shadow-xl custom-scroll divide-y divide-border/40"
+                                                >
+                                                    <div 
+                                                        v-for="j in jasaCetakItems" 
+                                                        :key="j.id"
+                                                        @click="selectJasaProduct(j)"
+                                                        class="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-muted/50 cursor-pointer transition text-xs"
+                                                        :class="{ 'bg-orange-500/10 font-bold text-orange-600 dark:text-orange-400': activeJasaProductId === j.id }"
+                                                    >
+                                                        <span>{{ j.name }}</span>
+                                                        <span class="font-mono text-muted-foreground">Rp {{ formatRupiah(j.selling_price) }} / {{ j.unit }}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                         
                                         <!-- Kalkulator Dinamis jika unit meter -->
@@ -870,37 +935,44 @@ const alertFeature = (fitur) => {
                     <h2 class="font-bold text-lg flex gap-2 items-center text-foreground"><i class="fas fa-receipt text-indigo-500 dark:text-indigo-400"></i> Keranjang</h2>
                     <span class="text-xs bg-background text-foreground border border-border px-2 py-1 rounded-full shadow-sm">{{ cart.length }} item</span>
                 </div>
-                <div class="flex-1 overflow-y-auto cart-scroll space-y-3 pr-1">
+                <div class="flex-1 overflow-y-auto cart-scroll space-y-2 pr-1">
                     <div v-if="cart.length === 0" class="text-center text-muted-foreground mt-10">
                         <i class="fas fa-shopping-cart text-4xl mb-2 opacity-30"></i>
                         <p>Keranjang kosong</p>
                     </div>
-                    <div v-for="(item, idx) in cart" :key="idx" class="bg-background rounded-xl p-3 shadow-sm border border-border relative group">
+                    <div v-for="(item, idx) in cart" :key="idx" class="bg-background rounded-xl p-2.5 shadow-sm border border-border relative group">
                         <div class="flex justify-between">
-                            <div class="w-2/3">
-                                <p class="font-semibold text-sm leading-tight truncate text-foreground" :title="item.name">{{ item.name }}</p>
-                                <p class="text-[11px] text-muted-foreground mt-0.5 line-clamp-2" :title="item.detail">{{ item.detail || '' }}</p>
-                                <div class="flex items-center gap-2 mt-2">
-                                    <Button @click="updateQty(item, -1)" variant="ghost" size="sm" class="w-6 h-6 p-0 flex items-center justify-center rounded-full bg-muted hover:bg-accent text-foreground text-xs transition">-</Button>
-                                    <span class="text-sm font-medium w-4 text-center text-foreground">{{ item.quantity }}</span>
-                                    <Button @click="updateQty(item, 1)" variant="ghost" size="sm" class="w-6 h-6 p-0 flex items-center justify-center rounded-full bg-muted hover:bg-accent text-foreground text-xs transition">+</Button>
+                            <div class="w-[70%]">
+                                <p class="font-bold text-xs leading-tight text-foreground truncate" :title="item.name">{{ item.name }}</p>
+                                <div class="mt-1">
+                                    <input 
+                                        type="text" 
+                                        v-model="item.detail" 
+                                        placeholder="Catatan item..." 
+                                        class="w-full bg-muted/40 dark:bg-muted/20 border-none rounded-md px-1.5 py-0.5 text-[10px] font-medium text-foreground focus:ring-1 focus:ring-indigo-500/50 outline-none placeholder:text-muted-foreground/60"
+                                    />
+                                </div>
+                                <div class="flex items-center gap-1.5 mt-1.5">
+                                    <Button @click="updateQty(item, -1)" variant="ghost" size="sm" class="w-5 h-5 p-0 flex items-center justify-center rounded-full bg-muted hover:bg-accent text-foreground text-[10px] transition">-</Button>
+                                    <span class="text-xs font-bold w-4 text-center text-foreground">{{ item.quantity }}</span>
+                                    <Button @click="updateQty(item, 1)" variant="ghost" size="sm" class="w-5 h-5 p-0 flex items-center justify-center rounded-full bg-muted hover:bg-accent text-foreground text-[10px] transition">+</Button>
                                 </div>
                             </div>
-                            <div class="text-right flex flex-col justify-between">
-                                <p class="font-bold text-indigo-700 dark:text-indigo-400 text-sm">Rp {{ formatRupiah(item.price * item.quantity) }}</p>
-                                <Button @click="removeFromCart(idx)" variant="ghost" size="sm" class="text-red-400 text-xs mt-1 self-end hover:text-red-600 dark:hover:text-red-400 bg-red-50 dark:bg-red-900/30 w-6 h-6 p-0 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition"><i class="fas fa-trash-alt"></i></Button>
+                            <div class="text-right flex flex-col justify-between w-[28%]">
+                                <p class="font-black text-indigo-700 dark:text-indigo-400 text-xs">Rp {{ formatRupiah(item.price * item.quantity) }}</p>
+                                <Button @click="removeFromCart(idx)" variant="ghost" size="sm" class="text-red-400 text-[10px] mt-1 self-end hover:text-red-600 dark:hover:text-red-400 bg-red-50 dark:bg-red-900/30 w-5 h-5 p-0 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition"><i class="fas fa-trash-alt text-[9px]"></i></Button>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- CUSTOMER SELECT & INVOICE NOTES -->
-                <div class="mt-4 pt-4 border-t border-border space-y-3.5 bg-muted/20 p-3 rounded-2xl border border-border/50">
+                <div class="mt-4 pt-4 border-t border-border space-y-3.5 bg-muted/20 p-3.5 rounded-2xl border border-border/50">
                     <!-- Customer Dropdown -->
                     <div class="space-y-1.5">
-                        <Label for="pos-customer" class="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
-                            <i class="fas fa-user-circle text-indigo-500 text-[11px]"></i>
-                            Pilih Customer (Opsional)
+                        <Label for="pos-customer" class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                            <i class="fas fa-user-circle text-indigo-500 text-[10px]"></i>
+                            Pilih Customer
                         </Label>
                         <select id="pos-customer" v-model="customerId" class="flex h-9 w-full rounded-xl border border-input bg-background px-3 py-1 text-xs shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] text-foreground">
                             <option value="">-- Cash / Umum --</option>
@@ -912,43 +984,64 @@ const alertFeature = (fitur) => {
 
                     <!-- Keterangan Invoice -->
                     <div class="space-y-1.5">
-                        <Label for="pos-keterangan" class="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
-                            <i class="fas fa-sticky-note text-indigo-500 text-[11px]"></i>
+                        <Label for="pos-keterangan" class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                            <i class="fas fa-sticky-note text-indigo-500 text-[10px]"></i>
                             Catatan / Keterangan Invoice
                         </Label>
-                        <textarea id="pos-keterangan" v-model="keterangan" rows="2" placeholder="Misal: Spanduk 3x1 meter, DP Rp 50.000..." class="flex min-h-[50px] w-full rounded-xl border border-input bg-background px-3 py-2 text-xs shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 text-foreground border-border"></textarea>
-                    </div>
-
-                    <!-- Jumlah Uang Dibayar (LUNAS / DP / PIUTANG) -->
-                    <div class="space-y-1.5 mt-3">
-                        <Label for="pos-jumlah-dibayar" class="text-xs font-bold text-muted-foreground flex items-center justify-between">
-                            <span class="flex items-center gap-1.5">
-                                <i class="fas fa-coins text-emerald-500 text-[11px]"></i>
-                                Jumlah Uang Dibayar
-                            </span>
-                            <span class="text-[10px] text-muted-foreground bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded font-medium">Default: Lunas</span>
-                        </Label>
-                        <div class="relative">
-                            <span class="absolute left-3 top-2.5 text-xs text-muted-foreground font-bold">Rp</span>
-                            <Input id="pos-jumlah-dibayar" type="number" v-model.number="jumlahDibayar" placeholder="Masukkan jumlah bayar..." min="0" class="pl-8 bg-background border border-input rounded-xl text-xs text-foreground font-bold" />
-                        </div>
-                        <div class="flex justify-between items-center text-[10px] font-bold mt-1 px-1">
-                            <span class="text-muted-foreground">Sisa Tagihan:</span>
-                            <span :class="sisaTagihan > 0 ? 'text-red-500 animate-pulse' : 'text-emerald-500'">
-                                Rp {{ formatRupiah(sisaTagihan) }}
-                             </span>
-                        </div>
+                        <textarea id="pos-keterangan" v-model="keterangan" rows="2" placeholder="Keterangan transaksi..." class="flex min-h-[45px] w-full rounded-xl border border-input bg-background px-3 py-1.5 text-xs shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 text-foreground border-border"></textarea>
                     </div>
                 </div>
 
-                <div class="mt-4 pt-3 border-t border-border space-y-3">
-                    <div class="flex justify-between font-bold text-lg text-foreground">
-                        <span>Total</span>
-                        <span :style="{ color: themeColor }">Rp {{ formatRupiah(cartTotal) }}</span>
+                <!-- RINGKASAN PEMBAYARAN -->
+                <div class="mt-4 pt-4 border-t border-border space-y-3 bg-muted/40 dark:bg-muted/10 p-4 rounded-2xl border border-border/50">
+                    <!-- Subtotal -->
+                    <div class="flex justify-between items-center text-xs font-semibold text-muted-foreground">
+                        <span>Subtotal Belanja</span>
+                        <span class="font-mono text-foreground">Rp {{ formatRupiah(cartTotal) }}</span>
                     </div>
-                    <Button @click="prosesBayar" :disabled="isProcessing" class="w-full py-6 rounded-xl text-white font-bold shadow-lg transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center" :style="{ backgroundColor: themeColor }">
+
+                    <!-- Input Jumlah Uang Dibayar -->
+                    <div class="space-y-1.5">
+                        <Label for="pos-jumlah-dibayar" class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                            <span>Jumlah Bayar</span>
+                            <span class="text-[9px] lowercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded font-bold">default: lunas</span>
+                        </Label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-2.5 text-xs text-muted-foreground font-bold">Rp</span>
+                            <Input 
+                                id="pos-jumlah-dibayar" 
+                                type="number" 
+                                v-model.number="jumlahDibayar" 
+                                placeholder="Masukkan jumlah uang..." 
+                                min="0" 
+                                class="pl-8 bg-background border border-input rounded-xl text-xs text-foreground font-extrabold h-9" 
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Kembalian / Sisa Tagihan -->
+                    <div class="flex justify-between items-center text-xs font-bold pt-1">
+                        <span class="text-muted-foreground">Sisa Tagihan:</span>
+                        <span :class="sisaTagihan > 0 ? 'text-red-500 animate-pulse' : 'text-emerald-500'" class="font-mono">
+                            Rp {{ formatRupiah(sisaTagihan) }}
+                        </span>
+                    </div>
+
+                    <!-- Total Block (Kontras Lembut) -->
+                    <div class="bg-indigo-500/10 dark:bg-indigo-500/20 p-3 rounded-xl flex justify-between items-center border border-indigo-500/20 shadow-sm mt-1">
+                        <span class="text-xs font-extrabold uppercase tracking-wider text-foreground">Total Akhir</span>
+                        <span class="font-black text-xl text-indigo-600 dark:text-indigo-400 font-mono">Rp {{ formatRupiah(cartTotal) }}</span>
+                    </div>
+
+                    <!-- Action Button -->
+                    <Button 
+                        @click="prosesBayar" 
+                        :disabled="isProcessing" 
+                        class="w-full py-5 rounded-xl text-white font-extrabold shadow-md transition-all hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-xs uppercase tracking-wider h-11" 
+                        :style="{ backgroundColor: themeColor }"
+                    >
                         <i class="fas fa-credit-card mr-2" v-if="!isProcessing"></i> 
-                        {{ isProcessing ? 'MEMPROSES...' : 'BAYAR SEKARANG' }}
+                        {{ isProcessing ? 'Memproses...' : 'Bayar Sekarang (F2)' }}
                     </Button>
                 </div>
             </div>
@@ -989,19 +1082,26 @@ const alertFeature = (fitur) => {
 
             <!-- Scrollable List -->
             <div class="overflow-y-auto px-5 py-4 flex-1 space-y-3 custom-scroll">
-                <div v-for="(item, idx) in cart" :key="idx" class="bg-muted/35 dark:bg-muted/10 rounded-xl p-3 border border-border/50 flex justify-between items-center">
-                    <div class="w-2/3">
-                        <p class="font-bold text-sm leading-tight truncate text-foreground" :title="item.name">{{ item.name }}</p>
-                        <p class="text-[10px] text-muted-foreground mt-0.5 truncate" :title="item.detail">{{ item.detail || '' }}</p>
+                <div v-for="(item, idx) in cart" :key="idx" class="bg-muted/35 dark:bg-muted/10 rounded-xl p-2.5 border border-border/50 flex justify-between items-center">
+                    <div class="w-[70%]">
+                        <p class="font-bold text-xs leading-tight truncate text-foreground" :title="item.name">{{ item.name }}</p>
+                        <div class="mt-1">
+                            <input 
+                                type="text" 
+                                v-model="item.detail" 
+                                placeholder="Catatan item..." 
+                                class="w-full bg-background border-none rounded-md px-1.5 py-0.5 text-[10px] font-medium text-foreground focus:ring-1 focus:ring-indigo-500/50 outline-none placeholder:text-muted-foreground/60"
+                            />
+                        </div>
                         <div class="flex items-center gap-2 mt-2">
-                            <Button @click="updateQty(item, -1)" variant="ghost" size="sm" class="w-6 h-6 p-0 flex items-center justify-center rounded-full bg-background hover:bg-muted text-foreground text-xs transition border border-border">-</Button>
+                            <Button @click="updateQty(item, -1)" variant="ghost" size="sm" class="w-5 h-5 p-0 flex items-center justify-center rounded-full bg-background hover:bg-muted text-foreground text-xs transition border border-border">-</Button>
                             <span class="text-xs font-bold w-4 text-center text-foreground">{{ item.quantity }}</span>
-                            <Button @click="updateQty(item, 1)" variant="ghost" size="sm" class="w-6 h-6 p-0 flex items-center justify-center rounded-full bg-background hover:bg-muted text-foreground text-xs transition border border-border">+</Button>
+                            <Button @click="updateQty(item, 1)" variant="ghost" size="sm" class="w-5 h-5 p-0 flex items-center justify-center rounded-full bg-background hover:bg-muted text-foreground text-xs transition border border-border">+</Button>
                         </div>
                     </div>
-                    <div class="text-right flex flex-col items-end justify-between min-h-[55px]">
-                        <p class="font-black text-indigo-600 dark:text-indigo-400 text-sm">Rp {{ formatRupiah(item.price * item.quantity) }}</p>
-                        <Button @click="removeFromCart(idx)" variant="ghost" size="sm" class="text-rose-500 hover:text-rose-600 bg-rose-50 dark:bg-rose-950/30 w-6 h-6 p-0 rounded-full flex items-center justify-center transition mt-1">
+                    <div class="text-right flex flex-col items-end justify-between min-h-[55px] w-[28%]">
+                        <p class="font-black text-indigo-600 dark:text-indigo-400 text-xs">Rp {{ formatRupiah(item.price * item.quantity) }}</p>
+                        <Button @click="removeFromCart(idx)" variant="ghost" size="sm" class="text-rose-500 hover:text-rose-600 bg-rose-50 dark:bg-rose-950/30 w-5 h-5 p-0 rounded-full flex items-center justify-center transition mt-1">
                             <i class="fas fa-trash-alt text-xs"></i>
                         </Button>
                     </div>
@@ -1262,19 +1362,11 @@ const alertFeature = (fitur) => {
 .font-inter {
     font-family: 'Inter', sans-serif;
 }
-.flip-enter-active {
-    animation: flip-in 0.35s cubic-bezier(0.23, 1, 0.32, 1);
+.fade-enter-active, .fade-leave-active {
+    transition: opacity 0.15s ease;
 }
-.flip-leave-active {
-    animation: flip-out 0.25s cubic-bezier(0.23, 1, 0.32, 1);
-}
-@keyframes flip-in {
-    0% { transform: rotateY(90deg); opacity: 0; }
-    100% { transform: rotateY(0deg); opacity: 1; }
-}
-@keyframes flip-out {
-    0% { transform: rotateY(0deg); opacity: 1; }
-    100% { transform: rotateY(-90deg); opacity: 0; }
+.fade-enter-from, .fade-leave-to {
+    opacity: 0;
 }
 .sidebar-transition {
     transition: all 0.3s ease-in-out;
