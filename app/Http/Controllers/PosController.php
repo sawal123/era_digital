@@ -159,8 +159,10 @@ class PosController extends Controller
                 $basePrice = $product ? $product->base_price : ($item['base_price'] ?? 0);
                 
                 if (isset($item['type']) && $item['type'] === 'cetak') {
-                    // Modal cetak = 77% dari harga jual (estimasi biaya vendor)
-                    $basePrice = $item['price'] / 1.3;
+                    // Modal cetak = 77% dari harga jual (estimasi biaya vendor) jika tidak ada produk DB
+                    if (!$product || $product->base_price <= 0) {
+                        $basePrice = $item['price'] / 1.3;
+                    }
                 } elseif (isset($item['type']) && ($item['type'] === 'digital' || $item['type'] === 'ppob')) {
                     // Modal PPOB = nominal yang dikirim ke pelanggan/distributor
                     // Keuntungan = admin_fee = total_harga - nominal

@@ -1,6 +1,7 @@
 <script setup>
-import { onMounted } from 'vue';
 import { Head } from '@inertiajs/vue3';
+import html2canvas from 'html2canvas';
+import html2pdf from 'html2pdf.js';
 
 defineOptions({
     layout: null,
@@ -42,27 +43,11 @@ const downloadInvoicePDF = () => {
         jsPDF:        { unit: 'mm', format: 'a5', orientation: 'landscape' }
     };
 
-    const runPdf = () => {
-        try {
-            window.html2pdf().set(opt).from(element).save();
-        } catch (e) {
-            console.error("html2pdf failed:", e);
-            alert("Gagal mengunduh PDF: " + e.message);
-        }
-    };
-
-    if (window.html2pdf) {
-        runPdf();
-    } else {
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-        script.onload = () => {
-            runPdf();
-        };
-        script.onerror = () => {
-            alert("Gagal memuat pustaka PDF dari CDN. Silakan coba lagi.");
-        };
-        document.body.appendChild(script);
+    try {
+        html2pdf().set(opt).from(element).save();
+    } catch (e) {
+        console.error("html2pdf failed:", e);
+        alert("Gagal mengunduh PDF: " + e.message);
     }
 };
 
@@ -70,65 +55,31 @@ const downloadInvoiceJPG = () => {
     const element = document.querySelector('.print-container');
     if (!element) return;
 
-    const runJpg = () => {
-        try {
-            window.html2canvas(element, {
-                scale: 2.5,
-                useCORS: true,
-                allowTaint: true,
-                backgroundColor: '#ffffff'
-            }).then((canvas) => {
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
-                const link = document.createElement('a');
-                link.download = `Invoice-${props.transaction.invoice_number}.jpg`;
-                link.href = dataUrl;
-                link.click();
-            }).catch((err) => {
-                console.error("html2canvas generation failed:", err);
-                alert("Gagal membuat JPG: " + err.message);
-            });
-        } catch (e) {
-            console.error("html2canvas execution failed:", e);
-            alert("Gagal membuat JPG: " + e.message);
-        }
-    };
-
-    if (window.html2canvas) {
-        runJpg();
-    } else {
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-        script.onload = () => {
-            runJpg();
-        };
-        script.onerror = () => {
-            alert("Gagal memuat pustaka gambar dari CDN. Silakan coba lagi.");
-        };
-        document.body.appendChild(script);
+    try {
+        html2canvas(element, {
+            scale: 2.5,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: '#ffffff'
+        }).then((canvas) => {
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+            const link = document.createElement('a');
+            link.download = `Invoice-${props.transaction.invoice_number}.jpg`;
+            link.href = dataUrl;
+            link.click();
+        }).catch((err) => {
+            console.error("html2canvas generation failed:", err);
+            alert("Gagal membuat JPG: " + err.message);
+        });
+    } catch (e) {
+        console.error("html2canvas execution failed:", e);
+        alert("Gagal membuat JPG: " + e.message);
     }
 };
 
 const closeWindow = () => {
     window.close();
 };
-
-onMounted(() => {
-    // Memuat CDN html2pdf secara dinamis ke dokumen head
-    if (!window.html2pdf) {
-        const scriptPdf = document.createElement('script');
-        scriptPdf.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-        scriptPdf.async = true;
-        document.head.appendChild(scriptPdf);
-    }
-    
-    // Memuat CDN html2canvas secara dinamis ke dokumen head
-    if (!window.html2canvas) {
-        const scriptCanvas = document.createElement('script');
-        scriptCanvas.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-        scriptCanvas.async = true;
-        document.head.appendChild(scriptCanvas);
-    }
-});
 </script>
 
 <template>
@@ -185,36 +136,31 @@ onMounted(() => {
     </div>
 
     <div class="print-container inv-bg-white inv-text-black font-sans">
+        <!-- Watermark Background Pattern -->
+        <div class="watermark-container"></div>
 
         <!-- HEADER: INFO TOKO & METADATA INVOICE -->
-        <div class="border-b inv-border-black pb-3 mb-3 flex justify-between items-start">
-            <div>
-                <h1 class="text-sm font-black uppercase tracking-tight leading-none">{{ profile.store_name }}</h1>
-                <p class="text-[9px] inv-text-muted mt-1 leading-normal whitespace-pre-line">{{ profile.address }}</p>
-                <p class="text-[9px] inv-text-muted mt-0.5"><i class="fas fa-phone mr-1"></i> {{ profile.phone }}</p>
-            </div>
-            <div class="text-right">
+        <div class="border-b inv-border-black pb-3 mb-3 text-left relative z-10">
+            <h1 class="text-sm font-black uppercase tracking-tight leading-none">{{ profile.store_name }}</h1>
+            <p class="text-[9px] inv-text-muted mt-1 leading-normal whitespace-pre-line">{{ profile.address }}</p>
+            <p class="text-[9px] inv-text-muted mt-0.5"><i class="fas fa-phone mr-1"></i> {{ profile.phone }}</p>
+            
+            <div class="mt-3 flex flex-col items-start gap-1">
                 <span class="inline-block bg-black text-white text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded">INVOICE</span>
-                <div class="text-[10px] font-mono font-bold inv-text-darker mt-1">{{ transaction.invoice_number }}</div>
-                <div class="text-[9px] inv-text-light mt-0.5">{{ formatDate(transaction.created_at) }}</div>
+                <div class="text-[10px] font-mono font-bold inv-text-darker">{{ transaction.invoice_number }}</div>
+                <div class="text-[9px] inv-text-light">{{ formatDate(transaction.created_at) }}</div>
             </div>
         </div>
 
-        <!-- META: PELANGGAN & KASIR -->
-        <div class="flex justify-between items-center text-[9px] inv-bg-card p-2 rounded-lg mb-3">
-            <div>
-                <span class="inv-text-light font-semibold">Pelanggan:</span>
-                <span class="font-bold inv-text-darker ml-1">{{ customer ? customer.name : 'Cash / Umum' }}</span>
-                <span v-if="customer && customer.phone" class="inv-text-muted ml-1">({{ customer.phone }})</span>
-            </div>
-            <div class="text-right">
-                <span class="inv-text-light font-semibold">Kasir:</span>
-                <span class="font-bold inv-text-darker ml-1">{{ transaction.cashier ? transaction.cashier.name : 'Administrator' }}</span>
-            </div>
+        <!-- META: PELANGGAN -->
+        <div class="text-[9px] inv-bg-card p-2 rounded-lg mb-3 relative z-10">
+            <span class="inv-text-light font-semibold">Pelanggan:</span>
+            <span class="font-bold inv-text-darker ml-1">{{ customer ? customer.name : 'Cash / Umum' }}</span>
+            <span v-if="customer && customer.phone" class="inv-text-muted ml-1">({{ customer.phone }})</span>
         </div>
 
         <!-- ITEMS TABLE -->
-        <table class="w-full text-left border-collapse text-[9px] mb-3">
+        <table class="w-full text-left border-collapse text-[9px] mb-3 relative z-10">
             <thead>
                 <tr class="inv-table-header font-bold uppercase inv-text-muted">
                     <th class="py-1.5">Nama Produk / Jasa</th>
@@ -239,7 +185,7 @@ onMounted(() => {
         </table>
 
         <!-- PAYMENT STATUS + TOTALS (dua kolom sejajar) -->
-        <div class="flex justify-between items-start gap-4 border-t inv-border-medium pt-3 mb-3">
+        <div class="flex justify-between items-start gap-4 border-t inv-border-medium pt-3 mb-3 relative z-10">
             <!-- Status Pembayaran -->
             <div class="inv-bg-card p-2 rounded-lg text-center" style="min-width:110px">
                 <span class="text-[8px] inv-text-light font-semibold block uppercase tracking-wider mb-1">Status</span>
@@ -274,12 +220,12 @@ onMounted(() => {
         </div>
 
         <!-- CATATAN -->
-        <div v-if="transaction.keterangan" class="p-2 inv-bg-amber rounded-lg text-[9px] leading-tight mb-3">
+        <div v-if="transaction.keterangan" class="p-2 inv-bg-amber rounded-lg text-[9px] leading-tight mb-3 relative z-10">
             <span class="font-bold"><i class="fas fa-sticky-note mr-0.5"></i> Catatan:</span> {{ transaction.keterangan }}
         </div>
 
         <!-- FOOTER: TERIMA KASIH & TANDA TANGAN -->
-        <div class="flex justify-between items-end border-t inv-border-light pt-2 mt-2">
+        <div class="flex justify-between items-end border-t inv-border-light pt-2 mt-2 relative z-10">
             <div class="text-[8px] inv-text-light">
                 <p>Terima kasih atas kepercayaan Anda.</p>
                 <p>Nota ini merupakan bukti pembayaran sah.</p>
@@ -358,8 +304,25 @@ html, body {
     border-bottom: 1px solid #f3f4f6 !important;
 }
 
+/* Watermark Background Pattern Container */
+.watermark-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='120'%3E%3Ctext x='90' y='60' fill='%23000000' font-family='sans-serif' font-size='14' font-weight='900' transform='rotate(-25 90 60)' text-anchor='middle'%3EERA DIGITAL%3C/text%3E%3C/svg%3E");
+    background-repeat: repeat;
+    opacity: 0.05;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+}
+
 /* Browser preview container - A5 Portrait */
 .print-container {
+    position: relative;
     width: 148mm;
     height: 210mm;
     background-color: white !important;
@@ -414,7 +377,7 @@ html, body {
         border: none !important;
         border-radius: 0 !important;
         box-sizing: border-box !important;
-        position: static !important;
+        position: relative !important;
         overflow: visible !important;
         page-break-before: avoid !important;
         page-break-after: avoid !important;

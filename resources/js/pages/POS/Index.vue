@@ -525,7 +525,7 @@ const alertFeature = (fitur) => {
 
     <div 
         class="flex flex-col flex-1 bg-transparent font-inter text-foreground pb-6 lg:pb-0 transition-all duration-300"
-        :class="{ 'fixed inset-0 z-[100] bg-background p-6 overflow-y-auto h-screen': !sidebarVisible, 'h-auto lg:h-[calc(100vh-8rem)] p-4 md:p-6': sidebarVisible }"
+        :class="{ 'fixed inset-0 z-[100] bg-background p-6 overflow-hidden h-screen': !sidebarVisible, 'h-auto lg:absolute lg:inset-0 lg:top-16 lg:overflow-hidden p-4 md:p-6': sidebarVisible }"
     >
         <!-- Header Mode Zen Premium -->
         <div v-if="!sidebarVisible" class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-border mb-6">
@@ -583,7 +583,7 @@ const alertFeature = (fitur) => {
             </div>
 
             <!-- Area Kiri Dinamis (2/3) -->
-            <div class="w-full lg:w-2/3 flex flex-col p-4 md:p-6 relative h-[calc(100vh-14rem)] lg:h-auto">
+            <div class="w-full lg:w-2/3 flex flex-col p-4 md:p-6 relative h-[calc(100vh-14rem)] lg:h-full">
                 <!-- TAB BUTTONS -->
                 <div class="flex gap-2 border-b border-border pb-3 mb-6 overflow-x-auto custom-scroll">
                     <Button 
@@ -865,7 +865,7 @@ const alertFeature = (fitur) => {
             </div>
 
             <!-- SISI KANAN KARTU: STRUK VIRTUAL -->
-            <div class="hidden lg:flex w-full lg:w-1/3 bg-muted/30 lg:bg-muted/50 border-t lg:border-t-0 lg:border-l border-border flex-col p-4 md:p-6 h-[50vh] lg:h-auto relative shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.1)] lg:shadow-none z-10">
+            <div class="hidden lg:flex w-full lg:w-1/3 bg-muted/30 lg:bg-muted/50 border-t lg:border-t-0 lg:border-l border-border flex-col p-4 md:p-6 h-[50vh] lg:h-full relative shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.1)] lg:shadow-none z-10">
                 <div class="flex items-center justify-between mb-4 pb-2 border-b border-border">
                     <h2 class="font-bold text-lg flex gap-2 items-center text-foreground"><i class="fas fa-receipt text-indigo-500 dark:text-indigo-400"></i> Keranjang</h2>
                     <span class="text-xs bg-background text-foreground border border-border px-2 py-1 rounded-full shadow-sm">{{ cart.length }} item</span>
