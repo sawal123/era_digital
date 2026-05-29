@@ -96,6 +96,7 @@ watch(cart, () => {
     dispatchCartSync();
 }, { deep: true });
 
+
 let handleOpenMobileCart;
 let handleRequestCartSync;
 
