@@ -26,11 +26,12 @@ class CustomerController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
+            'customer_type' => 'required|in:general,token,operator',
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string',
         ]);
 
-        Customer::create($request->only('name', 'phone', 'address'));
+        Customer::create($request->only('name', 'customer_type', 'phone', 'address'));
 
         return redirect()->back()->with('success', 'Customer berhasil ditambahkan!');
     }
@@ -42,11 +43,12 @@ class CustomerController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
+            'customer_type' => 'required|in:general,token,operator',
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string',
         ]);
 
-        $customer->update($request->only('name', 'phone', 'address'));
+        $customer->update($request->only('name', 'customer_type', 'phone', 'address'));
 
         return redirect()->back()->with('success', 'Data Customer berhasil diperbarui!');
     }

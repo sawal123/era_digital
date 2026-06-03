@@ -1,0 +1,1 @@
+import{Ot as e,Rt as t,ft as n,ht as r,qt as i,st as a,yt as o}from"./app-RQT4VB-_.js";var s={class:`text-sm text-red-600 dark:text-red-500`},c=o({__name:`InputError`,props:{message:{}},setup(o){return(c,l)=>t((e(),r(`div`,null,[n(`p`,s,i(o.message),1)],512)),[[a,o.message]])}});export{c as t};

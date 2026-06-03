@@ -13,6 +13,8 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\StoreProfileController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ReceivableController;
+use App\Http\Controllers\PaymentMethodController;
+use App\Http\Controllers\PrintVendorController;
 
 Route::inertia('/', 'Welcome', [
     'canRegister' => Features::enabled(Features::registration()),
@@ -32,9 +34,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('categories', CategoryController::class);
     Route::resource('products', ProductController::class);
     Route::resource('customers', CustomerController::class);
+    Route::resource('payment-methods', PaymentMethodController::class)->except(['show', 'create', 'edit']);
+    Route::resource('print-vendors', PrintVendorController::class)->except(['show', 'create', 'edit']);
 
     // Laporan Penjualan
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+    Route::patch('/reports/{transaction}/invoice-recipient', [ReportController::class, 'updateInvoiceRecipient'])->name('reports.invoice-recipient.update');
     Route::delete('/reports/{transaction}', [ReportController::class, 'destroy'])->name('reports.destroy');
 
     // Pengeluaran CRUD

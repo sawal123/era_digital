@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\StoreProfile;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -40,6 +41,10 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'auth' => [
                 'user' => $request->user(),
+            ],
+            'storeProfile' => fn () => StoreProfile::first()?->only(['store_name', 'logo_path']) ?? [
+                'store_name' => config('app.name'),
+                'logo_path' => null,
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'flash' => [

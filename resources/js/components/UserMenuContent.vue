@@ -45,6 +45,7 @@ defineProps<Props>();
             :href="logout()"
             @click="handleLogout"
             as="button"
+            data-navigation-button="true"
             data-test="logout-button"
         >
             <LogOut class="mr-2 h-4 w-4" />

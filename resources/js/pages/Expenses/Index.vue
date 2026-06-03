@@ -230,8 +230,8 @@ const formatDate = (dateString) => {
                                 </td>
                                 <!-- Actions -->
                                 <td class="p-4 text-right pr-6">
-                                    <Button @click="deleteExpense(exp.id)" variant="ghost" size="sm" class="h-8 rounded-lg text-red-650 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20">
-                                        <i class="fas fa-trash-alt mr-1"></i> Hapus
+                                    <Button @click="deleteExpense(exp.id)" variant="ghost" size="icon-sm" title="Hapus pengeluaran" aria-label="Hapus pengeluaran" class="h-8 rounded-lg text-red-650 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20">
+                                        <i class="fas fa-trash-alt"></i>
                                     </Button>
                                 </td>
                             </tr>

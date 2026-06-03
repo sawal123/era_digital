@@ -8,6 +8,8 @@ use App\Models\Transaction;
 use App\Models\TransactionItem;
 use App\Models\Customer;
 use App\Models\StoreProfile;
+use App\Models\PaymentMethod;
+use App\Models\PrintVendor;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -18,6 +20,11 @@ class PosController extends Controller
     {
         $products = Product::with('category')->where('is_active', true)->get();
         $customers = Customer::orderBy('name')->get();
+        $paymentMethods = PaymentMethod::where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+        $printVendors = PrintVendor::where('is_active', true)->orderBy('name')->get();
         $profile = StoreProfile::firstOrCreate([], [
             'store_name' => 'Era Digital',
             'address' => 'Jl. Raya Utama No. 45, Kebayoran Baru, Jakarta Selatan',
@@ -28,6 +35,8 @@ class PosController extends Controller
         return Inertia::render('POS/Index', [
             'products' => $products,
             'customers' => $customers,
+            'paymentMethods' => $paymentMethods,
+            'printVendors' => $printVendors,
             'profile' => $profile,
         ]);
     }
@@ -39,10 +48,13 @@ class PosController extends Controller
             'cart.*.id' => 'required',
             'cart.*.quantity' => 'required|numeric|min:0.1',
             'cart.*.price' => 'required|numeric|min:0',
+            'cart.*.print_vendor_id' => 'nullable|exists:print_vendors,id',
             'total' => 'required|numeric|min:0',
-            'payment_method' => 'required|string',
-            'jumlah_dibayar' => 'required|numeric|min:0',
+            'payment_method_id' => 'required|exists:payment_methods,id',
+            'uang_diterima' => 'nullable|numeric|min:0',
             'customer_id' => 'nullable|exists:customers,id',
+            'invoice_customer_name' => 'nullable|string|max:255',
+            'invoice_customer_phone' => 'nullable|string|max:30',
             'keterangan' => 'nullable|string',
         ]);
 
@@ -86,12 +98,13 @@ class PosController extends Controller
                 }
             }
 
-            if ($hasPpob && !$customerId && $ppobAccountNumber && $ppobAccountName) {
+            if ($hasPpob && !$customerId && !$request->invoice_customer_name && $ppobAccountNumber && $ppobAccountName) {
                 // Auto-create customer using PPOB account details
                 $existingCustomer = Customer::where('phone', $ppobAccountNumber)->first();
                 if (!$existingCustomer) {
                     $existingCustomer = Customer::create([
                         'name' => $ppobAccountName,
+                        'customer_type' => $ppobDigitalType === 'token' ? 'token' : 'operator',
                         'phone' => $ppobAccountNumber,
                     ]);
                 }
@@ -112,10 +125,18 @@ class PosController extends Controller
                         $customerPhone = $ppobAccountNumber;
                     }
                 }
+            } else {
+                $customerName = $request->invoice_customer_name;
+                $customerPhone = $request->invoice_customer_phone;
             }
 
-            $totalPrice = $request->total;
-            $jumlahDibayar = $request->jumlah_dibayar;
+            $paymentMethod = PaymentMethod::where('is_active', true)->findOrFail($request->payment_method_id);
+            $totalPrice = (float) $request->total;
+            $uangDiterima = $paymentMethod->is_cash
+                ? (float) ($request->uang_diterima ?? 0)
+                : $totalPrice;
+            $jumlahDibayar = min($uangDiterima, $totalPrice);
+            $kembalian = $paymentMethod->is_cash ? max(0, $uangDiterima - $totalPrice) : 0;
             $sisaTagihan = max(0, $totalPrice - $jumlahDibayar);
 
             if ($jumlahDibayar >= $totalPrice) {
@@ -139,10 +160,13 @@ class PosController extends Controller
                 'total_base_price' => 0,
                 'total_price' => $totalPrice,
                 'total_profit' => 0,
-                'payment_method' => $request->payment_method,
+                'payment_method' => $paymentMethod->code,
+                'payment_method_id' => $paymentMethod->id,
                 'payment_status' => $paymentStatus,
                 'status_bayar' => $statusBayar,
                 'jumlah_dibayar' => $jumlahDibayar,
+                'uang_diterima' => $uangDiterima,
+                'kembalian' => $kembalian,
                 'sisa_tagihan' => $sisaTagihan,
                 'keterangan' => $request->keterangan,
             ]);
@@ -183,6 +207,7 @@ class PosController extends Controller
                 TransactionItem::create([
                     'transaction_id' => $transaction->id,
                     'product_id' => $product ? $product->id : null,
+                    'print_vendor_id' => $item['print_vendor_id'] ?? null,
                     'item_name' => $item['name'],
                     'type' => $itemType,
                     'unit' => $product ? $product->unit : 'pcs',
@@ -240,12 +265,12 @@ class PosController extends Controller
             $transaction->paymentHistories()->create([
                 'jumlah_bayar' => $jumlahDibayar,
                 'tanggal_bayar' => now(),
-                'metode_bayar' => $request->payment_method ?? 'cash',
+                'metode_bayar' => $paymentMethod->code,
                 'keterangan' => $statusBayar === 'piutang' ? 'Piutang Awal' : ($statusBayar === 'dp' ? 'Uang Muka / DP Awal' : 'Pembayaran Lunas'),
             ]);
 
             // Refresh with relationships
-            $freshTransaction = Transaction::with(['items', 'customer', 'paymentHistories'])->find($transaction->id);
+            $freshTransaction = Transaction::with(['items', 'customer', 'paymentHistories', 'paymentMethodMaster'])->find($transaction->id);
 
             DB::commit();
 
@@ -262,7 +287,7 @@ class PosController extends Controller
 
     public function printInvoice($invoiceNumber)
     {
-        $transaction = Transaction::with(['items.product', 'cashier'])
+        $transaction = Transaction::with(['items.product', 'cashier', 'paymentMethodMaster'])
             ->where('invoice_number', $invoiceNumber)
             ->firstOrFail();
 
@@ -283,11 +308,14 @@ class PosController extends Controller
 
      public function searchDigitalAccounts(Request $request)
      {
-         $number = $request->query('number');
+         $query = $request->query('query');
          $type = $request->query('type'); // 'token' or 'phone'
 
          $accounts = \App\Models\CustomerDigitalAccount::where('type', $type)
-             ->where('account_number', 'like', "%{$number}%")
+             ->where(function ($builder) use ($query) {
+                 $builder->where('account_number', 'like', "%{$query}%")
+                     ->orWhere('account_name', 'like', "%{$query}%");
+             })
              ->limit(5)
              ->get();
 

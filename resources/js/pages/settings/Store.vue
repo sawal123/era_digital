@@ -15,19 +15,34 @@ const form = useForm({
     phone: props.profile.phone || '',
     address: props.profile.address || '',
     saldo_digital: props.profile.saldo_digital !== undefined ? parseFloat(props.profile.saldo_digital) : 350000,
+    logo: null,
     signature: null,
 });
 
-const imagePreview = ref(props.profile.signature_path || null);
-const fileInputRef = ref(null);
+const logoPreview = ref(props.profile.logo_path || null);
+const signaturePreview = ref(props.profile.signature_path || null);
+const logoInputRef = ref(null);
+const signatureInputRef = ref(null);
 
-const handleFileChange = (e) => {
+const handleLogoChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        form.logo = file;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            logoPreview.value = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+};
+
+const handleSignatureChange = (e) => {
     const file = e.target.files[0];
     if (file) {
         form.signature = file;
         const reader = new FileReader();
         reader.onload = (event) => {
-            imagePreview.value = event.target.result;
+            signaturePreview.value = event.target.result;
         };
         reader.readAsDataURL(file);
     }
@@ -112,6 +127,42 @@ const handleSubmit = () => {
                 <p v-if="form.errors.saldo_digital" class="text-xs text-red-500">{{ form.errors.saldo_digital }}</p>
             </div>
 
+            <!-- Upload Logo Toko -->
+            <div class="grid gap-3 p-4 bg-muted/20 border border-border/60 rounded-2xl">
+                <Label for="logo" class="font-bold flex items-center gap-2">
+                    <i class="fas fa-store text-indigo-500 text-sm"></i>
+                    Logo Toko
+                </Label>
+                <p class="text-xs text-muted-foreground">Logo akan ditampilkan pada bagian atas sidebar aplikasi. Gunakan gambar persegi PNG atau JPG maksimal 2MB.</p>
+
+                <input
+                    ref="logoInputRef"
+                    id="logo"
+                    type="file"
+                    accept="image/*"
+                    class="hidden"
+                    @change="handleLogoChange"
+                />
+
+                <div class="flex items-center gap-4 mt-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        class="rounded-xl border-indigo-200 hover:border-indigo-400 bg-background text-indigo-600 dark:text-indigo-400 dark:border-indigo-900/50"
+                        @click="() => logoInputRef.click()"
+                    >
+                        <i class="fas fa-upload mr-2 text-xs"></i>
+                        Pilih Logo
+                    </Button>
+
+                    <div v-if="logoPreview" class="relative border border-border/80 rounded-xl bg-white p-2 h-20 w-20 flex items-center justify-center overflow-hidden">
+                        <img :src="logoPreview" alt="Pratinjau Logo Toko" class="max-h-full max-w-full object-contain" />
+                    </div>
+                    <div v-else class="text-xs italic text-muted-foreground">Belum ada logo toko diunggah.</div>
+                </div>
+                <p v-if="form.errors.logo" class="text-xs text-red-500 mt-1">{{ form.errors.logo }}</p>
+            </div>
+
             <!-- Upload Tanda Tangan Digital -->
             <div class="grid gap-3 p-4 bg-muted/20 border border-border/60 rounded-2xl">
                 <Label for="signature" class="font-bold flex items-center gap-2">
@@ -121,12 +172,12 @@ const handleSubmit = () => {
                 <p class="text-xs text-muted-foreground">Pilih berkas gambar tanda tangan berformat PNG transparan (maksimal 2MB). Ini akan tercetak otomatis di bagian paling bawah invoice.</p>
                 
                 <input
-                    ref="fileInputRef"
+                    ref="signatureInputRef"
                     id="signature"
                     type="file"
                     accept="image/*"
                     class="hidden"
-                    @change="handleFileChange"
+                    @change="handleSignatureChange"
                 />
                 
                 <div class="flex items-center gap-4 mt-2">
@@ -135,15 +186,15 @@ const handleSubmit = () => {
                         type="button"
                         variant="outline"
                         class="rounded-xl border-indigo-200 hover:border-indigo-400 bg-background text-indigo-600 dark:text-indigo-400 dark:border-indigo-900/50"
-                        @click="() => fileInputRef.click()"
+                        @click="() => signatureInputRef.click()"
                     >
                         <i class="fas fa-upload mr-2 text-xs"></i>
                         Pilih Gambar
                     </Button>
 
                     <!-- Preview box -->
-                    <div v-if="imagePreview" class="relative border border-border/80 rounded-xl bg-white p-2 h-20 w-32 flex items-center justify-center overflow-hidden">
-                        <img :src="imagePreview" alt="Pratinjau Tanda Tangan" class="max-h-full max-w-full object-contain" />
+                    <div v-if="signaturePreview" class="relative border border-border/80 rounded-xl bg-white p-2 h-20 w-32 flex items-center justify-center overflow-hidden">
+                        <img :src="signaturePreview" alt="Pratinjau Tanda Tangan" class="max-h-full max-w-full object-contain" />
                     </div>
                     <div v-else class="text-xs italic text-muted-foreground">Belum ada tanda tangan diunggah.</div>
                 </div>

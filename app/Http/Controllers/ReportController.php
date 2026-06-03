@@ -5,13 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\Transaction;
 use App\Models\Product;
 use Inertia\Inertia;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class ReportController extends Controller
 {
     public function index()
     {
-        $transactions = Transaction::with(['items.product', 'paymentHistories', 'customer'])->latest()->get();
+        $transactions = Transaction::with(['items.product', 'items.printVendor', 'paymentHistories', 'customer'])->latest()->get();
         return Inertia::render('Reports/Index', [
             'transactions' => $transactions
         ]);
@@ -44,5 +45,21 @@ class ReportController extends Controller
             return redirect()->route('reports.index')
                 ->with('error', 'Gagal menghapus transaksi: ' . $e->getMessage());
         }
+    }
+
+    public function updateInvoiceRecipient(Request $request, Transaction $transaction)
+    {
+        $validated = $request->validate([
+            'customer_name' => 'nullable|string|max:255',
+            'customer_phone' => 'nullable|string|max:30',
+        ]);
+
+        $transaction->update([
+            'customer_name' => $validated['customer_name'] ?? null,
+            'customer_phone' => $validated['customer_phone'] ?? null,
+        ]);
+
+        return redirect()->route('reports.index')
+            ->with('success', "Penerima invoice {$transaction->invoice_number} berhasil diperbarui.");
     }
 }

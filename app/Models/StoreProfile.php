@@ -6,5 +6,5 @@ use Illuminate\Database\Eloquent\Model;
 
 class StoreProfile extends Model
 {
-    protected $fillable = ['store_name', 'address', 'phone', 'signature_path', 'saldo_digital'];
+    protected $fillable = ['store_name', 'address', 'phone', 'logo_path', 'signature_path', 'saldo_digital'];
 }

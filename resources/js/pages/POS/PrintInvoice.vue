@@ -155,8 +155,8 @@ const closeWindow = () => {
         <!-- META: PELANGGAN -->
         <div class="text-[9px] inv-bg-card p-2 rounded-lg mb-3 relative z-10">
             <span class="inv-text-light font-semibold">Pelanggan:</span>
-            <span class="font-bold inv-text-darker ml-1">{{ customer ? customer.name : 'Cash / Umum' }}</span>
-            <span v-if="customer && customer.phone" class="inv-text-muted ml-1">({{ customer.phone }})</span>
+            <span class="font-bold inv-text-darker ml-1">{{ transaction.customer_name || customer?.name || 'Cash / Umum' }}</span>
+            <span v-if="transaction.customer_phone || customer?.phone" class="inv-text-muted ml-1">({{ transaction.customer_phone || customer?.phone }})</span>
         </div>
 
         <!-- ITEMS TABLE -->
@@ -193,7 +193,7 @@ const closeWindow = () => {
                       :class="transaction.status_bayar === 'lunas' || !transaction.status_bayar ? 'inv-badge-lunas' : (transaction.status_bayar === 'dp' ? 'inv-badge-dp' : 'inv-badge-piutang')">
                     {{ transaction.status_bayar === 'lunas' || !transaction.status_bayar ? 'LUNAS' : (transaction.status_bayar === 'dp' ? 'DP' : 'PIUTANG') }}
                 </span>
-                <span class="text-[8px] inv-text-muted block mt-1 capitalize">{{ transaction.payment_method }}</span>
+                <span class="text-[8px] inv-text-muted block mt-1">{{ transaction.payment_method_master?.name || transaction.payment_method }}</span>
             </div>
 
             <!-- Rincian Billing -->
@@ -210,6 +210,16 @@ const closeWindow = () => {
                     <div class="flex justify-between inv-text-muted">
                         <span>Sisa Tagihan:</span>
                         <span class="font-mono" style="color:#dc2626">Rp {{ formatRupiah(transaction.sisa_tagihan) }}</span>
+                    </div>
+                </template>
+                <template v-if="transaction.kembalian > 0">
+                    <div class="flex justify-between inv-text-muted">
+                        <span>Uang Diterima:</span>
+                        <span class="font-mono">Rp {{ formatRupiah(transaction.uang_diterima) }}</span>
+                    </div>
+                    <div class="flex justify-between inv-text-muted">
+                        <span>Kembalian:</span>
+                        <span class="font-mono" style="color:#4f46e5">Rp {{ formatRupiah(transaction.kembalian) }}</span>
                     </div>
                 </template>
                 <div class="flex justify-between border-t inv-border-medium pt-1.5 text-[11px] font-black inv-text-darker">

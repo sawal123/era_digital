@@ -312,11 +312,11 @@ const getTypeBadgeClass = (type) => {
                             </td>
                             <!-- Actions -->
                             <td class="p-4 text-right pr-6 space-x-1 whitespace-nowrap">
-                                <Button @click="openEditModal(product)" variant="ghost" size="sm" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">
-                                    <i class="fas fa-edit mr-1"></i> Edit
+                                <Button @click="openEditModal(product)" variant="ghost" size="icon-sm" title="Edit produk" aria-label="Edit produk" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">
+                                    <i class="fas fa-edit"></i>
                                 </Button>
-                                <Button @click="deleteProduct(product.id)" variant="ghost" size="sm" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
-                                    <i class="fas fa-trash-alt mr-1"></i> Hapus
+                                <Button @click="deleteProduct(product.id)" variant="ghost" size="icon-sm" title="Hapus produk" aria-label="Hapus produk" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
+                                    <i class="fas fa-trash-alt"></i>
                                 </Button>
                             </td>
                         </tr>

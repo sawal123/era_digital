@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { BookOpen, FolderGit2, LayoutGrid, MonitorSmartphone, Layers, Package, BarChart3, Wallet, RefreshCw, Users, Settings, Receipt } from 'lucide-vue-next';
+import { LayoutGrid, MonitorSmartphone, Layers, Package, BarChart3, Wallet, RefreshCw, Users, Settings, Receipt, CreditCard, Handshake } from 'lucide-vue-next';
 import AppLogo from '@/components/AppLogo.vue';
-import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
 import {
@@ -29,24 +28,9 @@ const mainNavItems: NavItem[] = [
         icon: MonitorSmartphone,
     },
     {
-        title: 'Master Kategori',
-        href: '/categories',
-        icon: Layers,
-    },
-    {
-        title: 'Master Produk',
-        href: '/products',
-        icon: Package,
-    },
-    {
         title: 'Restock Barang',
         href: '/purchases',
         icon: RefreshCw,
-    },
-    {
-        title: 'Data Customer',
-        href: '/customers',
-        icon: Users,
     },
     {
         title: 'Laporan Penjualan',
@@ -70,18 +54,34 @@ const mainNavItems: NavItem[] = [
     },
 ];
 
-const footerNavItems: NavItem[] = [
+const masterNavItems: NavItem[] = [
     {
-        title: 'Repository',
-        href: 'https://github.com/laravel/vue-starter-kit',
-        icon: FolderGit2,
+        title: 'Master Kategori',
+        href: '/categories',
+        icon: Layers,
     },
     {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#vue',
-        icon: BookOpen,
+        title: 'Master Produk',
+        href: '/products',
+        icon: Package,
+    },
+    {
+        title: 'Data Customer',
+        href: '/customers',
+        icon: Users,
+    },
+    {
+        title: 'Data Master Pembayaran',
+        href: '/payment-methods',
+        icon: CreditCard,
+    },
+    {
+        title: 'Mitra Percetakan',
+        href: '/print-vendors',
+        icon: Handshake,
     },
 ];
+
 </script>
 
 <template>
@@ -99,11 +99,11 @@ const footerNavItems: NavItem[] = [
         </SidebarHeader>
 
         <SidebarContent>
-            <NavMain :items="mainNavItems" />
+            <NavMain label="Menu Utama" :items="mainNavItems" />
+            <NavMain label="Data Master" :items="masterNavItems" />
         </SidebarContent>
 
         <SidebarFooter>
-            <NavFooter :items="footerNavItems" />
             <NavUser />
         </SidebarFooter>
     </Sidebar>

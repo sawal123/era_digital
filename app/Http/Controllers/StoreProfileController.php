@@ -37,6 +37,7 @@ class StoreProfileController extends Controller
             'phone' => 'required|string|max:50',
             'address' => 'required|string',
             'saldo_digital' => 'required|numeric|min:0',
+            'logo' => 'nullable|image|max:2048',
             'signature' => 'nullable|image|max:2048',
         ]);
 
@@ -51,6 +52,16 @@ class StoreProfileController extends Controller
             'address' => $request->address,
             'saldo_digital' => $request->saldo_digital,
         ];
+
+        if ($request->hasFile('logo')) {
+            if ($profile->logo_path) {
+                $oldPath = str_replace('/storage/', '', $profile->logo_path);
+                Storage::disk('public')->delete($oldPath);
+            }
+
+            $path = $request->file('logo')->store('logos', 'public');
+            $data['logo_path'] = '/storage/' . $path;
+        }
 
         if ($request->hasFile('signature')) {
             // Hapus gambar tanda tangan lama jika ada

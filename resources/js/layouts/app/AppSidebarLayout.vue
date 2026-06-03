@@ -19,7 +19,9 @@ import {
     Settings, 
     Menu, 
     X,
-    Receipt
+    Receipt,
+    CreditCard,
+    Handshake
 } from 'lucide-vue-next';
 
 type Props = {
@@ -55,24 +57,9 @@ const mainNavItems = [
         icon: MonitorSmartphone,
     },
     {
-        title: 'Kategori',
-        href: '/categories',
-        icon: Layers,
-    },
-    {
-        title: 'Produk',
-        href: '/products',
-        icon: Package,
-    },
-    {
         title: 'Restock',
         href: '/purchases',
         icon: RefreshCw,
-    },
-    {
-        title: 'Customer',
-        href: '/customers',
-        icon: Users,
     },
     {
         title: 'Laporan',
@@ -93,6 +80,34 @@ const mainNavItems = [
         title: 'Pengaturan',
         href: '/settings/store',
         icon: Settings,
+    },
+];
+
+const masterNavItems = [
+    {
+        title: 'Kategori',
+        href: '/categories',
+        icon: Layers,
+    },
+    {
+        title: 'Produk',
+        href: '/products',
+        icon: Package,
+    },
+    {
+        title: 'Customer',
+        href: '/customers',
+        icon: Users,
+    },
+    {
+        title: 'Pembayaran',
+        href: '/payment-methods',
+        icon: CreditCard,
+    },
+    {
+        title: 'Mitra Cetak',
+        href: '/print-vendors',
+        icon: Handshake,
     },
 ];
 
@@ -142,12 +157,12 @@ onUnmounted(() => {
 
     <!-- FLOATING ACTION BUTTON (KHUSUS MOBILE - DEFAULT) -->
     <div v-if="currentPath !== '/pos'" class="fixed bottom-6 right-6 z-[90] md:hidden">
-        <button 
+        <button
             @click="toggleMobileMenu"
             class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-3 rounded-full shadow-[0_10px_25px_-5px_rgba(79,70,229,0.5)] active:scale-95 transition-all duration-300 border border-white/10 group"
         >
-            <component 
-                :is="isMobileMenuOpen ? X : Menu" 
+            <component
+                :is="isMobileMenuOpen ? X : Menu"
                 class="w-5 h-5 transition-transform duration-300 group-hover:rotate-90"
             />
             <span class="text-sm tracking-wider uppercase font-extrabold">MENU</span>
@@ -156,18 +171,6 @@ onUnmounted(() => {
 
     <!-- FLOATING CONTAINER FOR BOTH MENU AND CART (VERTICALLY STACKED) ON POS PAGE -->
     <div v-if="currentPath === '/pos'" class="fixed bottom-4 right-4 z-[90] md:hidden flex flex-col items-end gap-2">
-        <!-- Tombol MENU (Warna Ungu) -->
-        <button 
-            @click="toggleMobileMenu"
-            class="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-bold px-5 py-3 rounded-full shadow-[0_10px_25px_-5px_rgba(147,51,234,0.4)] active:scale-95 transition-all duration-300 border border-white/10 group"
-        >
-            <component 
-                :is="isMobileMenuOpen ? X : Menu" 
-                class="w-4 h-4 transition-transform duration-300 group-hover:rotate-90"
-            />
-            <span class="text-xs tracking-wider uppercase font-extrabold">MENU</span>
-        </button>
-
         <!-- Tombol KERANJANG / BAYAR (Warna Hijau) -->
         <button 
             v-if="mobileCart.hasItems"
@@ -180,6 +183,18 @@ onUnmounted(() => {
             </div>
             <span class="h-3 w-px bg-white/20"></span>
             <span class="text-xs font-black">Rp {{ formatRupiah(mobileCart.total) }}</span>
+        </button>
+
+        <!-- Tombol MENU (Warna Ungu) -->
+        <button
+            @click="toggleMobileMenu"
+            class="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-bold px-5 py-3 rounded-full shadow-[0_10px_25px_-5px_rgba(147,51,234,0.4)] active:scale-95 transition-all duration-300 border border-white/10 group"
+        >
+            <component
+                :is="isMobileMenuOpen ? X : Menu"
+                class="w-4 h-4 transition-transform duration-300 group-hover:rotate-90"
+            />
+            <span class="text-xs tracking-wider uppercase font-extrabold">MENU</span>
         </button>
     </div>
 
@@ -214,6 +229,7 @@ onUnmounted(() => {
 
         <!-- Grid Menu Content -->
         <div class="overflow-y-auto px-5 py-6 pb-12">
+            <p class="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">Menu Utama</p>
             <div class="grid grid-cols-3 gap-3.5">
                 <Link 
                     v-for="item in mainNavItems" 
@@ -229,6 +245,30 @@ onUnmounted(() => {
                         class="w-10 h-10 rounded-xl flex items-center justify-center mb-2 transition-transform duration-300 group-active:scale-90"
                         :class="isItemActive(item.href) 
                             ? 'bg-indigo-500 text-white shadow-sm' 
+                            : 'bg-background text-muted-foreground group-hover:text-foreground border border-border'"
+                    >
+                        <component :is="item.icon" class="w-5 h-5" />
+                    </div>
+                    <span class="text-[10px] leading-snug font-bold uppercase tracking-wider block truncate w-full">{{ item.title }}</span>
+                </Link>
+            </div>
+
+            <p class="mb-2 mt-6 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">Data Master</p>
+            <div class="grid grid-cols-3 gap-3.5">
+                <Link
+                    v-for="item in masterNavItems"
+                    :key="item.href"
+                    :href="item.href"
+                    @click="closeMobileMenu"
+                    class="flex flex-col items-center justify-center p-4 rounded-2xl border text-center transition-all duration-200 select-none group"
+                    :class="isItemActive(item.href)
+                        ? 'bg-indigo-500/10 text-indigo-600 border-indigo-500/30 dark:bg-indigo-500/20 dark:text-indigo-400 font-extrabold shadow-xs'
+                        : 'bg-muted/30 text-muted-foreground hover:text-foreground hover:bg-muted/80 border-border/80'"
+                >
+                    <div
+                        class="w-10 h-10 rounded-xl flex items-center justify-center mb-2 transition-transform duration-300 group-active:scale-90"
+                        :class="isItemActive(item.href)
+                            ? 'bg-indigo-500 text-white shadow-sm'
                             : 'bg-background text-muted-foreground group-hover:text-foreground border border-border'"
                     >
                         <component :is="item.icon" class="w-5 h-5" />

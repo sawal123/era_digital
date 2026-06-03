@@ -180,11 +180,11 @@ const getTypeLabel = (type) => {
                                 {{ category.products_count || 0 }} Produk
                             </td>
                             <td class="p-4 text-right pr-6 space-x-2">
-                                <Button @click="openEditModal(category)" variant="ghost" size="sm" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">
-                                    <i class="fas fa-edit mr-1"></i> Edit
+                                <Button @click="openEditModal(category)" variant="ghost" size="icon-sm" title="Edit kategori" aria-label="Edit kategori" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">
+                                    <i class="fas fa-edit"></i>
                                 </Button>
-                                <Button @click="deleteCategory(category.id)" variant="ghost" size="sm" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
-                                    <i class="fas fa-trash-alt mr-1"></i> Hapus
+                                <Button @click="deleteCategory(category.id)" variant="ghost" size="icon-sm" title="Hapus kategori" aria-label="Hapus kategori" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
+                                    <i class="fas fa-trash-alt"></i>
                                 </Button>
                             </td>
                         </tr>

@@ -1,6 +1,8 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, nextTick, watch } from 'vue';
 import { Head, router, usePage } from '@inertiajs/vue3';
+import html2pdf from 'html2pdf.js';
+import { toast } from 'vue-sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -31,22 +33,132 @@ const filterMode  = ref('harian');   // 'harian' | 'bulanan' | 'tahunan'
 const filterDate  = ref(new Date().toISOString().slice(0, 10));    // YYYY-MM-DD
 const filterMonth = ref(new Date().toISOString().slice(0, 7));     // YYYY-MM
 const filterYear  = ref(String(new Date().getFullYear()));          // YYYY
+const searchQuery = ref('');
+const perPage = ref(10);
+const currentPage = ref(1);
+const exportPdfRef = ref(null);
+const copiedInvoice = ref('');
+let copyFeedbackTimer = null;
 
 const setMode = (mode) => { filterMode.value = mode; };
 
 // ─── FILTERED LIST ───────────────────────────────────────────────
 const filteredTransactions = computed(() => {
+    const query = searchQuery.value.toLowerCase().trim();
+
     return props.transactions.filter(t => {
-        const d = new Date(t.created_at);
-        if (filterMode.value === 'harian') {
-            return t.created_at.slice(0, 10) === filterDate.value;
-        } else if (filterMode.value === 'bulanan') {
-            return t.created_at.slice(0, 7) === filterMonth.value;
-        } else {
-            return t.created_at.slice(0, 4) === filterYear.value;
-        }
+        const matchesPeriod = filterMode.value === 'harian'
+            ? t.created_at.slice(0, 10) === filterDate.value
+            : filterMode.value === 'bulanan'
+                ? t.created_at.slice(0, 7) === filterMonth.value
+                : t.created_at.slice(0, 4) === filterYear.value;
+
+        if (!matchesPeriod) return false;
+        if (!query) return true;
+
+        const customerName = t.customer_name || t.customer?.name || 'cash / umum';
+        const paymentMethod = t.payment_method || '';
+
+        return [
+            t.invoice_number,
+            customerName,
+            paymentMethod,
+        ].some(value => String(value).toLowerCase().includes(query));
     });
 });
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredTransactions.value.length / perPage.value)));
+const paginatedTransactions = computed(() => {
+    const start = (currentPage.value - 1) * perPage.value;
+    return filteredTransactions.value.slice(start, start + perPage.value);
+});
+const paginationStart = computed(() => filteredTransactions.value.length === 0 ? 0 : ((currentPage.value - 1) * perPage.value) + 1);
+const paginationEnd = computed(() => Math.min(currentPage.value * perPage.value, filteredTransactions.value.length));
+const visiblePages = computed(() => {
+    const pages = [];
+    const start = Math.max(1, currentPage.value - 2);
+    const end = Math.min(totalPages.value, start + 4);
+
+    for (let page = Math.max(1, end - 4); page <= end; page += 1) {
+        pages.push(page);
+    }
+
+    return pages;
+});
+
+watch([filterMode, filterDate, filterMonth, filterYear, searchQuery, perPage], () => {
+    currentPage.value = 1;
+});
+
+watch(totalPages, (pages) => {
+    if (currentPage.value > pages) currentPage.value = pages;
+});
+
+const goToPage = (page) => {
+    currentPage.value = Math.min(Math.max(1, page), totalPages.value);
+};
+
+const getCustomerName = (transaction) => transaction.customer_name || transaction.customer?.name || 'Cash / Umum';
+
+const downloadBlob = (content, type, filename) => {
+    const url = URL.createObjectURL(new Blob([content], { type }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+};
+
+const escapeHtml = (value) => String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
+
+const exportExcel = () => {
+    const rows = filteredTransactions.value.map(transaction => `
+        <tr>
+            <td>${escapeHtml(transaction.invoice_number)}</td>
+            <td>${escapeHtml(formatDate(transaction.created_at))}</td>
+            <td>${escapeHtml(getCustomerName(transaction))}</td>
+            <td>${escapeHtml(transaction.payment_method)}</td>
+            <td>${escapeHtml(transaction.status_bayar || 'lunas')}</td>
+            <td>${Number(transaction.total_price || 0)}</td>
+            <td>${Number(transaction.total_profit || 0)}</td>
+        </tr>
+    `).join('');
+
+    const workbook = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
+            <head><meta charset="UTF-8"></head>
+            <body>
+                <table border="1">
+                    <tr><th colspan="7">Laporan Penjualan - ${escapeHtml(filterLabel.value)}</th></tr>
+                    <tr>
+                        <th>Nomor Invoice</th><th>Tanggal</th><th>Customer</th><th>Metode Pembayaran</th>
+                        <th>Status</th><th>Total Belanja</th><th>Keuntungan</th>
+                    </tr>
+                    ${rows}
+                </table>
+            </body>
+        </html>
+    `;
+
+    downloadBlob(workbook, 'application/vnd.ms-excel;charset=utf-8;', `laporan-penjualan-${filterLabel.value}.xls`);
+};
+
+const exportPdf = async () => {
+    if (filteredTransactions.value.length === 0) return;
+
+    await nextTick();
+    await html2pdf().set({
+        margin: 8,
+        filename: `laporan-penjualan-${filterLabel.value}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, backgroundColor: '#ffffff' },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+    }).from(exportPdfRef.value).save();
+};
 
 // ─── SUMMARY METRICS ─────────────────────────────────────────────
 const totalSales  = computed(() => filteredTransactions.value.reduce((s, t) => s + parseFloat(t.total_price),      0));
@@ -56,12 +168,52 @@ const totalProfit = computed(() => filteredTransactions.value.reduce((s, t) => s
 // ─── DETAIL DIALOG ────────────────────────────────────────────────
 const selectedTransaction = ref(null);
 const detailOpen = ref(false);
-const openDetail = (trx) => { selectedTransaction.value = trx; detailOpen.value = true; };
+const invoiceRecipientName = ref('');
+const invoiceRecipientPhone = ref('');
+const isSavingInvoiceRecipient = ref(false);
+
+const openDetail = (trx) => {
+    selectedTransaction.value = trx;
+    invoiceRecipientName.value = trx.customer_name || trx.customer?.name || '';
+    invoiceRecipientPhone.value = trx.customer_phone || trx.customer?.phone || '';
+    detailOpen.value = true;
+};
+
+const saveInvoiceRecipient = () => {
+    if (!selectedTransaction.value) return;
+
+    isSavingInvoiceRecipient.value = true;
+    router.patch(`/reports/${selectedTransaction.value.id}/invoice-recipient`, {
+        customer_name: invoiceRecipientName.value.trim() || null,
+        customer_phone: invoiceRecipientPhone.value.trim() || null,
+    }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            selectedTransaction.value.customer_name = invoiceRecipientName.value.trim() || null;
+            selectedTransaction.value.customer_phone = invoiceRecipientPhone.value.trim() || null;
+            isSavingInvoiceRecipient.value = false;
+        },
+        onError: () => { isSavingInvoiceRecipient.value = false; },
+    });
+};
 
 // ─── HELPERS ─────────────────────────────────────────────────────
 const formatRupiah = (n) => new Intl.NumberFormat('id-ID').format(n);
 const formatDate   = (s) => new Date(s).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-const copyToClipboard = (text) => { navigator.clipboard.writeText(text); alert(`Nota ${text} disalin!`); };
+const copyToClipboard = async (text) => {
+    try {
+        await navigator.clipboard.writeText(text);
+        copiedInvoice.value = text;
+        toast.success(`Invoice ${text} berhasil disalin.`, { duration: 2500 });
+
+        clearTimeout(copyFeedbackTimer);
+        copyFeedbackTimer = setTimeout(() => {
+            copiedInvoice.value = '';
+        }, 2500);
+    } catch {
+        toast.error('Invoice gagal disalin.', { duration: 2500 });
+    }
+};
 
 // Generate daftar tahun (5 tahun ke belakang)
 const yearOptions = Array.from({ length: 5 }, (_, i) => String(new Date().getFullYear() - i));
@@ -253,14 +405,50 @@ const flash = computed(() => usePage().props.flash ?? {});
 
         <!-- History Table -->
         <Card class="border-border/50 shadow-sm overflow-hidden bg-card text-card-foreground">
-            <CardHeader class="border-b border-border/40 py-4 bg-muted/10">
-                <CardTitle class="text-sm font-bold text-foreground">Riwayat Nota Penjualan</CardTitle>
-                <CardDescription class="text-xs text-muted-foreground">
-                    Daftar transaksi periode
-                    <strong class="text-foreground">
-                        {{ filterMode === 'harian' ? filterDate : filterMode === 'bulanan' ? filterMonth : filterYear }}
-                    </strong>
-                </CardDescription>
+            <CardHeader class="border-b border-border/40 py-4 bg-muted/10 gap-4">
+                <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                        <CardTitle class="text-sm font-bold text-foreground">Riwayat Nota Penjualan</CardTitle>
+                        <CardDescription class="text-xs text-muted-foreground">
+                            Daftar transaksi periode
+                            <strong class="text-foreground">
+                                {{ filterMode === 'harian' ? filterDate : filterMode === 'bulanan' ? filterMonth : filterYear }}
+                            </strong>
+                        </CardDescription>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <Button type="button" variant="outline" size="sm" class="rounded-xl text-xs text-emerald-600 dark:text-emerald-400" :disabled="filteredTransactions.length === 0" @click="exportExcel">
+                            <i class="fas fa-file-excel"></i>
+                            Export Excel
+                        </Button>
+                        <Button type="button" variant="outline" size="sm" class="rounded-xl text-xs text-red-500" :disabled="filteredTransactions.length === 0" @click="exportPdf">
+                            <i class="fas fa-file-pdf"></i>
+                            Export PDF
+                        </Button>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="relative w-full sm:max-w-md">
+                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground"></i>
+                        <input
+                            v-model="searchQuery"
+                            type="search"
+                            placeholder="Cari invoice, nama customer, atau metode pembayaran..."
+                            class="h-9 w-full rounded-xl border border-input bg-background pl-8 pr-3 text-xs text-foreground outline-none transition focus:ring-2 focus:ring-indigo-500"
+                        />
+                    </div>
+                    <div class="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>Tampilkan</span>
+                        <select v-model.number="perPage" class="h-9 rounded-xl border border-input bg-background px-3 text-xs text-foreground outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option :value="10">10</option>
+                            <option :value="25">25</option>
+                            <option :value="50">50</option>
+                            <option :value="100">100</option>
+                        </select>
+                        <span>data</span>
+                    </div>
+                </div>
             </CardHeader>
             <CardContent class="p-0">
                 <div class="overflow-x-auto">
@@ -269,6 +457,7 @@ const flash = computed(() => usePage().props.flash ?? {});
                             <tr class="border-b border-border bg-muted/30 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                                 <th class="p-4 pl-6">Nomor Nota</th>
                                 <th class="p-4">Tanggal Transaksi</th>
+                                <th class="p-4">Customer</th>
                                 <th class="p-4">Metode Bayar</th>
                                 <th class="p-4">Status</th>
                                 <th class="p-4 text-right">Total Belanja</th>
@@ -279,7 +468,7 @@ const flash = computed(() => usePage().props.flash ?? {});
                         <tbody class="divide-y divide-border text-sm">
                             <!-- Empty state -->
                             <tr v-if="filteredTransactions.length === 0">
-                                <td colspan="7" class="p-14 text-center text-muted-foreground">
+                                <td colspan="8" class="p-14 text-center text-muted-foreground">
                                     <i class="fas fa-filter text-4xl mb-3 opacity-20 block"></i>
                                     <p class="font-semibold text-sm">Tidak ada transaksi pada periode ini.</p>
                                     <p class="text-xs text-muted-foreground mt-1 opacity-70">Coba ubah filter tanggal, bulan, atau tahun.</p>
@@ -287,16 +476,28 @@ const flash = computed(() => usePage().props.flash ?? {});
                             </tr>
 
                             <!-- Data rows -->
-                            <tr v-for="trx in filteredTransactions" :key="trx.id" class="hover:bg-muted/30 transition">
+                            <tr v-for="trx in paginatedTransactions" :key="trx.id" class="hover:bg-muted/30 transition">
                                 <td class="p-4 pl-6 font-mono font-semibold text-foreground">
                                     <div class="flex items-center gap-1.5">
                                         {{ trx.invoice_number }}
-                                        <Button @click="copyToClipboard(trx.invoice_number)" variant="ghost" size="xs" class="h-6 w-6 p-0 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted">
-                                            <i class="fas fa-copy text-[10px]"></i>
+                                        <Button
+                                            @click="copyToClipboard(trx.invoice_number)"
+                                            variant="ghost"
+                                            size="xs"
+                                            data-click-feedback="none"
+                                            title="Salin nomor invoice"
+                                            aria-label="Salin nomor invoice"
+                                            class="h-6 w-6 p-0 rounded-full transition-colors"
+                                            :class="copiedInvoice === trx.invoice_number
+                                                ? 'bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400'
+                                                : 'text-muted-foreground hover:text-foreground hover:bg-muted'"
+                                        >
+                                            <i :class="copiedInvoice === trx.invoice_number ? 'fas fa-check' : 'fas fa-copy'" class="text-[10px]"></i>
                                         </Button>
                                     </div>
                                 </td>
                                 <td class="p-4 text-muted-foreground text-xs">{{ formatDate(trx.created_at) }}</td>
+                                <td class="p-4 text-xs font-semibold text-foreground">{{ getCustomerName(trx) }}</td>
                                 <td class="p-4">
                                     <Badge variant="secondary" class="capitalize px-2 py-0.5 rounded-full text-[11px] font-medium border"
                                         :class="{
@@ -328,15 +529,17 @@ const flash = computed(() => usePage().props.flash ?? {});
                                 <td class="p-4 text-right font-bold text-emerald-600 dark:text-emerald-400 font-mono">Rp {{ formatRupiah(trx.total_profit) }}</td>
                                 <td class="p-4 text-right pr-6">
                                     <div class="flex items-center justify-end gap-1.5">
-                                        <Button @click="openDetail(trx)" variant="ghost" size="xs" class="h-8 rounded-xl text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 font-semibold px-2">
-                                            <i class="fas fa-eye mr-1"></i> Detail
+                                        <Button @click="openDetail(trx)" variant="ghost" size="icon-sm" title="Detail transaksi" aria-label="Detail transaksi" class="h-8 rounded-xl text-indigo-600 hover:text-indigo-900 dark:text-indigo-400">
+                                            <i class="fas fa-eye"></i>
                                         </Button>
                                         <a :href="`/pos/print/${trx.invoice_number}`" target="_blank"
-                                            class="inline-flex items-center justify-center rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 dark:bg-neutral-800 dark:hover:bg-neutral-700 dark:text-neutral-200 font-bold text-xs h-8 px-3 shadow-xs transition">
-                                            <i class="fas fa-print mr-1"></i> Cetak
+                                            data-click-feedback="action"
+                                            title="Cetak transaksi" aria-label="Cetak transaksi"
+                                            class="inline-flex items-center justify-center rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 dark:bg-neutral-800 dark:hover:bg-neutral-700 dark:text-neutral-200 h-8 w-8 shadow-xs transition">
+                                            <i class="fas fa-print"></i>
                                         </a>
-                                        <Button @click="openDeleteConfirm(trx)" variant="ghost" size="xs" class="h-8 rounded-xl text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/30 font-semibold px-2">
-                                            <i class="fas fa-trash-alt mr-1"></i> Hapus
+                                        <Button @click="openDeleteConfirm(trx)" variant="ghost" size="icon-sm" title="Hapus transaksi" aria-label="Hapus transaksi" class="h-8 rounded-xl text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/30">
+                                            <i class="fas fa-trash-alt"></i>
                                         </Button>
                                     </div>
                                 </td>
@@ -344,8 +547,70 @@ const flash = computed(() => usePage().props.flash ?? {});
                         </tbody>
                     </table>
                 </div>
+
+                <div class="flex flex-col gap-3 border-t border-border/50 px-4 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                    <span>Menampilkan {{ paginationStart }} - {{ paginationEnd }} dari {{ filteredTransactions.length }} transaksi</span>
+                    <div class="flex items-center gap-1">
+                        <Button type="button" variant="outline" size="sm" data-click-feedback="none" class="h-8 rounded-lg px-3 text-xs" :disabled="currentPage === 1" @click="goToPage(currentPage - 1)">
+                            Sebelumnya
+                        </Button>
+                        <Button
+                            v-for="page in visiblePages"
+                            :key="page"
+                            type="button"
+                            size="sm"
+                            class="h-8 w-8 rounded-lg p-0 text-xs"
+                            :variant="page === currentPage ? 'default' : 'outline'"
+                            data-click-feedback="none"
+                            @click="goToPage(page)"
+                        >
+                            {{ page }}
+                        </Button>
+                        <Button type="button" variant="outline" size="sm" data-click-feedback="none" class="h-8 rounded-lg px-3 text-xs" :disabled="currentPage === totalPages" @click="goToPage(currentPage + 1)">
+                            Berikutnya
+                        </Button>
+                    </div>
+                </div>
             </CardContent>
         </Card>
+
+        <div class="fixed left-[-10000px] top-0 w-[1100px] bg-white p-8 text-black">
+            <div ref="exportPdfRef">
+                <h1 class="mb-1 text-xl font-bold">Laporan Penjualan</h1>
+                <p class="mb-5 text-xs">Periode: {{ filterLabel }} | Jumlah transaksi: {{ filteredTransactions.length }}</p>
+                <table class="w-full border-collapse text-xs">
+                    <thead>
+                        <tr>
+                            <th class="border border-gray-400 p-2 text-left">Invoice</th>
+                            <th class="border border-gray-400 p-2 text-left">Tanggal</th>
+                            <th class="border border-gray-400 p-2 text-left">Customer</th>
+                            <th class="border border-gray-400 p-2 text-left">Metode</th>
+                            <th class="border border-gray-400 p-2 text-left">Status</th>
+                            <th class="border border-gray-400 p-2 text-right">Total Belanja</th>
+                            <th class="border border-gray-400 p-2 text-right">Keuntungan</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="transaction in filteredTransactions" :key="`pdf-${transaction.id}`">
+                            <td class="border border-gray-300 p-2">{{ transaction.invoice_number }}</td>
+                            <td class="border border-gray-300 p-2">{{ formatDate(transaction.created_at) }}</td>
+                            <td class="border border-gray-300 p-2">{{ getCustomerName(transaction) }}</td>
+                            <td class="border border-gray-300 p-2">{{ transaction.payment_method }}</td>
+                            <td class="border border-gray-300 p-2">{{ transaction.status_bayar || 'lunas' }}</td>
+                            <td class="border border-gray-300 p-2 text-right">Rp {{ formatRupiah(transaction.total_price) }}</td>
+                            <td class="border border-gray-300 p-2 text-right">Rp {{ formatRupiah(transaction.total_profit) }}</td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="font-bold">
+                            <td colspan="5" class="border border-gray-400 p-2 text-right">TOTAL</td>
+                            <td class="border border-gray-400 p-2 text-right">Rp {{ formatRupiah(totalSales) }}</td>
+                            <td class="border border-gray-400 p-2 text-right">Rp {{ formatRupiah(totalProfit) }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
 
         <!-- DIALOG DETAIL NOTA -->
         <Dialog :open="detailOpen" @update:open="detailOpen = $event">
@@ -363,15 +628,30 @@ const flash = computed(() => usePage().props.flash ?? {});
                     <div class="grid grid-cols-2 gap-4 p-4 rounded-2xl bg-indigo-50/5 dark:bg-indigo-950/20 border border-indigo-100/10 text-xs">
                         <div>
                             <span class="text-muted-foreground block">Pelanggan:</span>
-                            <span class="font-bold text-foreground text-sm mt-0.5">{{ selectedTransaction.customer?.name || selectedTransaction.customer_name || 'Cash / Umum' }}</span>
-                            <span v-if="selectedTransaction.customer?.phone || selectedTransaction.customer_phone" class="text-[10px] text-muted-foreground block">
-                                Telp: {{ selectedTransaction.customer?.phone || selectedTransaction.customer_phone }}
+                            <span class="font-bold text-foreground text-sm mt-0.5">{{ selectedTransaction.customer_name || selectedTransaction.customer?.name || 'Cash / Umum' }}</span>
+                            <span v-if="selectedTransaction.customer_phone || selectedTransaction.customer?.phone" class="text-[10px] text-muted-foreground block">
+                                Telp: {{ selectedTransaction.customer_phone || selectedTransaction.customer?.phone }}
                             </span>
                         </div>
                         <div>
                             <span class="text-muted-foreground block">Catatan / Keterangan:</span>
                             <span class="font-medium text-foreground block mt-0.5 whitespace-pre-line">{{ selectedTransaction.keterangan || '-' }}</span>
                         </div>
+                    </div>
+
+                    <div class="space-y-2 rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-4">
+                        <div>
+                            <p class="text-xs font-bold text-foreground">Penerima Invoice</p>
+                            <p class="text-[10px] text-muted-foreground">Bisa diisi untuk customer sekali beli tanpa menyimpan ke master pelanggan.</p>
+                        </div>
+                        <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            <input v-model="invoiceRecipientName" type="text" placeholder="Nama penerima invoice" class="h-9 rounded-xl border border-input bg-background px-3 text-xs text-foreground outline-none focus:ring-1 focus:ring-ring" />
+                            <input v-model="invoiceRecipientPhone" type="text" placeholder="Nomor telepon (opsional)" class="h-9 rounded-xl border border-input bg-background px-3 text-xs text-foreground outline-none focus:ring-1 focus:ring-ring" />
+                        </div>
+                        <Button type="button" size="sm" class="rounded-xl" :disabled="isSavingInvoiceRecipient" @click="saveInvoiceRecipient">
+                            <i class="fas fa-save text-xs"></i>
+                            Simpan Penerima Invoice
+                        </Button>
                     </div>
 
                     <!-- Status & Metode -->
@@ -419,6 +699,7 @@ const flash = computed(() => usePage().props.flash ?? {});
                                         {{ parseFloat(item.quantity) }} {{ item.unit || 'pcs' }} &times; Rp {{ formatRupiah(item.selling_price) }}
                                     </p>
                                     <p v-if="item.metadata?.detail" class="text-[10px] text-indigo-500 font-mono mt-0.5">{{ item.metadata.detail }}</p>
+                                    <p v-if="item.print_vendor" class="text-[10px] text-orange-500 mt-0.5">Mitra internal: {{ item.print_vendor.name }}</p>
                                 </div>
                                 <div class="text-right">
                                     <p class="font-bold text-foreground text-sm">Rp {{ formatRupiah(item.subtotal_price) }}</p>

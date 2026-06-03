@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class TransactionItem extends Model
 {
     protected $fillable = [
-        'transaction_id', 'product_id', 'item_name', 'type', 'unit',
+        'transaction_id', 'product_id', 'print_vendor_id', 'item_name', 'type', 'unit',
         'quantity', 'base_price', 'selling_price', 'subtotal_base',
         'subtotal_price', 'profit', 'service_status', 'metadata'
     ];
@@ -24,5 +24,10 @@ class TransactionItem extends Model
     public function product()
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function printVendor()
+    {
+        return $this->belongsTo(PrintVendor::class);
     }
 }

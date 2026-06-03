@@ -201,9 +201,12 @@ const realTimeSisa = computed(() => {
                             <td class="p-4 text-right pr-6">
                                 <Button 
                                     @click="openPayModal(t)" 
-                                    class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl text-xs px-3 py-1.5 flex items-center gap-1.5 ml-auto shadow-sm"
+                                    size="icon-sm"
+                                    title="Pelunasan piutang"
+                                    aria-label="Pelunasan piutang"
+                                    class="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl ml-auto shadow-sm"
                                 >
-                                    <i class="fas fa-hand-holding-usd"></i> Pelunasan
+                                    <i class="fas fa-hand-holding-usd"></i>
                                 </Button>
                             </td>
                         </tr>

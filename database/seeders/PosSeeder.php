@@ -11,11 +11,24 @@ use App\Models\TransactionItem;
 use App\Models\Expense;
 use App\Models\Customer;
 use App\Models\StoreProfile;
+use App\Models\PaymentMethod;
+use App\Models\PrintVendor;
 
 class PosSeeder extends Seeder
 {
     public function run(): void
     {
+        PaymentMethod::upsert([
+            ['code' => 'cash', 'name' => 'Cash / Tunai', 'is_cash' => true, 'is_active' => true, 'sort_order' => 1],
+            ['code' => 'qris', 'name' => 'QRIS', 'is_cash' => false, 'is_active' => true, 'sort_order' => 2],
+            ['code' => 'transfer', 'name' => 'Transfer Bank', 'is_cash' => false, 'is_active' => true, 'sort_order' => 3],
+        ], ['code'], ['name', 'is_cash', 'is_active', 'sort_order']);
+
+        PrintVendor::firstOrCreate(
+            ['name' => 'MITRA PRINT'],
+            ['phone' => null, 'address' => null, 'is_active' => true]
+        );
+
         // Seed default store profile
         StoreProfile::create([
             'store_name' => 'Era Digital',

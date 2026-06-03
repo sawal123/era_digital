@@ -35,6 +35,7 @@ const filteredCustomers = computed(() => {
     if (!searchQuery.value) return props.customers;
     return props.customers.filter(c =>
         c.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+        (c.customer_type && c.customer_type.toLowerCase().includes(searchQuery.value.toLowerCase())) ||
         (c.phone && c.phone.includes(searchQuery.value)) ||
         (c.address && c.address.toLowerCase().includes(searchQuery.value.toLowerCase()))
     );
@@ -47,6 +48,7 @@ const selectedCustomerId = ref(null);
 
 const form = useForm({
     name: '',
+    customer_type: 'general',
     phone: '',
     address: '',
 });
@@ -62,6 +64,7 @@ const openEditModal = (customer) => {
     isEditing.value = true;
     selectedCustomerId.value = customer.id;
     form.name = customer.name;
+    form.customer_type = customer.customer_type || 'general';
     form.phone = customer.phone || '';
     form.address = customer.address || '';
     form.clearErrors();
@@ -96,6 +99,12 @@ const formatDate = (dateString) => {
     const options = { year: 'numeric', month: 'long', day: 'numeric' };
     return new Date(dateString).toLocaleDateString('id-ID', options);
 };
+
+const customerTypeLabel = (type) => ({
+    general: 'Umum',
+    token: 'Token Listrik',
+    operator: 'Nomor Operator',
+}[type] || 'Umum');
 </script>
 
 <template>
@@ -134,6 +143,7 @@ const formatDate = (dateString) => {
                     <thead>
                         <tr class="border-b border-border bg-muted/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                             <th class="p-4 pl-6">Nama Lengkap</th>
+                            <th class="p-4">Tipe Customer</th>
                             <th class="p-4">Nomor HP</th>
                             <th class="p-4">Alamat Rumah</th>
                             <th class="p-4">Tanggal Input</th>
@@ -142,7 +152,7 @@ const formatDate = (dateString) => {
                     </thead>
                     <tbody class="divide-y divide-border text-sm">
                         <tr v-if="filteredCustomers.length === 0">
-                            <td colspan="5" class="p-8 text-center text-muted-foreground">
+                            <td colspan="6" class="p-8 text-center text-muted-foreground">
                                 <i class="fas fa-users-slash text-3xl mb-2 opacity-30"></i>
                                 <p>Tidak ada data customer ditemukan.</p>
                             </td>
@@ -150,6 +160,11 @@ const formatDate = (dateString) => {
                         <tr v-for="c in filteredCustomers" :key="c.id" class="hover:bg-muted/30 transition">
                             <td class="p-4 pl-6 font-semibold text-foreground">
                                 {{ c.name }}
+                            </td>
+                            <td class="p-4">
+                                <span class="rounded-full border border-indigo-500/20 bg-indigo-500/10 px-2.5 py-1 text-xs font-medium text-indigo-600 dark:text-indigo-400">
+                                    {{ customerTypeLabel(c.customer_type) }}
+                                </span>
                             </td>
                             <td class="p-4 text-muted-foreground">
                                 {{ c.phone || '-' }}
@@ -161,11 +176,11 @@ const formatDate = (dateString) => {
                                 {{ formatDate(c.created_at) }}
                             </td>
                             <td class="p-4 text-right pr-6 space-x-2">
-                                <Button @click="openEditModal(c)" variant="ghost" size="sm" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">
-                                    <i class="fas fa-edit mr-1"></i> Edit
+                                <Button @click="openEditModal(c)" variant="ghost" size="icon-sm" title="Edit customer" aria-label="Edit customer" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">
+                                    <i class="fas fa-edit"></i>
                                 </Button>
-                                <Button @click="deleteCustomer(c.id)" variant="ghost" size="sm" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
-                                    <i class="fas fa-trash-alt mr-1"></i> Hapus
+                                <Button @click="deleteCustomer(c.id)" variant="ghost" size="icon-sm" title="Hapus customer" aria-label="Hapus customer" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
+                                    <i class="fas fa-trash-alt"></i>
                                 </Button>
                             </td>
                         </tr>
@@ -197,6 +212,16 @@ const formatDate = (dateString) => {
                             required
                         />
                         <p v-if="form.errors.name" class="text-xs text-red-500 font-medium">{{ form.errors.name }}</p>
+                    </div>
+
+                    <div class="space-y-2">
+                        <Label for="cust-type">Tipe Customer</Label>
+                        <select id="cust-type" v-model="form.customer_type" class="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground">
+                            <option value="general">Umum</option>
+                            <option value="token">Token Listrik</option>
+                            <option value="operator">Nomor Operator / Pulsa</option>
+                        </select>
+                        <p v-if="form.errors.customer_type" class="text-xs text-red-500 font-medium">{{ form.errors.customer_type }}</p>
                     </div>
 
                     <!-- Nomor HP -->

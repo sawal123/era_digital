@@ -35,14 +35,24 @@ defineOptions({
 const props = defineProps({
     products: Array,
     customers: Array,
+    paymentMethods: Array,
+    printVendors: Array,
     profile: Object,
 });
 
 // ---------- CORE CART VARIABLES ----------
 const cart = ref([]);
 const isMobileCartOpen = ref(false);
+const duplicateCetakDialogOpen = ref(false);
+const pendingCetakItem = ref(null);
+const duplicateCetakIndex = ref(-1);
+const normalizeQuantity = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+const formatQuantity = (value) => new Intl.NumberFormat('id-ID', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+}).format(normalizeQuantity(value));
 const cartItemCount = computed(() => {
-    return cart.value.reduce((sum, item) => sum + item.quantity, 0);
+    return normalizeQuantity(cart.value.reduce((sum, item) => sum + item.quantity, 0));
 });
 const cartTotal = computed(() => {
     return cart.value.reduce((sum, i) => sum + (i.price * i.quantity), 0);
@@ -101,9 +111,26 @@ let handleOpenMobileCart;
 let handleRequestCartSync;
 
 const jasaDropdownOpen = ref(false);
+const jasaSearchQuery = ref('');
+const vendorDropdownOpen = ref(false);
+const vendorSearchQuery = ref('');
+const digitalDropdownOpen = ref(false);
+const digitalSearchQuery = ref('');
+const customerDropdownOpen = ref(false);
+const customerSearchQuery = ref('');
+const paymentMethodsOpen = ref(false);
 const closeJasaDropdown = (e) => {
     if (jasaDropdownOpen.value && !e.target.closest('.jasa-dropdown-container')) {
         jasaDropdownOpen.value = false;
+    }
+    if (customerDropdownOpen.value && !e.target.closest('.customer-dropdown-container')) {
+        customerDropdownOpen.value = false;
+    }
+    if (vendorDropdownOpen.value && !e.target.closest('.vendor-dropdown-container')) {
+        vendorDropdownOpen.value = false;
+    }
+    if (digitalDropdownOpen.value && !e.target.closest('.digital-dropdown-container')) {
+        digitalDropdownOpen.value = false;
     }
 };
 
@@ -128,6 +155,7 @@ onUnmounted(() => {
     window.removeEventListener('keydown', handleKeyDown);
     document.removeEventListener('click', closeJasaDropdown);
     if (timer) clearInterval(timer);
+    if (autocompleteTimer) clearTimeout(autocompleteTimer);
     if (handleOpenMobileCart) {
         window.removeEventListener('open-mobile-cart', handleOpenMobileCart);
     }
@@ -163,6 +191,7 @@ const themeColor = computed(() => {
 const selectJasaProduct = (product) => {
     activeJasaProductId.value = product.id;
     jasaDropdownOpen.value = false;
+    jasaSearchQuery.value = '';
 };
 
 const getInitials = (name) => {
@@ -228,7 +257,7 @@ const addInstanToCart = () => {
     
     addToCart({
         id: service.id,
-        name: `${service.name} - ${qty} Lembar`,
+        name: service.name,
         price: service.price,
         quantity: qty,
         type: 'fotokopi',
@@ -241,6 +270,16 @@ const addInstanToCart = () => {
 const jasaCetakItems = computed(() => {
     const instantSkus = ['JSA-FTK-01', 'JSA-FTK-02', 'JSA-PRN-01', 'JSA-PRN-02'];
     return props.products.filter(p => p.category && p.category.type === 'jasa' && !instantSkus.includes(p.sku));
+});
+
+const filteredJasaCetakItems = computed(() => {
+    const query = jasaSearchQuery.value.toLowerCase().trim();
+    if (!query) return jasaCetakItems.value;
+
+    return jasaCetakItems.value.filter(product =>
+        product.name.toLowerCase().includes(query) ||
+        (product.sku && product.sku.toLowerCase().includes(query))
+    );
 });
 
 const activeJasaProductId = ref('');
@@ -258,7 +297,34 @@ const selectedJasaProduct = computed(() => {
 const cetakQty = ref(1);
 const cetakPanjang = ref(1);
 const cetakLebar = ref(1);
-const cetakVendor = ref('MITRA PRINT');
+const cetakVendorId = ref('');
+
+watch(() => props.printVendors, (vendors) => {
+    if (vendors?.length > 0 && !cetakVendorId.value) {
+        cetakVendorId.value = vendors[0].id;
+    }
+}, { immediate: true });
+
+const selectedPrintVendor = computed(() => {
+    return props.printVendors?.find(vendor => String(vendor.id) === String(cetakVendorId.value)) || null;
+});
+
+const filteredPrintVendors = computed(() => {
+    const query = vendorSearchQuery.value.toLowerCase().trim();
+    if (!query) return props.printVendors || [];
+
+    return props.printVendors.filter(vendor =>
+        vendor.name.toLowerCase().includes(query) ||
+        (vendor.phone && vendor.phone.toLowerCase().includes(query)) ||
+        (vendor.address && vendor.address.toLowerCase().includes(query))
+    );
+});
+
+const selectPrintVendor = (vendor) => {
+    cetakVendorId.value = vendor?.id || '';
+    vendorDropdownOpen.value = false;
+    vendorSearchQuery.value = '';
+};
 
 const hargaJasaCetak = computed(() => {
     const prod = selectedJasaProduct.value;
@@ -279,16 +345,15 @@ const addCetakToCart = () => {
     if (!prod) return;
 
     let quantity = 1;
-    let detail = `Vendor: ${cetakVendor.value || '-'}`;
+    let detail = '';
 
     if (prod.unit === 'meter') {
         let p = parseFloat(cetakPanjang.value) || 1;
         let l = parseFloat(cetakLebar.value) || 1;
-        quantity = p * l;
-        detail += ` | Ukuran: ${p}x${l} m`;
+        quantity = normalizeQuantity(p * l);
+        detail = `Ukuran: ${formatQuantity(p)}x${formatQuantity(l)} m`;
     } else {
         quantity = parseInt(cetakQty.value) || 1;
-        detail += ` | Jumlah: ${quantity} ${prod.unit}`;
     }
 
     addToCart({
@@ -297,7 +362,8 @@ const addCetakToCart = () => {
         price: parseFloat(prod.selling_price),
         quantity: quantity,
         type: 'cetak',
-        detail: detail
+        detail: detail,
+        print_vendor_id: cetakVendorId.value || null,
     });
 };
 
@@ -307,6 +373,16 @@ const digitalItems = computed(() => {
     return props.products.filter(p => p.category && p.category.type === 'ppob');
 });
 
+const filteredDigitalItems = computed(() => {
+    const query = digitalSearchQuery.value.toLowerCase().trim();
+    if (!query) return digitalItems.value;
+
+    return digitalItems.value.filter(product =>
+        product.name.toLowerCase().includes(query) ||
+        (product.sku && product.sku.toLowerCase().includes(query))
+    );
+});
+
 const selectedLayanan = ref(null);
 const nomorPelanggan = ref('');
 const namaPelanggan = ref('');
@@ -314,6 +390,8 @@ const nominalManual = ref('');
 
 const autocompleteResults = ref([]);
 const showAutocomplete = ref(false);
+const activeAutocompleteField = ref('');
+let autocompleteTimer = null;
 
 watch(digitalItems, (newItems) => {
     if (newItems.length > 0 && !selectedLayanan.value) {
@@ -327,36 +405,59 @@ const totalBiaya = computed(() => {
 });
 
 // Autocomplete and auto-fill feature
-watch(nomorPelanggan, async (newVal) => {
-    if (!newVal || newVal.length <= 3) {
+const searchDigitalAccounts = (value, field) => {
+    activeAutocompleteField.value = field;
+    clearTimeout(autocompleteTimer);
+
+    const query = String(value || '').trim();
+    if (query.length < 2) {
         autocompleteResults.value = [];
         showAutocomplete.value = false;
         return;
     }
 
-    const type = (selectedLayanan.value?.name?.toLowerCase().includes('token') || 
-                  selectedLayanan.value?.name?.toLowerCase().includes('listrik') || 
-                  selectedLayanan.value?.sku?.toLowerCase().includes('tkn')) 
-                  ? 'token' 
-                  : 'phone';
+    autocompleteTimer = setTimeout(async () => {
+        const type = (selectedLayanan.value?.name?.toLowerCase().includes('token') ||
+                      selectedLayanan.value?.name?.toLowerCase().includes('listrik') ||
+                      selectedLayanan.value?.sku?.toLowerCase().includes('tkn'))
+                      ? 'token'
+                      : 'phone';
 
-    try {
-        const response = await axios.get('/api/digital-accounts/search', {
-            params: {
-                number: newVal,
-                type: type
-            }
-        });
-        autocompleteResults.value = response.data;
-        showAutocomplete.value = response.data.length > 0;
-    } catch (error) {
-        console.error('Error fetching digital accounts autocomplete:', error);
-    }
-});
+        try {
+            const response = await axios.get('/api/digital-accounts/search', {
+                params: {
+                    query,
+                    type,
+                }
+            });
+            autocompleteResults.value = response.data;
+            showAutocomplete.value = response.data.length > 0;
+        } catch (error) {
+            console.error('Error fetching digital accounts autocomplete:', error);
+            autocompleteResults.value = [];
+            showAutocomplete.value = false;
+        }
+    }, 250);
+};
+
+const hideDigitalAutocomplete = () => {
+    setTimeout(() => {
+        showAutocomplete.value = false;
+    }, 150);
+};
 
 const selectAccount = (account) => {
     nomorPelanggan.value = account.account_number;
     namaPelanggan.value = account.account_name;
+    showAutocomplete.value = false;
+    activeAutocompleteField.value = '';
+};
+
+const selectDigitalService = (service) => {
+    selectedLayanan.value = service;
+    digitalDropdownOpen.value = false;
+    digitalSearchQuery.value = '';
+    autocompleteResults.value = [];
     showAutocomplete.value = false;
 };
 
@@ -421,22 +522,68 @@ const beliSaldoDigital = () => {
 
 // ---------- GLOBAL FUNCTION ----------
 const addToCart = (item) => {
-    cart.value.push({
+    const cartItem = {
+        _cartKey: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
         id: item.id || Date.now(),
         name: item.name,
         price: item.price,
-        quantity: item.quantity || item.qty || 1,
+        quantity: normalizeQuantity(item.quantity || item.qty || 1),
         detail: item.detail || '',
         type: item.type,
         ...item
-    });
+    };
+
+    if (cartItem.type === 'cetak') {
+        const existingIndex = cart.value.findIndex(existing => existing.id === cartItem.id && existing.type === 'cetak');
+        if (existingIndex !== -1) {
+            pendingCetakItem.value = cartItem;
+            duplicateCetakIndex.value = existingIndex;
+            duplicateCetakDialogOpen.value = true;
+            return;
+        }
+    }
+
+    if (cartItem.type !== 'digital') {
+        const existingItem = cart.value.find(existing => existing.id === cartItem.id && existing.type === cartItem.type);
+        if (existingItem) {
+            existingItem.quantity = normalizeQuantity(existingItem.quantity + cartItem.quantity);
+            if (existingItem.type === 'fotokopi') {
+                existingItem.detail = `${formatQuantity(existingItem.quantity)} lembar x Rp ${formatRupiah(existingItem.price)}`;
+            }
+            return;
+        }
+    }
+
+    cart.value.push(cartItem);
+};
+
+const overwriteDuplicateCetak = () => {
+    if (!pendingCetakItem.value || duplicateCetakIndex.value === -1) return;
+
+    const existingKey = cart.value[duplicateCetakIndex.value]._cartKey;
+    cart.value[duplicateCetakIndex.value] = {
+        ...pendingCetakItem.value,
+        _cartKey: existingKey,
+    };
+    duplicateCetakDialogOpen.value = false;
+    pendingCetakItem.value = null;
+    duplicateCetakIndex.value = -1;
+};
+
+const keepDuplicateCetak = () => {
+    if (!pendingCetakItem.value) return;
+
+    cart.value.push(pendingCetakItem.value);
+    duplicateCetakDialogOpen.value = false;
+    pendingCetakItem.value = null;
+    duplicateCetakIndex.value = -1;
 };
 
 const updateQty = (item, delta) => {
-    const idx = cart.value.findIndex(i => i.id === item.id && i.detail === item.detail);
+    const idx = cart.value.findIndex(i => i._cartKey === item._cartKey);
     if (idx === -1) return;
     
-    const newQty = cart.value[idx].quantity + delta;
+    const newQty = normalizeQuantity(cart.value[idx].quantity + delta);
     if (newQty <= 0) {
         cart.value.splice(idx, 1);
     } else {
@@ -465,7 +612,85 @@ const showNotification = (message, title = 'Notifikasi', type = 'info') => {
 
 const isProcessing = ref(false);
 const customerId = ref('');
+const useOneTimeCustomer = ref(false);
+const invoiceCustomerName = ref('');
+const invoiceCustomerPhone = ref('');
 const keterangan = ref('');
+const paymentMethodId = ref('');
+const cashModalOpen = ref(false);
+const cashPaymentConfirmed = ref(false);
+const cashKeypadFresh = ref(true);
+
+const selectedPaymentMethod = computed(() => {
+    return props.paymentMethods?.find(method => String(method.id) === String(paymentMethodId.value)) || null;
+});
+
+const isCashPayment = computed(() => selectedPaymentMethod.value?.is_cash === true);
+
+const selectedCustomer = computed(() => {
+    return props.customers?.find(customer => String(customer.id) === String(customerId.value)) || null;
+});
+
+const selectedCustomerLabel = computed(() => {
+    if (selectedCustomer.value) {
+        return `${selectedCustomer.value.name} (${selectedCustomer.value.phone || '-'})`;
+    }
+
+    if (useOneTimeCustomer.value) {
+        return invoiceCustomerName.value || 'Customer Sekali Beli / Invoice';
+    }
+
+    return '-- Cash / Umum --';
+});
+
+const filteredCustomers = computed(() => {
+    const query = customerSearchQuery.value.toLowerCase().trim();
+    if (!query) return props.customers || [];
+
+    return props.customers.filter(customer =>
+        customer.name.toLowerCase().includes(query) ||
+        (customer.phone && customer.phone.toLowerCase().includes(query))
+    );
+});
+
+const selectCustomer = (customer) => {
+    customerId.value = customer?.id || '';
+    useOneTimeCustomer.value = false;
+    invoiceCustomerName.value = '';
+    invoiceCustomerPhone.value = '';
+    customerDropdownOpen.value = false;
+    customerSearchQuery.value = '';
+};
+
+const selectOneTimeCustomer = () => {
+    customerId.value = '';
+    useOneTimeCustomer.value = true;
+    customerDropdownOpen.value = false;
+    customerSearchQuery.value = '';
+};
+
+const getPaymentMethodIcon = (method) => {
+    if (method.is_cash) return 'fas fa-money-bill-wave';
+    if (method.code?.toLowerCase().includes('qris')) return 'fas fa-qrcode';
+    if (method.code?.toLowerCase().includes('transfer')) return 'fas fa-university';
+    return 'fas fa-credit-card';
+};
+
+const selectPaymentMethod = (method) => {
+    paymentMethodId.value = method.id;
+    paymentMethodsOpen.value = false;
+
+    if (method.is_cash) {
+        uangDiterimaInput.value = cartTotal.value;
+        cashPaymentConfirmed.value = false;
+        cashKeypadFresh.value = true;
+        cashModalOpen.value = true;
+        return;
+    }
+
+    uangDiterimaInput.value = null;
+    cashPaymentConfirmed.value = true;
+};
 
 const successDialogOpen = ref(false);
 const successTransaction = ref(null);
@@ -473,37 +698,110 @@ const successTransaction = ref(null);
 const resetPOSState = () => {
     cart.value = [];
     customerId.value = '';
+    useOneTimeCustomer.value = false;
+    invoiceCustomerName.value = '';
+    invoiceCustomerPhone.value = '';
     keterangan.value = '';
-    jumlahDibayarInput.value = null;
+    uangDiterimaInput.value = null;
+    paymentMethodId.value = '';
+    cashPaymentConfirmed.value = false;
+    cashModalOpen.value = false;
     isMobileCartOpen.value = false;
     successDialogOpen.value = false;
     successTransaction.value = null;
+    duplicateCetakDialogOpen.value = false;
+    pendingCetakItem.value = null;
+    duplicateCetakIndex.value = -1;
 };
 
-const jumlahDibayarInput = ref(null);
-const jumlahDibayar = computed({
+const uangDiterimaInput = ref(null);
+const uangDiterima = computed({
     get: () => {
-        if (jumlahDibayarInput.value === null) {
+        if (uangDiterimaInput.value === null) {
             return cartTotal.value;
         }
-        return jumlahDibayarInput.value;
+        return uangDiterimaInput.value;
     },
     set: (val) => {
-        jumlahDibayarInput.value = val;
+        uangDiterimaInput.value = val;
     }
 });
 
 watch(cartTotal, () => {
-    jumlahDibayarInput.value = null;
+    uangDiterimaInput.value = null;
+    if (isCashPayment.value) {
+        cashPaymentConfirmed.value = false;
+    }
+});
+
+watch(paymentMethodId, () => {
+    if (!isCashPayment.value) {
+        uangDiterimaInput.value = null;
+    }
+});
+
+const jumlahDibayar = computed(() => {
+    if (!isCashPayment.value) return cartTotal.value;
+    return Math.min(Number(uangDiterima.value) || 0, cartTotal.value);
 });
 
 const sisaTagihan = computed(() => {
     return Math.max(0, cartTotal.value - jumlahDibayar.value);
 });
 
+const kembalian = computed(() => {
+    if (!isCashPayment.value) return 0;
+    return Math.max(0, (Number(uangDiterima.value) || 0) - cartTotal.value);
+});
+
+const appendCashDigit = (digit) => {
+    if (cashKeypadFresh.value) {
+        uangDiterimaInput.value = Number(digit);
+        cashKeypadFresh.value = false;
+        return;
+    }
+
+    const current = String(Math.max(0, Number(uangDiterimaInput.value) || 0));
+    const next = current === '0' ? digit : `${current}${digit}`;
+    uangDiterimaInput.value = Number(next);
+};
+
+const removeCashDigit = () => {
+    cashKeypadFresh.value = false;
+    const current = String(Math.max(0, Number(uangDiterimaInput.value) || 0));
+    uangDiterimaInput.value = Number(current.slice(0, -1)) || 0;
+};
+
+const setExactCash = () => {
+    uangDiterimaInput.value = cartTotal.value;
+    cashKeypadFresh.value = true;
+};
+
+const confirmCashPayment = () => {
+    cashPaymentConfirmed.value = true;
+    cashModalOpen.value = false;
+};
+
 const prosesBayar = () => {
     if (cart.value.length === 0) {
         showNotification("Keranjang belanja kasir Anda saat ini masih kosong. Silakan tambahkan beberapa produk atau layanan cetak terlebih dahulu sebelum memproses pembayaran.", "Keranjang Kosong", "warning");
+        return;
+    }
+
+    if (!paymentMethodId.value) {
+        showNotification("Pilih metode pembayaran sebelum menyimpan transaksi.", "Metode Pembayaran Kosong", "warning");
+        return;
+    }
+
+    if (useOneTimeCustomer.value && !invoiceCustomerName.value.trim()) {
+        showNotification("Isi nama penerima invoice untuk customer sekali beli.", "Nama Penerima Invoice Kosong", "warning");
+        return;
+    }
+
+    isMobileCartOpen.value = false;
+
+    if (isCashPayment.value && !cashPaymentConfirmed.value) {
+        cashModalOpen.value = true;
         return;
     }
     
@@ -512,9 +810,11 @@ const prosesBayar = () => {
     router.post('/pos', {
         cart: cart.value,
         total: cartTotal.value,
-        payment_method: 'cash',
-        jumlah_dibayar: jumlahDibayar.value,
+        payment_method_id: paymentMethodId.value,
+        uang_diterima: isCashPayment.value ? uangDiterima.value : cartTotal.value,
         customer_id: customerId.value || null,
+        invoice_customer_name: useOneTimeCustomer.value ? invoiceCustomerName.value.trim() : null,
+        invoice_customer_phone: useOneTimeCustomer.value ? invoiceCustomerPhone.value.trim() || null : null,
         keterangan: keterangan.value || null,
     }, {
         onSuccess: () => {
@@ -619,19 +919,20 @@ const alertFeature = (fitur) => {
             <!-- Area Kiri Dinamis (2/3) -->
             <div class="w-full lg:w-2/3 flex flex-col p-4 md:p-6 relative h-[calc(100vh-14rem)] lg:h-full">
                 <!-- TAB BUTTONS -->
-                <div class="flex p-1 bg-muted/40 dark:bg-muted/10 rounded-2xl gap-1 mb-6 border border-border/40 max-w-xl">
+                <div class="grid grid-cols-3 p-1 bg-muted/40 dark:bg-muted/10 rounded-2xl gap-1 mb-6 border border-border/40 w-full max-w-xl">
                     <button 
                         v-for="(tab, idx) in tabs" 
                         :key="idx"
                         @click="handleTabChange(idx)"
-                        class="flex-1 py-2 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap h-9"
+                        data-click-feedback="none"
+                        class="min-w-0 py-2 px-1 sm:px-4 rounded-xl font-bold text-[9px] sm:text-xs uppercase tracking-wide sm:tracking-wider transition-all duration-300 flex items-center justify-center gap-1 sm:gap-2 leading-tight text-center min-h-11 sm:h-9"
                         :class="activeTab === idx 
                             ? 'shadow-sm text-white' 
                             : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'"
                         :style="activeTab === idx ? { backgroundColor: themeColor } : {}"
                     >
-                        <i :class="tab.icon" class="text-xs"></i>
-                        {{ tab.name }}
+                        <i :class="tab.icon" class="text-[10px] sm:text-xs shrink-0"></i>
+                        <span class="whitespace-normal break-words">{{ tab.name }}</span>
                     </button>
                 </div>
 
@@ -769,6 +1070,7 @@ const alertFeature = (fitur) => {
                                                 <button 
                                                     type="button" 
                                                     @click="jasaDropdownOpen = !jasaDropdownOpen"
+                                                    data-click-feedback="none"
                                                     class="flex h-11 w-full items-center justify-between rounded-xl border border-input bg-background px-4 py-2 text-sm shadow-sm transition-all outline-none focus-visible:ring-2 focus-visible:ring-orange-500 text-foreground"
                                                 >
                                                     <span class="font-semibold text-foreground">
@@ -780,8 +1082,14 @@ const alertFeature = (fitur) => {
                                                     v-if="jasaDropdownOpen" 
                                                     class="absolute left-0 right-0 z-50 mt-1 max-h-60 overflow-y-auto rounded-xl border border-border bg-card p-1.5 shadow-xl custom-scroll divide-y divide-border/40"
                                                 >
+                                                    <div class="sticky top-0 z-10 bg-card p-1.5">
+                                                        <div class="relative">
+                                                            <i class="fas fa-search absolute left-3 top-2.5 text-xs text-muted-foreground"></i>
+                                                            <Input v-model="jasaSearchQuery" type="text" placeholder="Cari nama atau SKU jasa..." class="h-8 pl-8 rounded-lg bg-background text-xs" @click.stop />
+                                                        </div>
+                                                    </div>
                                                     <div 
-                                                        v-for="j in jasaCetakItems" 
+                                                        v-for="j in filteredJasaCetakItems"
                                                         :key="j.id"
                                                         @click="selectJasaProduct(j)"
                                                         class="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-muted/50 cursor-pointer transition text-xs"
@@ -789,6 +1097,9 @@ const alertFeature = (fitur) => {
                                                     >
                                                         <span>{{ j.name }}</span>
                                                         <span class="font-mono text-muted-foreground">Rp {{ formatRupiah(j.selling_price) }} / {{ j.unit }}</span>
+                                                    </div>
+                                                    <div v-if="filteredJasaCetakItems.length === 0" class="px-3 py-4 text-center text-xs text-muted-foreground">
+                                                        Layanan jasa tidak ditemukan.
                                                     </div>
                                                 </div>
                                             </div>
@@ -811,9 +1122,42 @@ const alertFeature = (fitur) => {
                                             <Input type="number" step="1" min="1" v-model.number="cetakQty" class="w-full bg-background border-border text-foreground" />
                                         </div>
 
-                                        <div class="space-y-1.5">
-                                            <Label class="text-xs font-semibold text-foreground">Nama Vendor / Mitra (Opsional)</Label>
-                                            <Input type="text" v-model="cetakVendor" placeholder="ex: CV. Grafika Jaya" class="w-full bg-background border-border text-foreground" />
+                                        <div class="space-y-1.5 vendor-dropdown-container relative">
+                                            <Label class="text-xs font-semibold text-foreground">Mitra / Vendor Percetakan</Label>
+                                            <button
+                                                type="button"
+                                                data-click-feedback="none"
+                                                @click="vendorDropdownOpen = !vendorDropdownOpen"
+                                                class="flex h-10 w-full items-center justify-between rounded-xl border border-input bg-background px-3 text-sm text-foreground outline-none transition focus:ring-2 focus:ring-orange-500"
+                                            >
+                                                <span class="truncate">{{ selectedPrintVendor?.name || '-- Tanpa Mitra --' }}</span>
+                                                <i class="fas fa-chevron-down text-xs text-muted-foreground transition-transform" :class="{ 'rotate-180': vendorDropdownOpen }"></i>
+                                            </button>
+                                            <div v-if="vendorDropdownOpen" class="absolute left-0 right-0 z-50 mt-1 max-h-60 overflow-y-auto rounded-xl border border-border bg-card p-1.5 shadow-xl custom-scroll">
+                                                <div class="sticky top-0 z-10 bg-card p-1">
+                                                    <div class="relative">
+                                                        <i class="fas fa-search absolute left-3 top-2.5 text-xs text-muted-foreground"></i>
+                                                        <Input v-model="vendorSearchQuery" type="text" placeholder="Cari nama, telepon, atau alamat..." class="h-8 pl-8 rounded-lg bg-background text-xs" @click.stop />
+                                                    </div>
+                                                </div>
+                                                <button type="button" data-click-feedback="none" @click="selectPrintVendor(null)" class="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold hover:bg-muted/50">
+                                                    -- Tanpa Mitra --
+                                                </button>
+                                                <button
+                                                    v-for="vendor in filteredPrintVendors"
+                                                    :key="vendor.id"
+                                                    type="button"
+                                                    data-click-feedback="none"
+                                                    @click="selectPrintVendor(vendor)"
+                                                    class="w-full rounded-lg px-3 py-2 text-left text-xs hover:bg-muted/50"
+                                                    :class="{ 'bg-orange-500/10 font-bold text-orange-600 dark:text-orange-400': String(cetakVendorId) === String(vendor.id) }"
+                                                >
+                                                    <span class="block font-semibold">{{ vendor.name }}</span>
+                                                    <span class="block text-[10px] text-muted-foreground">{{ vendor.phone || vendor.address || '-' }}</span>
+                                                </button>
+                                                <div v-if="filteredPrintVendors.length === 0" class="px-3 py-4 text-center text-xs text-muted-foreground">Mitra tidak ditemukan.</div>
+                                            </div>
+                                            <p class="text-[10px] text-muted-foreground">Nama mitra hanya untuk pencatatan internal dan tidak dicetak pada invoice.</p>
                                         </div>
                                         
                                         <div class="bg-muted/50 p-4 rounded-xl flex justify-between items-center border border-border shadow-inner mt-2">
@@ -821,7 +1165,7 @@ const alertFeature = (fitur) => {
                                             <span class="font-bold text-lg text-foreground">Rp {{ formatRupiah(hargaJasaCetak) }}</span>
                                         </div>
                                         
-                                        <Button @click="addCetakToCart" class="w-full py-6 rounded-xl text-white font-bold shadow-md text-sm transition-all hover:opacity-90 mt-2 bg-orange-600 hover:bg-orange-700">
+                                        <Button @click="addCetakToCart" data-loading-mode="spinner-only" class="w-full py-6 rounded-xl text-white font-bold shadow-md text-sm transition-all hover:opacity-90 mt-2 bg-orange-600 hover:bg-orange-700">
                                             <i class="fas fa-cart-plus mr-2 text-xs"></i> Tambah ke Keranjang
                                         </Button>
                                     </CardContent>
@@ -842,13 +1186,38 @@ const alertFeature = (fitur) => {
                                     </CardHeader>
                                     <CardContent class="p-0 grid grid-cols-1 gap-5">
                                         <!-- Layanan Selector -->
-                                        <div class="space-y-1.5">
+                                        <div class="space-y-1.5 digital-dropdown-container relative">
                                             <Label class="text-sm font-semibold text-foreground">Pilih Layanan Saldo / PPOB</Label>
-                                            <select v-model="selectedLayanan" class="flex h-10 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm shadow-xs transition-all outline-none focus-visible:ring-2 focus-visible:ring-blue-500 text-foreground">
-                                                <option v-for="d in digitalItems" :key="d.id" :value="d">
-                                                    {{ d.name }}
-                                                </option>
-                                            </select>
+                                            <button
+                                                type="button"
+                                                data-click-feedback="none"
+                                                @click="digitalDropdownOpen = !digitalDropdownOpen"
+                                                class="flex h-10 w-full items-center justify-between rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none transition-all focus-visible:ring-2 focus-visible:ring-blue-500"
+                                            >
+                                                <span class="truncate font-semibold">{{ selectedLayanan?.name || 'Pilih layanan digital...' }}</span>
+                                                <i class="fas fa-chevron-down text-xs text-muted-foreground transition-transform" :class="{ 'rotate-180': digitalDropdownOpen }"></i>
+                                            </button>
+                                            <div v-if="digitalDropdownOpen" class="absolute left-0 right-0 z-50 mt-1 max-h-60 overflow-y-auto rounded-xl border border-border bg-card p-1.5 shadow-xl custom-scroll">
+                                                <div class="sticky top-0 z-10 bg-card p-1">
+                                                    <div class="relative">
+                                                        <i class="fas fa-search absolute left-3 top-2.5 text-xs text-muted-foreground"></i>
+                                                        <Input v-model="digitalSearchQuery" type="text" placeholder="Cari nama atau SKU layanan..." class="h-8 pl-8 rounded-lg bg-background text-xs" @click.stop />
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    v-for="service in filteredDigitalItems"
+                                                    :key="service.id"
+                                                    type="button"
+                                                    data-click-feedback="none"
+                                                    @click="selectDigitalService(service)"
+                                                    class="w-full rounded-lg px-3 py-2 text-left text-xs hover:bg-muted/50"
+                                                    :class="{ 'bg-blue-500/10 font-bold text-blue-600 dark:text-blue-400': selectedLayanan?.id === service.id }"
+                                                >
+                                                    <span class="block font-semibold">{{ service.name }}</span>
+                                                    <span class="block text-[10px] font-mono text-muted-foreground">{{ service.sku || '-' }}</span>
+                                                </button>
+                                                <div v-if="filteredDigitalItems.length === 0" class="px-3 py-4 text-center text-xs text-muted-foreground">Layanan digital tidak ditemukan.</div>
+                                            </div>
                                         </div>
 
                                         <!-- Nomor Pelanggan with Autocomplete -->
@@ -861,15 +1230,23 @@ const alertFeature = (fitur) => {
                                                     <i v-if="selectedLayanan?.name?.toLowerCase().includes('token') || selectedLayanan?.name?.toLowerCase().includes('listrik')" class="fas fa-plug text-blue-500"></i>
                                                     <i v-else class="fas fa-mobile-alt text-blue-500"></i>
                                                 </span>
-                                                <Input type="text" v-model="nomorPelanggan" placeholder="Masukkan nomor pelanggan..." class="w-full bg-background border-border text-foreground rounded-xl pl-9 h-10" />
+                                                <Input
+                                                    type="text"
+                                                    v-model="nomorPelanggan"
+                                                    placeholder="Ketik nomor pelanggan..."
+                                                    class="w-full bg-background border-border text-foreground rounded-xl pl-9 h-10"
+                                                    @input="searchDigitalAccounts(nomorPelanggan, 'number')"
+                                                    @focus="searchDigitalAccounts(nomorPelanggan, 'number')"
+                                                    @blur="hideDigitalAutocomplete"
+                                                />
                                             </div>
 
                                             <!-- Autocomplete List -->
-                                            <div v-if="showAutocomplete && autocompleteResults.length > 0" class="absolute left-0 right-0 z-50 mt-1 bg-card border border-border rounded-2xl shadow-2xl max-h-48 overflow-y-auto divide-y divide-border/60">
+                                            <div v-if="showAutocomplete && activeAutocompleteField === 'number' && autocompleteResults.length > 0" class="absolute left-0 right-0 z-50 mt-1 bg-card border border-border rounded-2xl shadow-2xl max-h-48 overflow-y-auto divide-y divide-border/60">
                                                 <div 
                                                     v-for="account in autocompleteResults" 
                                                     :key="account.id"
-                                                    @click="selectAccount(account)"
+                                                    @mousedown.prevent="selectAccount(account)"
                                                     class="px-4 py-3 hover:bg-blue-500/10 cursor-pointer text-xs transition-colors flex justify-between items-center"
                                                 >
                                                     <div>
@@ -882,13 +1259,36 @@ const alertFeature = (fitur) => {
                                         </div>
 
                                         <!-- Nama Pelanggan -->
-                                        <div class="space-y-1.5">
+                                        <div class="space-y-1.5 relative">
                                             <Label class="text-xs font-semibold text-foreground">Nama Pemilik Akun / Pelanggan</Label>
                                             <div class="relative">
                                                 <span class="absolute left-3 top-3 text-muted-foreground text-xs">
                                                     <i class="fas fa-user-circle text-blue-500"></i>
                                                 </span>
-                                                <Input type="text" v-model="namaPelanggan" placeholder="Masukkan nama pemilik akun..." class="w-full bg-background border-border text-foreground rounded-xl pl-9 h-10" />
+                                                <Input
+                                                    type="text"
+                                                    v-model="namaPelanggan"
+                                                    placeholder="Ketik nama pemilik akun..."
+                                                    class="w-full bg-background border-border text-foreground rounded-xl pl-9 h-10"
+                                                    @input="searchDigitalAccounts(namaPelanggan, 'name')"
+                                                    @focus="searchDigitalAccounts(namaPelanggan, 'name')"
+                                                    @blur="hideDigitalAutocomplete"
+                                                />
+                                            </div>
+
+                                            <div v-if="showAutocomplete && activeAutocompleteField === 'name' && autocompleteResults.length > 0" class="absolute left-0 right-0 z-50 mt-1 bg-card border border-border rounded-2xl shadow-2xl max-h-48 overflow-y-auto divide-y divide-border/60">
+                                                <div
+                                                    v-for="account in autocompleteResults"
+                                                    :key="account.id"
+                                                    @mousedown.prevent="selectAccount(account)"
+                                                    class="px-4 py-3 hover:bg-blue-500/10 cursor-pointer text-xs transition-colors flex justify-between items-center"
+                                                >
+                                                    <div>
+                                                        <p class="font-bold text-foreground">{{ account.account_name }}</p>
+                                                        <p class="text-[10px] text-muted-foreground">{{ account.account_number }}</p>
+                                                    </div>
+                                                    <Badge variant="outline" class="text-[9px] uppercase border-blue-500/30 text-blue-500 bg-blue-500/5">{{ account.type }}</Badge>
+                                                </div>
                                             </div>
                                         </div>
 
@@ -931,17 +1331,17 @@ const alertFeature = (fitur) => {
             </div>
 
             <!-- SISI KANAN KARTU: STRUK VIRTUAL -->
-            <div class="hidden lg:flex w-full lg:w-1/3 bg-muted/30 lg:bg-muted/50 border-t lg:border-t-0 lg:border-l border-border flex-col p-4 md:p-6 h-[50vh] lg:h-full relative shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.1)] lg:shadow-none z-10">
+            <div class="hidden lg:flex w-full lg:w-1/3 bg-muted/30 lg:bg-muted/50 border-t lg:border-t-0 lg:border-l border-border flex-col p-4 md:p-6 h-[50vh] lg:h-full relative shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.1)] lg:shadow-none z-10 overflow-y-auto custom-scroll">
                 <div class="flex items-center justify-between mb-4 pb-2 border-b border-border">
                     <h2 class="font-bold text-lg flex gap-2 items-center text-foreground"><i class="fas fa-receipt text-indigo-500 dark:text-indigo-400"></i> Keranjang</h2>
                     <span class="text-xs bg-background text-foreground border border-border px-2 py-1 rounded-full shadow-sm">{{ cart.length }} item</span>
                 </div>
-                <div class="flex-1 overflow-y-auto cart-scroll space-y-2 pr-1">
+                <div class="flex-1 min-h-[180px] overflow-y-auto cart-scroll space-y-2 pr-1">
                     <div v-if="cart.length === 0" class="text-center text-muted-foreground mt-10">
                         <i class="fas fa-shopping-cart text-4xl mb-2 opacity-30"></i>
                         <p>Keranjang kosong</p>
                     </div>
-                    <div v-for="(item, idx) in cart" :key="idx" class="bg-background rounded-xl p-2.5 shadow-sm border border-border relative group">
+                    <div v-for="(item, idx) in cart" :key="item._cartKey" class="bg-background rounded-xl p-2.5 shadow-sm border border-border relative group">
                         <div class="flex justify-between">
                             <div class="w-[70%]">
                                 <p class="font-bold text-xs leading-tight text-foreground truncate" :title="item.name">{{ item.name }}</p>
@@ -954,9 +1354,9 @@ const alertFeature = (fitur) => {
                                     />
                                 </div>
                                 <div class="flex items-center gap-1.5 mt-1.5">
-                                    <Button @click="updateQty(item, -1)" variant="ghost" size="sm" class="w-5 h-5 p-0 flex items-center justify-center rounded-full bg-muted hover:bg-accent text-foreground text-[10px] transition">-</Button>
-                                    <span class="text-xs font-bold w-4 text-center text-foreground">{{ item.quantity }}</span>
-                                    <Button @click="updateQty(item, 1)" variant="ghost" size="sm" class="w-5 h-5 p-0 flex items-center justify-center rounded-full bg-muted hover:bg-accent text-foreground text-[10px] transition">+</Button>
+                                    <Button @click="updateQty(item, -1)" variant="ghost" size="sm" data-click-feedback="none" class="w-5 h-5 p-0 flex items-center justify-center rounded-full bg-muted hover:bg-accent text-foreground text-[10px] transition">-</Button>
+                                    <span class="text-xs font-bold min-w-4 text-center text-foreground">{{ formatQuantity(item.quantity) }}</span>
+                                    <Button @click="updateQty(item, 1)" variant="ghost" size="sm" data-click-feedback="none" class="w-5 h-5 p-0 flex items-center justify-center rounded-full bg-muted hover:bg-accent text-foreground text-[10px] transition">+</Button>
                                 </div>
                             </div>
                             <div class="text-right flex flex-col justify-between w-[28%]">
@@ -970,17 +1370,40 @@ const alertFeature = (fitur) => {
                 <!-- CUSTOMER SELECT & INVOICE NOTES -->
                 <div class="mt-4 pt-4 border-t border-border space-y-3.5 bg-muted/20 p-3.5 rounded-2xl border border-border/50">
                     <!-- Customer Dropdown -->
-                    <div class="space-y-1.5">
-                        <Label for="pos-customer" class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <div class="space-y-1.5 customer-dropdown-container relative">
+                        <Label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                             <i class="fas fa-user-circle text-indigo-500 text-[10px]"></i>
                             Pilih Customer
                         </Label>
-                        <select id="pos-customer" v-model="customerId" class="flex h-9 w-full rounded-xl border border-input bg-background px-3 py-1 text-xs shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] text-foreground">
-                            <option value="">-- Cash / Umum --</option>
-                            <option v-for="cust in customers" :key="cust.id" :value="cust.id">
-                                {{ cust.name }} ({{ cust.phone || '-' }})
-                            </option>
-                        </select>
+                        <button type="button" @click="customerDropdownOpen = !customerDropdownOpen" data-click-feedback="none" class="flex h-9 w-full items-center justify-between rounded-xl border border-input bg-background px-3 py-1 text-xs shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] text-foreground">
+                            <span class="truncate">{{ selectedCustomerLabel }}</span>
+                            <i class="fas fa-chevron-down text-[10px] text-muted-foreground transition-transform" :class="{ 'rotate-180': customerDropdownOpen }"></i>
+                        </button>
+                        <div v-if="customerDropdownOpen" class="absolute left-0 right-0 z-50 mt-1 max-h-56 overflow-y-auto rounded-xl border border-border bg-card p-1.5 shadow-xl custom-scroll">
+                            <div class="sticky top-0 z-10 bg-card p-1">
+                                <div class="relative">
+                                    <i class="fas fa-search absolute left-3 top-2.5 text-xs text-muted-foreground"></i>
+                                    <Input v-model="customerSearchQuery" type="text" placeholder="Cari nama atau telepon..." class="h-8 pl-8 rounded-lg bg-background text-xs" @click.stop />
+                                </div>
+                            </div>
+                            <button type="button" @click="selectCustomer(null)" data-click-feedback="none" class="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold hover:bg-muted/50">
+                                -- Cash / Umum --
+                            </button>
+                            <button type="button" @click="selectOneTimeCustomer" data-click-feedback="none" class="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-indigo-600 hover:bg-indigo-500/10 dark:text-indigo-400">
+                                <span class="block">Customer Sekali Beli / Invoice</span>
+                                <span class="block text-[10px] font-normal text-muted-foreground">Tidak disimpan ke master pelanggan</span>
+                            </button>
+                            <button v-for="cust in filteredCustomers" :key="cust.id" type="button" @click="selectCustomer(cust)" data-click-feedback="none" class="w-full rounded-lg px-3 py-2 text-left text-xs hover:bg-muted/50" :class="{ 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-bold': String(customerId) === String(cust.id) }">
+                                <span class="block font-semibold">{{ cust.name }}</span>
+                                <span class="block text-[10px] text-muted-foreground">{{ cust.phone || '-' }}</span>
+                            </button>
+                            <div v-if="filteredCustomers.length === 0" class="px-3 py-4 text-center text-xs text-muted-foreground">Customer tidak ditemukan.</div>
+                        </div>
+                    </div>
+
+                    <div v-if="useOneTimeCustomer" class="grid grid-cols-1 gap-2 rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-3">
+                        <Input v-model="invoiceCustomerName" type="text" placeholder="Nama penerima invoice *" class="h-8 rounded-lg bg-background text-xs" />
+                        <Input v-model="invoiceCustomerPhone" type="text" placeholder="Nomor telepon (opsional)" class="h-8 rounded-lg bg-background text-xs" />
                     </div>
 
                     <!-- Keterangan Invoice -->
@@ -1001,30 +1424,37 @@ const alertFeature = (fitur) => {
                         <span class="font-mono text-foreground">Rp {{ formatRupiah(cartTotal) }}</span>
                     </div>
 
-                    <!-- Input Jumlah Uang Dibayar -->
+                    <!-- Metode Pembayaran -->
                     <div class="space-y-1.5">
-                        <Label for="pos-jumlah-dibayar" class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                            <span>Jumlah Bayar</span>
-                            <span class="text-[9px] lowercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded font-bold">default: lunas</span>
-                        </Label>
-                        <div class="relative">
-                            <span class="absolute left-3 top-2.5 text-xs text-muted-foreground font-bold">Rp</span>
-                            <Input 
-                                id="pos-jumlah-dibayar" 
-                                type="number" 
-                                v-model.number="jumlahDibayar" 
-                                placeholder="Masukkan jumlah uang..." 
-                                min="0" 
-                                class="pl-8 bg-background border border-input rounded-xl text-xs text-foreground font-extrabold h-9" 
-                            />
+                        <button type="button" @click="paymentMethodsOpen = !paymentMethodsOpen" data-click-feedback="none" class="flex w-full items-center justify-between rounded-xl border border-border bg-background px-3 py-2 text-left transition hover:bg-muted/30">
+                            <span>
+                                <span class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Metode Pembayaran</span>
+                                <span class="block text-xs font-bold text-foreground">{{ selectedPaymentMethod?.name || 'Pilih metode pembayaran' }}</span>
+                            </span>
+                            <i class="fas fa-chevron-down text-xs text-muted-foreground transition-transform" :class="{ 'rotate-180': paymentMethodsOpen }"></i>
+                        </button>
+                        <div v-if="paymentMethodsOpen" class="grid grid-cols-2 gap-2 rounded-xl border border-border/60 bg-muted/20 p-2">
+                            <button
+                                v-for="method in paymentMethods"
+                                :key="method.id"
+                                type="button"
+                                @click="selectPaymentMethod(method)"
+                                class="rounded-xl border p-2.5 text-left transition-all"
+                                :class="String(paymentMethodId) === String(method.id) ? 'border-indigo-500 bg-indigo-500/10 ring-1 ring-indigo-500/30' : 'border-border bg-background hover:border-indigo-500/40 hover:bg-muted/40'"
+                            >
+                                <span class="flex items-center gap-2">
+                                    <i :class="getPaymentMethodIcon(method)" class="text-indigo-500 text-xs"></i>
+                                    <span class="text-[11px] font-bold text-foreground leading-tight">{{ method.name }}</span>
+                                </span>
+                            </button>
                         </div>
                     </div>
 
                     <!-- Kembalian / Sisa Tagihan -->
-                    <div class="flex justify-between items-center text-xs font-bold pt-1">
-                        <span class="text-muted-foreground">Sisa Tagihan:</span>
+                    <div v-if="paymentMethodId" class="flex justify-between items-center text-xs font-bold pt-1">
+                        <span class="text-muted-foreground">{{ isCashPayment && kembalian > 0 ? 'Kembalian:' : 'Sisa Tagihan:' }}</span>
                         <span :class="sisaTagihan > 0 ? 'text-red-500 animate-pulse' : 'text-emerald-500'" class="font-mono">
-                            Rp {{ formatRupiah(sisaTagihan) }}
+                            Rp {{ formatRupiah(isCashPayment && kembalian > 0 ? kembalian : sisaTagihan) }}
                         </span>
                     </div>
 
@@ -1054,13 +1484,17 @@ const alertFeature = (fitur) => {
         <div 
             v-if="isMobileCartOpen"
             @click="isMobileCartOpen = false"
-            class="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100] lg:hidden transition-all duration-300"
+            class="fixed inset-0 bg-black/60 backdrop-blur-xs lg:hidden transition-all duration-300"
+            :class="cashModalOpen ? 'z-40' : 'z-[100]'"
         ></div>
 
         <!-- BOTTOM SHEET DETAIL KERANJANG -->
         <div 
-            class="fixed bottom-0 left-0 right-0 max-h-[85vh] bg-card border-t border-border rounded-t-[2.5rem] z-[101] lg:hidden flex flex-col transition-all duration-500 ease-out shadow-2xl overflow-hidden transform"
-            :class="isMobileCartOpen ? 'translate-y-0' : 'translate-y-full'"
+            class="fixed bottom-0 left-0 right-0 max-h-[85vh] bg-card border-t border-border rounded-t-[2.5rem] lg:hidden flex flex-col transition-all duration-500 ease-out shadow-2xl overflow-hidden transform"
+            :class="[
+                isMobileCartOpen ? 'translate-y-0' : 'translate-y-full',
+                cashModalOpen ? 'z-40' : 'z-[101]',
+            ]"
         >
             <!-- Drag Handle Indicator -->
             <div class="w-12 h-1.5 bg-muted rounded-full mx-auto my-3.5 opacity-60"></div>
@@ -1083,7 +1517,7 @@ const alertFeature = (fitur) => {
 
             <!-- Scrollable List -->
             <div class="overflow-y-auto px-5 py-4 flex-1 space-y-3 custom-scroll">
-                <div v-for="(item, idx) in cart" :key="idx" class="bg-muted/35 dark:bg-muted/10 rounded-xl p-2.5 border border-border/50 flex justify-between items-center">
+                <div v-for="(item, idx) in cart" :key="item._cartKey" class="bg-muted/35 dark:bg-muted/10 rounded-xl p-2.5 border border-border/50 flex justify-between items-center">
                     <div class="w-[70%]">
                         <p class="font-bold text-xs leading-tight truncate text-foreground" :title="item.name">{{ item.name }}</p>
                         <div class="mt-1">
@@ -1095,9 +1529,9 @@ const alertFeature = (fitur) => {
                             />
                         </div>
                         <div class="flex items-center gap-2 mt-2">
-                            <Button @click="updateQty(item, -1)" variant="ghost" size="sm" class="w-5 h-5 p-0 flex items-center justify-center rounded-full bg-background hover:bg-muted text-foreground text-xs transition border border-border">-</Button>
-                            <span class="text-xs font-bold w-4 text-center text-foreground">{{ item.quantity }}</span>
-                            <Button @click="updateQty(item, 1)" variant="ghost" size="sm" class="w-5 h-5 p-0 flex items-center justify-center rounded-full bg-background hover:bg-muted text-foreground text-xs transition border border-border">+</Button>
+                            <Button @click="updateQty(item, -1)" variant="ghost" size="sm" data-click-feedback="none" class="w-5 h-5 p-0 flex items-center justify-center rounded-full bg-background hover:bg-muted text-foreground text-xs transition border border-border">-</Button>
+                            <span class="text-xs font-bold min-w-4 text-center text-foreground">{{ formatQuantity(item.quantity) }}</span>
+                            <Button @click="updateQty(item, 1)" variant="ghost" size="sm" data-click-feedback="none" class="w-5 h-5 p-0 flex items-center justify-center rounded-full bg-background hover:bg-muted text-foreground text-xs transition border border-border">+</Button>
                         </div>
                     </div>
                     <div class="text-right flex flex-col items-end justify-between min-h-[55px] w-[28%]">
@@ -1111,17 +1545,38 @@ const alertFeature = (fitur) => {
                 <!-- Customer Select & Invoice Notes (Mobile Mode) -->
                 <div class="space-y-3.5 bg-muted/20 p-4 rounded-2xl border border-border/50 mt-4">
                     <!-- Customer Dropdown -->
-                    <div class="space-y-1.5">
-                        <Label for="pos-customer-mobile" class="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
+                    <div class="space-y-1.5 customer-dropdown-container relative">
+                        <Label class="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
                             <i class="fas fa-user-circle text-indigo-500 text-[11px]"></i>
                             Pilih Customer (Opsional)
                         </Label>
-                        <select id="pos-customer-mobile" v-model="customerId" class="flex h-9 w-full rounded-xl border border-input bg-background px-3 py-1 text-xs shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] text-foreground">
-                            <option value="">-- Cash / Umum --</option>
-                            <option v-for="cust in customers" :key="cust.id" :value="cust.id">
-                                {{ cust.name }} ({{ cust.phone || '-' }})
-                            </option>
-                        </select>
+                        <button type="button" @click="customerDropdownOpen = !customerDropdownOpen" data-click-feedback="none" class="flex h-9 w-full items-center justify-between rounded-xl border border-input bg-background px-3 py-1 text-xs shadow-xs outline-none text-foreground">
+                            <span class="truncate">{{ selectedCustomerLabel }}</span>
+                            <i class="fas fa-chevron-down text-[10px] text-muted-foreground transition-transform" :class="{ 'rotate-180': customerDropdownOpen }"></i>
+                        </button>
+                        <div v-if="customerDropdownOpen" class="absolute left-0 right-0 z-50 mt-1 max-h-56 overflow-y-auto rounded-xl border border-border bg-card p-1.5 shadow-xl custom-scroll">
+                            <div class="sticky top-0 z-10 bg-card p-1">
+                                <div class="relative">
+                                    <i class="fas fa-search absolute left-3 top-2.5 text-xs text-muted-foreground"></i>
+                                    <Input v-model="customerSearchQuery" type="text" placeholder="Cari nama atau telepon..." class="h-8 pl-8 rounded-lg bg-background text-xs" @click.stop />
+                                </div>
+                            </div>
+                            <button type="button" @click="selectCustomer(null)" data-click-feedback="none" class="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold hover:bg-muted/50">-- Cash / Umum --</button>
+                            <button type="button" @click="selectOneTimeCustomer" data-click-feedback="none" class="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-indigo-600 hover:bg-indigo-500/10 dark:text-indigo-400">
+                                <span class="block">Customer Sekali Beli / Invoice</span>
+                                <span class="block text-[10px] font-normal text-muted-foreground">Tidak disimpan ke master pelanggan</span>
+                            </button>
+                            <button v-for="cust in filteredCustomers" :key="cust.id" type="button" @click="selectCustomer(cust)" data-click-feedback="none" class="w-full rounded-lg px-3 py-2 text-left text-xs hover:bg-muted/50" :class="{ 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-bold': String(customerId) === String(cust.id) }">
+                                <span class="block font-semibold">{{ cust.name }}</span>
+                                <span class="block text-[10px] text-muted-foreground">{{ cust.phone || '-' }}</span>
+                            </button>
+                            <div v-if="filteredCustomers.length === 0" class="px-3 py-4 text-center text-xs text-muted-foreground">Customer tidak ditemukan.</div>
+                        </div>
+                    </div>
+
+                    <div v-if="useOneTimeCustomer" class="grid grid-cols-1 gap-2 rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-3">
+                        <Input v-model="invoiceCustomerName" type="text" placeholder="Nama penerima invoice *" class="h-8 rounded-lg bg-background text-xs" />
+                        <Input v-model="invoiceCustomerPhone" type="text" placeholder="Nomor telepon (opsional)" class="h-8 rounded-lg bg-background text-xs" />
                     </div>
 
                     <!-- Keterangan Invoice -->
@@ -1135,21 +1590,35 @@ const alertFeature = (fitur) => {
 
                     <!-- Jumlah Uang Dibayar (Mobile) -->
                     <div class="space-y-1.5 mt-3">
-                        <Label for="pos-jumlah-dibayar-mobile" class="text-xs font-bold text-muted-foreground flex items-center justify-between">
-                            <span class="flex items-center gap-1.5">
-                                <i class="fas fa-coins text-emerald-500 text-[11px]"></i>
-                                Jumlah Uang Dibayar
+                        <button type="button" @click="paymentMethodsOpen = !paymentMethodsOpen" data-click-feedback="none" class="flex w-full items-center justify-between rounded-xl border border-border bg-background px-3 py-2 text-left">
+                            <span>
+                                <span class="block text-[10px] font-bold text-muted-foreground">Metode Pembayaran</span>
+                                <span class="block text-xs font-bold text-foreground">{{ selectedPaymentMethod?.name || 'Pilih metode pembayaran' }}</span>
                             </span>
-                            <span class="text-[10px] text-muted-foreground bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded font-medium">Default: Lunas</span>
-                        </Label>
-                        <div class="relative">
-                            <span class="absolute left-3 top-2.5 text-xs text-muted-foreground font-bold">Rp</span>
-                            <Input id="pos-jumlah-dibayar-mobile" type="number" v-model.number="jumlahDibayar" placeholder="Masukkan jumlah bayar..." min="0" class="pl-8 bg-background border border-input rounded-xl text-xs text-foreground font-bold" />
+                            <i class="fas fa-chevron-down text-xs text-muted-foreground transition-transform" :class="{ 'rotate-180': paymentMethodsOpen }"></i>
+                        </button>
+                        <div v-if="paymentMethodsOpen" class="grid grid-cols-2 gap-2 rounded-xl border border-border/60 bg-muted/20 p-2">
+                            <button
+                                v-for="method in paymentMethods"
+                                :key="method.id"
+                                type="button"
+                                @click="selectPaymentMethod(method)"
+                                class="rounded-xl border p-3 text-left transition-all"
+                                :class="String(paymentMethodId) === String(method.id) ? 'border-indigo-500 bg-indigo-500/10 ring-1 ring-indigo-500/30' : 'border-border bg-background hover:border-indigo-500/40'"
+                            >
+                                <span class="flex items-center gap-2">
+                                    <i :class="getPaymentMethodIcon(method)" class="text-indigo-500 text-sm"></i>
+                                    <span class="text-xs font-bold text-foreground">{{ method.name }}</span>
+                                </span>
+                            </button>
                         </div>
+                    </div>
+
+                    <div v-if="paymentMethodId" class="space-y-1.5 mt-3">
                         <div class="flex justify-between items-center text-[10px] font-bold mt-1 px-1">
-                            <span class="text-muted-foreground">Sisa Tagihan:</span>
+                            <span class="text-muted-foreground">{{ kembalian > 0 ? 'Kembalian:' : 'Sisa Tagihan:' }}</span>
                             <span :class="sisaTagihan > 0 ? 'text-red-500 animate-pulse' : 'text-emerald-500'">
-                                Rp {{ formatRupiah(sisaTagihan) }}
+                                Rp {{ formatRupiah(kembalian > 0 ? kembalian : sisaTagihan) }}
                              </span>
                         </div>
                     </div>
@@ -1168,6 +1637,115 @@ const alertFeature = (fitur) => {
                 </Button>
             </div>
         </div>
+
+        <!-- DIALOG INPUT UANG TUNAI -->
+        <Dialog :open="cashModalOpen" @update:open="cashModalOpen = $event">
+            <DialogContent class="sm:max-w-[420px] rounded-3xl bg-card border-border text-foreground p-6">
+                <DialogHeader>
+                    <DialogTitle class="flex items-center gap-2">
+                        <i class="fas fa-money-bill-wave text-emerald-500"></i>
+                        Input Uang Diterima
+                    </DialogTitle>
+                    <DialogDescription>
+                        Masukkan nominal tunai melalui keyboard atau tombol angka di layar.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div class="space-y-4 py-2">
+                    <div class="rounded-2xl border border-border bg-muted/30 p-4 space-y-2">
+                        <div class="flex justify-between text-xs text-muted-foreground">
+                            <span>Total Belanja</span>
+                            <span class="font-mono font-bold text-foreground">Rp {{ formatRupiah(cartTotal) }}</span>
+                        </div>
+                        <div class="relative">
+                            <span class="absolute left-4 top-3.5 text-sm text-muted-foreground font-bold">Rp</span>
+                            <Input
+                                id="cash-received-input"
+                                v-model.number="uangDiterima"
+                                type="number"
+                                min="0"
+                                class="h-12 pl-11 rounded-xl bg-background border-border text-right text-xl font-black font-mono text-foreground"
+                                autofocus
+                                @input="cashKeypadFresh = false"
+                            />
+                        </div>
+                        <div class="flex justify-between text-sm font-bold pt-1">
+                            <span class="text-muted-foreground">{{ kembalian > 0 ? 'Kembalian' : 'Sisa Tagihan' }}</span>
+                            <span :class="sisaTagihan > 0 ? 'text-red-500' : 'text-emerald-500'" class="font-mono">
+                                Rp {{ formatRupiah(kembalian > 0 ? kembalian : sisaTagihan) }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2">
+                        <button v-for="digit in ['1', '2', '3', '4', '5', '6', '7', '8', '9']" :key="digit" type="button" @click="appendCashDigit(digit)" data-click-feedback="none" class="h-12 rounded-xl border border-border bg-background hover:bg-muted text-lg font-black text-foreground transition">
+                            {{ digit }}
+                        </button>
+                        <button type="button" @click="uangDiterimaInput = 0; cashKeypadFresh = false" data-click-feedback="none" class="h-12 rounded-xl border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-sm font-black text-red-500 transition">C</button>
+                        <button type="button" @click="appendCashDigit('0')" data-click-feedback="none" class="h-12 rounded-xl border border-border bg-background hover:bg-muted text-lg font-black text-foreground transition">0</button>
+                        <button type="button" @click="removeCashDigit" data-click-feedback="none" class="h-12 rounded-xl border border-border bg-background hover:bg-muted text-foreground transition">
+                            <i class="fas fa-backspace"></i>
+                        </button>
+                    </div>
+
+                    <Button type="button" variant="outline" @click="setExactCash" class="w-full rounded-xl border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-bold">
+                        <i class="fas fa-check mr-2"></i> Uang Pas
+                    </Button>
+                </div>
+
+                <DialogFooter class="gap-2">
+                    <DialogClose as-child>
+                        <Button type="button" variant="secondary" class="rounded-xl">Batal</Button>
+                    </DialogClose>
+                    <Button type="button" @click="confirmCashPayment" data-loading-mode="spinner-only" class="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold">
+                        Gunakan Nominal
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
+        <!-- DIALOG DUPLIKAT JASA CETAK -->
+        <Dialog :open="duplicateCetakDialogOpen" @update:open="duplicateCetakDialogOpen = $event">
+            <DialogContent class="sm:max-w-[440px] rounded-3xl bg-card border-border text-foreground p-6">
+                <DialogHeader>
+                    <DialogTitle class="flex items-center gap-2">
+                        <i class="fas fa-print text-orange-500"></i>
+                        Jasa Cetak Sudah Ada
+                    </DialogTitle>
+                    <DialogDescription>
+                        Produk jasa cetak yang sama sudah ada di keranjang. Pilih cara memasukkan data terbaru.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div v-if="pendingCetakItem && duplicateCetakIndex !== -1" class="space-y-3 py-2">
+                    <div class="rounded-2xl border border-border bg-muted/30 p-4">
+                        <p class="text-sm font-bold text-foreground">{{ pendingCetakItem.name }}</p>
+                        <p class="mt-1 text-xs text-muted-foreground">{{ pendingCetakItem.detail }}</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3 text-xs">
+                        <div class="rounded-xl border border-border bg-background p-3">
+                            <span class="block text-muted-foreground">Jumlah di keranjang</span>
+                            <span class="mt-1 block text-lg font-black text-foreground">{{ formatQuantity(cart[duplicateCetakIndex]?.quantity) }}</span>
+                        </div>
+                        <div class="rounded-xl border border-orange-500/20 bg-orange-500/5 p-3">
+                            <span class="block text-muted-foreground">Jumlah input baru</span>
+                            <span class="mt-1 block text-lg font-black text-orange-600 dark:text-orange-400">{{ formatQuantity(pendingCetakItem.quantity) }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <DialogFooter class="gap-2 sm:grid sm:grid-cols-2">
+                    <Button type="button" variant="outline" data-click-feedback="none" class="rounded-xl" @click="keepDuplicateCetak">
+                        <i class="fas fa-plus text-xs"></i>
+                        Tetap Masukkan Baru
+                    </Button>
+                    <Button type="button" data-click-feedback="none" class="rounded-xl bg-orange-600 text-white hover:bg-orange-700" @click="overwriteDuplicateCetak">
+                        <i class="fas fa-pen text-xs"></i>
+                        Timpa Jumlah Lama
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
 
         <!-- DIALOG SHORTCUT HELPER -->
         <Dialog :open="helpDialogOpen" @update:open="helpDialogOpen = $event">
@@ -1248,6 +1826,10 @@ const alertFeature = (fitur) => {
                                 {{ successTransaction.status_bayar }}
                             </span>
                         </div>
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="text-muted-foreground">Metode Pembayaran:</span>
+                            <span class="font-bold">{{ successTransaction.payment_method_master?.name || successTransaction.payment_method }}</span>
+                        </div>
                         <div class="flex justify-between items-center border-t border-border/60 pt-2 font-bold text-xs">
                             <span class="text-muted-foreground">Total Belanja:</span>
                             <span class="font-mono text-foreground">Rp {{ formatRupiah(successTransaction.total_price) }}</span>
@@ -1255,6 +1837,10 @@ const alertFeature = (fitur) => {
                         <div class="flex justify-between items-center font-bold text-xs">
                             <span class="text-emerald-600 dark:text-emerald-400">Jumlah Uang Dibayar:</span>
                             <span class="font-mono text-emerald-600 dark:text-emerald-400">Rp {{ formatRupiah(successTransaction.jumlah_dibayar) }}</span>
+                        </div>
+                        <div v-if="successTransaction.kembalian > 0" class="flex justify-between items-center font-bold text-xs text-indigo-600 dark:text-indigo-400">
+                            <span>Kembalian:</span>
+                            <span class="font-mono">Rp {{ formatRupiah(successTransaction.kembalian) }}</span>
                         </div>
                         <div v-if="successTransaction.sisa_tagihan > 0" class="flex justify-between items-center font-bold text-xs text-red-500">
                             <span>Sisa Kurang (Piutang):</span>
@@ -1371,17 +1957,6 @@ const alertFeature = (fitur) => {
 }
 .sidebar-transition {
     transition: all 0.3s ease-in-out;
-}
-.cart-scroll::-webkit-scrollbar, .custom-scroll::-webkit-scrollbar {
-    width: 4px;
-}
-.cart-scroll::-webkit-scrollbar-track, .custom-scroll::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 10px;
-}
-.cart-scroll::-webkit-scrollbar-thumb, .custom-scroll::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 10px;
 }
 .btn-zen-hover:hover {
     transform: scale(0.97);
