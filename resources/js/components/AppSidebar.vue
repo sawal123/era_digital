@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import { LayoutGrid, MonitorSmartphone, Layers, Package, BarChart3, Wallet, RefreshCw, Users, Settings, Receipt, CreditCard, Handshake } from 'lucide-vue-next';
 import AppLogo from '@/components/AppLogo.vue';
 import NavMain from '@/components/NavMain.vue';
@@ -15,8 +15,12 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import type { NavItem } from '@/types';
+import { computed } from 'vue';
 
-const mainNavItems: NavItem[] = [
+const page = usePage();
+const isDemoUser = computed(() => page.props.auth.user?.role === 'demo');
+
+const mainNavItems = computed<NavItem[]>(() => [
     {
         title: 'Dashboard',
         href: dashboard(),
@@ -47,12 +51,14 @@ const mainNavItems: NavItem[] = [
         href: '/expenses',
         icon: Wallet,
     },
-    {
-        title: 'Pengaturan Toko',
-        href: '/settings/store',
-        icon: Settings,
-    },
-];
+    ...(isDemoUser.value
+        ? []
+        : [{
+            title: 'Pengaturan Toko',
+            href: '/settings/store',
+            icon: Settings,
+        }]),
+]);
 
 const masterNavItems: NavItem[] = [
     {

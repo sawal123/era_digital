@@ -1,29 +1,27 @@
 <?php
 
+use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\PaymentMethodController;
+use App\Http\Controllers\PosController;
+use App\Http\Controllers\PrintVendorController;
+use App\Http\Controllers\ProductController;
+use App\Http\Controllers\PurchaseController;
+use App\Http\Controllers\ReceivableController;
+use App\Http\Controllers\ReportController;
+use App\Http\Controllers\StoreProfileController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
-
-use App\Http\Controllers\PosController;
-use App\Http\Controllers\CategoryController;
-use App\Http\Controllers\ProductController;
-use App\Http\Controllers\ReportController;
-use App\Http\Controllers\ExpenseController;
-use App\Http\Controllers\PurchaseController;
-use App\Http\Controllers\CustomerController;
-use App\Http\Controllers\StoreProfileController;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\ReceivableController;
-use App\Http\Controllers\PaymentMethodController;
-use App\Http\Controllers\PrintVendorController;
 
 Route::inertia('/', 'Welcome', [
     'canRegister' => Features::enabled(Features::registration()),
 ])->name('home');
 
-
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-    
+
     // POS Routes
     Route::get('/pos', [PosController::class, 'index'])->name('pos.index');
     Route::post('/pos', [PosController::class, 'store'])->name('pos.store');
@@ -57,7 +55,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Pengaturan Toko
     Route::get('/settings/store', [StoreProfileController::class, 'edit'])->name('settings.store.edit');
-    Route::post('/settings/store', [StoreProfileController::class, 'update'])->name('settings.store.update');
+    Route::post('/settings/store', [StoreProfileController::class, 'update'])
+        ->middleware('not.demo')
+        ->name('settings.store.update');
 });
 
 require __DIR__.'/settings.php';
