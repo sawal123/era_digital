@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Expense;
 use App\Models\Transaction;
 use App\Models\Product;
 use Inertia\Inertia;
@@ -13,8 +14,11 @@ class ReportController extends Controller
     public function index()
     {
         $transactions = Transaction::with(['items.product', 'items.printVendor', 'paymentHistories', 'customer'])->latest()->get();
+        $expenses = Expense::orderByDesc('date')->latest()->get();
+
         return Inertia::render('Reports/Index', [
-            'transactions' => $transactions
+            'transactions' => $transactions,
+            'expenses' => $expenses,
         ]);
     }
     

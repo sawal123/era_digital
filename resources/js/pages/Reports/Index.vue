@@ -1,10 +1,11 @@
-<script setup>
-import { ref, computed, nextTick, watch } from 'vue';
+<script setup lang="ts">
 import { Head, router, usePage } from '@inertiajs/vue3';
+import flatpickr from 'flatpickr';
 import html2pdf from 'html2pdf.js';
+import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from 'vue';
 import { toast } from 'vue-sonner';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import {
     Dialog,
@@ -15,6 +16,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import 'flatpickr/dist/flatpickr.min.css';
 
 defineOptions({
     layout: {
@@ -25,36 +27,109 @@ defineOptions({
     },
 });
 
+const props = defineProps({
+    transactions: {
+        type: Array,
+        default: () => [],
+    },
+    expenses: {
+        type: Array,
+        default: () => [],
+    },
+});
 
-const props = defineProps({ transactions: Array });
+const padDatePart = (value) => String(value).padStart(2, '0');
+const getTodayString = () => {
+    const now = new Date();
+
+    return `${now.getFullYear()}-${padDatePart(now.getMonth() + 1)}-${padDatePart(now.getDate())}`;
+};
+const getCurrentMonthString = () => {
+    const now = new Date();
+
+    return `${now.getFullYear()}-${padDatePart(now.getMonth() + 1)}`;
+};
+const getCurrentYearString = () => String(new Date().getFullYear());
+const todayString = getTodayString();
 
 // ─── FILTER STATE ───────────────────────────────────────────────
 const filterMode  = ref('harian');   // 'harian' | 'bulanan' | 'tahunan'
-const filterDate  = ref(new Date().toISOString().slice(0, 10));    // YYYY-MM-DD
-const filterMonth = ref(new Date().toISOString().slice(0, 7));     // YYYY-MM
-const filterYear  = ref(String(new Date().getFullYear()));          // YYYY
+const filterDateRange = ref(`${todayString} to ${todayString}`);
+const filterMonth = ref(getCurrentMonthString());
+const filterYear  = ref(getCurrentYearString());
 const searchQuery = ref('');
 const perPage = ref(10);
 const currentPage = ref(1);
 const exportPdfRef = ref(null);
+const dateRangeInput = ref(null);
 const copiedInvoice = ref('');
 let copyFeedbackTimer = null;
+let dateRangePickerInstance = null;
 
-const setMode = (mode) => { filterMode.value = mode; };
+const setMode = (mode) => {
+    filterMode.value = mode;
+};
+const toNumber = (value) => Number.parseFloat(value ?? 0) || 0;
+const parseDateRange = (value) => {
+    const [start = '', end = ''] = String(value ?? '').split(' to ');
+    const normalizedStart = start || todayString;
+    const normalizedEnd = end || normalizedStart;
+
+    return {
+        start: normalizedStart,
+        end: normalizedEnd,
+    };
+};
+const selectedDateRange = computed(() => parseDateRange(filterDateRange.value));
+const setDateRange = (start, end = start) => {
+    filterDateRange.value = end && end !== start ? `${start} to ${end}` : start;
+
+    if (dateRangePickerInstance) {
+        dateRangePickerInstance.setDate([start, end || start], false);
+    }
+};
+const initDateRangePicker = () => {
+    if (!dateRangeInput.value) {
+        return;
+    }
+
+    dateRangePickerInstance?.destroy();
+    dateRangePickerInstance = flatpickr(dateRangeInput.value, {
+        mode: 'range',
+        dateFormat: 'Y-m-d',
+        defaultDate: [selectedDateRange.value.start, selectedDateRange.value.end],
+        onChange: (selectedDates, _dateStr, instance) => {
+            if (selectedDates.length === 0) {
+                setDateRange(todayString);
+
+                return;
+            }
+
+            const [startDate, endDate = startDate] = selectedDates.map((date) => instance.formatDate(date, 'Y-m-d'));
+            filterDateRange.value = startDate === endDate ? startDate : `${startDate} to ${endDate}`;
+        },
+    });
+};
 
 // ─── FILTERED LIST ───────────────────────────────────────────────
 const filteredTransactions = computed(() => {
     const query = searchQuery.value.toLowerCase().trim();
+    const { start, end } = selectedDateRange.value;
 
     return props.transactions.filter(t => {
         const matchesPeriod = filterMode.value === 'harian'
-            ? t.created_at.slice(0, 10) === filterDate.value
+            ? t.created_at.slice(0, 10) >= start && t.created_at.slice(0, 10) <= end
             : filterMode.value === 'bulanan'
                 ? t.created_at.slice(0, 7) === filterMonth.value
                 : t.created_at.slice(0, 4) === filterYear.value;
 
-        if (!matchesPeriod) return false;
-        if (!query) return true;
+        if (!matchesPeriod) {
+            return false;
+        }
+
+        if (!query) {
+            return true;
+        }
 
         const customerName = t.customer_name || t.customer?.name || 'cash / umum';
         const paymentMethod = t.payment_method || '';
@@ -66,10 +141,24 @@ const filteredTransactions = computed(() => {
         ].some(value => String(value).toLowerCase().includes(query));
     });
 });
+const filteredExpenses = computed(() => {
+    const { start, end } = selectedDateRange.value;
+
+    return props.expenses.filter((expense) => {
+        const expenseDate = String(expense.date ?? '');
+
+        return filterMode.value === 'harian'
+            ? expenseDate >= start && expenseDate <= end
+            : filterMode.value === 'bulanan'
+                ? expenseDate.slice(0, 7) === filterMonth.value
+                : expenseDate.slice(0, 4) === filterYear.value;
+    });
+});
 
 const totalPages = computed(() => Math.max(1, Math.ceil(filteredTransactions.value.length / perPage.value)));
 const paginatedTransactions = computed(() => {
     const start = (currentPage.value - 1) * perPage.value;
+
     return filteredTransactions.value.slice(start, start + perPage.value);
 });
 const paginationStart = computed(() => filteredTransactions.value.length === 0 ? 0 : ((currentPage.value - 1) * perPage.value) + 1);
@@ -86,12 +175,37 @@ const visiblePages = computed(() => {
     return pages;
 });
 
-watch([filterMode, filterDate, filterMonth, filterYear, searchQuery, perPage], () => {
+watch([filterMode, filterDateRange, filterMonth, filterYear, searchQuery, perPage], () => {
     currentPage.value = 1;
 });
 
 watch(totalPages, (pages) => {
-    if (currentPage.value > pages) currentPage.value = pages;
+    if (currentPage.value > pages) {
+        currentPage.value = pages;
+    }
+});
+
+watch(filterMode, async (mode) => {
+    if (mode !== 'harian') {
+        dateRangePickerInstance?.destroy();
+        dateRangePickerInstance = null;
+
+        return;
+    }
+
+    await nextTick();
+    initDateRangePicker();
+});
+
+onMounted(() => {
+    if (filterMode.value === 'harian') {
+        initDateRangePicker();
+    }
+});
+
+onBeforeUnmount(() => {
+    clearTimeout(copyFeedbackTimer);
+    dateRangePickerInstance?.destroy();
 });
 
 const goToPage = (page) => {
@@ -134,6 +248,7 @@ const exportExcel = () => {
             <body>
                 <table border="1">
                     <tr><th colspan="7">Laporan Penjualan - ${escapeHtml(filterLabel.value)}</th></tr>
+                    <tr><td colspan="7">Pengeluaran: ${Number(totalExpenses.value)} | Profit Bersih: ${Number(netProfit.value)}</td></tr>
                     <tr>
                         <th>Nomor Invoice</th><th>Tanggal</th><th>Customer</th><th>Metode Pembayaran</th>
                         <th>Status</th><th>Total Belanja</th><th>Keuntungan</th>
@@ -144,16 +259,18 @@ const exportExcel = () => {
         </html>
     `;
 
-    downloadBlob(workbook, 'application/vnd.ms-excel;charset=utf-8;', `laporan-penjualan-${filterLabel.value}.xls`);
+    downloadBlob(workbook, 'application/vnd.ms-excel;charset=utf-8;', `laporan-penjualan-${filterFileLabel.value}.xls`);
 };
 
 const exportPdf = async () => {
-    if (filteredTransactions.value.length === 0) return;
+    if (filteredTransactions.value.length === 0) {
+return;
+}
 
     await nextTick();
     await html2pdf().set({
         margin: 8,
-        filename: `laporan-penjualan-${filterLabel.value}.pdf`,
+        filename: `laporan-penjualan-${filterFileLabel.value}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, backgroundColor: '#ffffff' },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
@@ -161,9 +278,11 @@ const exportPdf = async () => {
 };
 
 // ─── SUMMARY METRICS ─────────────────────────────────────────────
-const totalSales  = computed(() => filteredTransactions.value.reduce((s, t) => s + parseFloat(t.total_price),      0));
-const totalBase   = computed(() => filteredTransactions.value.reduce((s, t) => s + parseFloat(t.total_base_price),  0));
-const totalProfit = computed(() => filteredTransactions.value.reduce((s, t) => s + parseFloat(t.total_profit),      0));
+const totalSales  = computed(() => filteredTransactions.value.reduce((sum, transaction) => sum + toNumber(transaction.total_price), 0));
+const totalBase   = computed(() => filteredTransactions.value.reduce((sum, transaction) => sum + toNumber(transaction.total_base_price), 0));
+const totalTransactionProfit = computed(() => filteredTransactions.value.reduce((sum, transaction) => sum + toNumber(transaction.total_profit), 0));
+const totalExpenses = computed(() => filteredExpenses.value.reduce((sum, expense) => sum + toNumber(expense.amount), 0));
+const netProfit = computed(() => totalSales.value - totalExpenses.value);
 
 // ─── DETAIL DIALOG ────────────────────────────────────────────────
 const selectedTransaction = ref(null);
@@ -180,7 +299,9 @@ const openDetail = (trx) => {
 };
 
 const saveInvoiceRecipient = () => {
-    if (!selectedTransaction.value) return;
+    if (!selectedTransaction.value) {
+return;
+}
 
     isSavingInvoiceRecipient.value = true;
     router.patch(`/reports/${selectedTransaction.value.id}/invoice-recipient`, {
@@ -193,7 +314,9 @@ const saveInvoiceRecipient = () => {
             selectedTransaction.value.customer_phone = invoiceRecipientPhone.value.trim() || null;
             isSavingInvoiceRecipient.value = false;
         },
-        onError: () => { isSavingInvoiceRecipient.value = false; },
+        onError: () => {
+ isSavingInvoiceRecipient.value = false; 
+},
     });
 };
 
@@ -220,9 +343,26 @@ const yearOptions = Array.from({ length: 5 }, (_, i) => String(new Date().getFul
 
 // Label badge pada mode aktif
 const filterLabel = computed(() => {
-    if (filterMode.value === 'harian')  return filterDate.value;
-    if (filterMode.value === 'bulanan') return filterMonth.value;
+    if (filterMode.value === 'harian') {
+        const { start, end } = selectedDateRange.value;
+
+        return start === end ? start : `${start} s/d ${end}`;
+    }
+
+    if (filterMode.value === 'bulanan') {
+return filterMonth.value;
+}
+
     return filterYear.value;
+});
+const filterFileLabel = computed(() => {
+    if (filterMode.value === 'harian') {
+        const { start, end } = selectedDateRange.value;
+
+        return start === end ? start : `${start}_sd_${end}`;
+    }
+
+    return filterMode.value === 'bulanan' ? filterMonth.value : filterYear.value;
 });
 
 // ─── DELETE ───────────────────────────────────────────────────────
@@ -236,7 +376,10 @@ const openDeleteConfirm = (trx) => {
 };
 
 const confirmDelete = () => {
-    if (!deleteTarget.value) return;
+    if (!deleteTarget.value) {
+return;
+}
+
     isDeleting.value = true;
     router.delete(`/reports/${deleteTarget.value.id}`, {
         onSuccess: () => {
@@ -244,7 +387,9 @@ const confirmDelete = () => {
             deleteTarget.value = null;
             isDeleting.value = false;
         },
-        onError: () => { isDeleting.value = false; },
+        onError: () => {
+ isDeleting.value = false; 
+},
     });
 };
 
@@ -312,13 +457,15 @@ const flash = computed(() => usePage().props.flash ?? {});
 
                 <!-- Input sesuai mode -->
                 <div class="flex-1 flex items-center gap-3">
-                    <!-- Harian: date picker -->
-                    <div v-if="filterMode === 'harian'" class="relative flex-1 max-w-xs">
+                    <!-- Harian: flatpickr range -->
+                    <div v-if="filterMode === 'harian'" class="relative flex-1 max-w-sm">
                         <i class="fas fa-calendar-day absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
                         <input
-                            type="date"
-                            v-model="filterDate"
-                            class="pl-8 h-9 w-full rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 transition px-3"
+                            ref="dateRangeInput"
+                            type="text"
+                            :value="filterDateRange"
+                            placeholder="Pilih rentang tanggal"
+                            class="h-9 w-full rounded-xl border border-input bg-background px-3 pl-8 text-sm text-foreground transition focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         />
                     </div>
 
@@ -346,9 +493,9 @@ const flash = computed(() => usePage().props.flash ?? {});
                     <!-- Quick shortcut: Hari ini / Bulan ini / Tahun ini -->
                     <button
                         @click="
-                            filterMode === 'harian'  ? filterDate  = new Date().toISOString().slice(0,10) :
-                            filterMode === 'bulanan' ? filterMonth = new Date().toISOString().slice(0,7)  :
-                                                       filterYear  = String(new Date().getFullYear())
+                            filterMode === 'harian'  ? setDateRange(todayString) :
+                            filterMode === 'bulanan' ? filterMonth = getCurrentMonthString() :
+                                                       filterYear  = getCurrentYearString()
                         "
                         class="text-xs text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-300 font-semibold whitespace-nowrap transition underline underline-offset-2"
                     >
@@ -359,7 +506,7 @@ const flash = computed(() => usePage().props.flash ?? {});
         </div>
 
         <!-- Metrics Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div class="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
             <Card class="border-border/60 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 relative overflow-hidden shadow-sm">
                 <CardHeader class="pb-2">
                     <CardTitle class="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
@@ -388,6 +535,20 @@ const flash = computed(() => usePage().props.flash ?? {});
                 <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-orange-500"></div>
             </Card>
 
+            <Card class="border-border/60 bg-gradient-to-br from-rose-500/5 to-red-500/5 relative overflow-hidden shadow-sm">
+                <CardHeader class="pb-2">
+                    <CardTitle class="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                        <span>Total Pengeluaran</span>
+                        <i class="fas fa-file-invoice-dollar text-rose-500 dark:text-rose-400 text-sm"></i>
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div class="text-2xl font-black text-rose-600 dark:text-rose-400">Rp {{ formatRupiah(totalExpenses) }}</div>
+                    <p class="text-[11px] text-muted-foreground mt-1">{{ filteredExpenses.length }} catatan pengeluaran pada periode ini</p>
+                </CardContent>
+                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 to-red-500"></div>
+            </Card>
+
             <Card class="border-border/60 bg-gradient-to-br from-emerald-500/5 to-teal-500/5 relative overflow-hidden shadow-sm">
                 <CardHeader class="pb-2">
                     <CardTitle class="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
@@ -396,8 +557,10 @@ const flash = computed(() => usePage().props.flash ?? {});
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div class="text-2xl font-black text-emerald-600 dark:text-emerald-400">Rp {{ formatRupiah(totalProfit) }}</div>
-                    <p class="text-[11px] text-muted-foreground mt-1">Selisih harga jual dikurangi modal pokok</p>
+                    <div class="text-2xl font-black" :class="netProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'">
+                        Rp {{ formatRupiah(netProfit) }}
+                    </div>
+                    <p class="text-[11px] text-muted-foreground mt-1">Omset dikurangi total pengeluaran sesuai filter aktif</p>
                 </CardContent>
                 <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500"></div>
             </Card>
@@ -412,7 +575,7 @@ const flash = computed(() => usePage().props.flash ?? {});
                         <CardDescription class="text-xs text-muted-foreground">
                             Daftar transaksi periode
                             <strong class="text-foreground">
-                                {{ filterMode === 'harian' ? filterDate : filterMode === 'bulanan' ? filterMonth : filterYear }}
+                                {{ filterLabel }}
                             </strong>
                         </CardDescription>
                     </div>
@@ -578,6 +741,7 @@ const flash = computed(() => usePage().props.flash ?? {});
             <div ref="exportPdfRef">
                 <h1 class="mb-1 text-xl font-bold">Laporan Penjualan</h1>
                 <p class="mb-5 text-xs">Periode: {{ filterLabel }} | Jumlah transaksi: {{ filteredTransactions.length }}</p>
+                <p class="mb-3 text-xs">Pengeluaran: Rp {{ formatRupiah(totalExpenses) }} | Profit bersih: Rp {{ formatRupiah(netProfit) }}</p>
                 <table class="w-full border-collapse text-xs">
                     <thead>
                         <tr>
@@ -605,7 +769,7 @@ const flash = computed(() => usePage().props.flash ?? {});
                         <tr class="font-bold">
                             <td colspan="5" class="border border-gray-400 p-2 text-right">TOTAL</td>
                             <td class="border border-gray-400 p-2 text-right">Rp {{ formatRupiah(totalSales) }}</td>
-                            <td class="border border-gray-400 p-2 text-right">Rp {{ formatRupiah(totalProfit) }}</td>
+                            <td class="border border-gray-400 p-2 text-right">Rp {{ formatRupiah(totalTransactionProfit) }}</td>
                         </tr>
                     </tfoot>
                 </table>
@@ -726,7 +890,7 @@ const flash = computed(() => usePage().props.flash ?? {});
                     </div>
 
                     <div class="pt-2 border-t border-border flex justify-between items-center">
-                        <span class="text-sm font-medium text-muted-foreground">Total Keuntungan Bersih:</span>
+                        <span class="text-sm font-medium text-muted-foreground">Total Profit Transaksi:</span>
                         <span class="text-lg font-black text-emerald-600 dark:text-emerald-400">Rp {{ formatRupiah(selectedTransaction.total_profit) }}</span>
                     </div>
                 </div>
