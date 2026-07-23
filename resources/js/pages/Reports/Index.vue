@@ -731,7 +731,7 @@ const flash = computed(() => usePage().props.flash ?? {});
             <Card class="border-border/60 bg-gradient-to-br from-emerald-500/5 to-teal-500/5 relative overflow-hidden shadow-sm">
                 <CardHeader class="pb-2">
                     <CardTitle class="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                        <span>Laba Kotor</span>
+                        <span>Laba Bersih</span>
                         <i class="fas fa-chart-line text-emerald-500 dark:text-emerald-400 text-sm"></i>
                     </CardTitle>
                 </CardHeader>
