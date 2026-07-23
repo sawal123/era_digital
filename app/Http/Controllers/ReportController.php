@@ -13,7 +13,7 @@ class ReportController extends Controller
 {
     public function index()
     {
-        $transactions = Transaction::with(['items.product', 'items.printVendor', 'paymentHistories', 'customer'])->latest()->get();
+        $transactions = Transaction::with(['items.product.category', 'items.printVendor', 'paymentHistories', 'customer'])->latest()->get();
         $expenses = Expense::orderByDesc('date')->latest()->get();
 
         return Inertia::render('Reports/Index', [

@@ -88,9 +88,9 @@ class PosSeeder extends Seeder
         ]);
 
         // Seed some mock expenses
-        Expense::create(['date' => '2026-05-10', 'name' => 'Bayar Tagihan WiFi Biznet', 'amount' => 350000, 'category' => 'operasional', 'note' => 'Langganan WiFi internet bulanan toko']);
-        Expense::create(['date' => '2026-05-12', 'name' => 'Kertas A4 HVS PaperOne 5 Rim', 'amount' => 200000, 'category' => 'stok', 'note' => 'Bahan baku fotokopi dan cetak spanduk/brosur']);
-        Expense::create(['date' => '2026-05-15', 'name' => 'Token Listrik PLN Kantor', 'amount' => 100000, 'category' => 'operasional', 'note' => 'Listrik operasional mesin fotokopi']);
+        Expense::create(['date' => '2026-05-10', 'name' => 'Bayar Tagihan WiFi Biznet', 'amount' => 350000, 'category' => 'operasional_rutin', 'hpp_status' => 'not_applicable', 'note' => 'Langganan WiFi internet bulanan toko']);
+        Expense::create(['date' => '2026-05-12', 'name' => 'Kertas A4 HVS PaperOne 5 Rim', 'amount' => 200000, 'category' => 'pembelian_stok', 'hpp_status' => 'not_applicable', 'note' => 'Bahan baku fotokopi dan cetak spanduk/brosur']);
+        Expense::create(['date' => '2026-05-15', 'name' => 'Token Listrik PLN Kantor', 'amount' => 100000, 'category' => 'operasional_rutin', 'hpp_status' => 'not_applicable', 'note' => 'Listrik operasional mesin fotokopi']);
 
         // Seed some mock transactions
         $t1 = Transaction::create([

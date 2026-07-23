@@ -78,12 +78,13 @@ class PurchaseController extends Controller
                 'note' => 'Restock: ' . ($request->note ?? 'Stok masuk supplier')
             ]);
 
-            // 4. Catat otomatis ke Tabel Pengeluaran (expenses) kategori 'stok'
+            // 4. Catat otomatis ke Tabel Pengeluaran (expenses) kategori pembelian stok
             Expense::create([
                 'date' => $request->purchase_date,
                 'name' => 'Belanja Stok: ' . $product->name,
                 'amount' => $totalPrice,
-                'category' => 'stok',
+                'category' => 'pembelian_stok',
+                'hpp_status' => 'not_applicable',
                 'note' => 'Jumlah: ' . parseFloatAsString($request->quantity) . ' ' . $product->unit . ' @ Rp ' . number_format($request->cost_price, 0, ',', '.') . '. ' . ($request->note ?? '')
             ]);
 

@@ -241,6 +241,16 @@ const exportExcel = () => {
             <td>${Number(transaction.total_profit || 0)}</td>
         </tr>
     `).join('');
+    const businessRows = businessCategoryRows.value.map(category => `
+        <tr>
+            <td>${escapeHtml(category.label)}</td>
+            <td>${Number(category.omzet || 0)}</td>
+            <td>${Number(category.modal || 0)}</td>
+            <td>${Number(category.laba || 0)}</td>
+            <td>${Number(category.margin || 0).toFixed(1)}%</td>
+            <td>${Number(category.transactionCount || 0)}</td>
+        </tr>
+    `).join('');
 
     const workbook = `
         <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
@@ -248,7 +258,14 @@ const exportExcel = () => {
             <body>
                 <table border="1">
                     <tr><th colspan="7">Laporan Penjualan - ${escapeHtml(filterLabel.value)}</th></tr>
-                    <tr><td colspan="7">Pengeluaran: ${Number(totalExpenses.value)} | Profit Bersih: ${Number(netProfit.value)}</td></tr>
+                    <tr><td colspan="7">Pengeluaran: ${Number(totalExpenses.value)} | Pendapatan Bersih: ${Number(netProfit.value)}</td></tr>
+                    <tr><td colspan="7"></td></tr>
+                    <tr><th colspan="6">Performa per Jenis Usaha</th></tr>
+                    <tr>
+                        <th>Jenis Usaha</th><th>Omzet</th><th>Modal / HPP</th><th>Laba</th><th>Margin</th><th>Transaksi</th>
+                    </tr>
+                    ${businessRows}
+                    <tr><td colspan="7"></td></tr>
                     <tr>
                         <th>Nomor Invoice</th><th>Tanggal</th><th>Customer</th><th>Metode Pembayaran</th>
                         <th>Status</th><th>Total Belanja</th><th>Keuntungan</th>
@@ -281,8 +298,170 @@ return;
 const totalSales  = computed(() => filteredTransactions.value.reduce((sum, transaction) => sum + toNumber(transaction.total_price), 0));
 const totalBase   = computed(() => filteredTransactions.value.reduce((sum, transaction) => sum + toNumber(transaction.total_base_price), 0));
 const totalTransactionProfit = computed(() => filteredTransactions.value.reduce((sum, transaction) => sum + toNumber(transaction.total_profit), 0));
-const totalExpenses = computed(() => filteredExpenses.value.reduce((sum, expense) => sum + toNumber(expense.amount), 0));
-const netProfit = computed(() => totalSales.value - totalBase.value);
+const affectsProfit = (expense) => expense.category !== 'pribadi_pemilik'
+    && !(expense.category === 'hpp_pesanan' && expense.hpp_status === 'sudah_masuk_hpp');
+const profitAffectingExpenses = computed(() => filteredExpenses.value.filter(affectsProfit));
+const totalExpenses = computed(() => profitAffectingExpenses.value.reduce((sum, expense) => sum + toNumber(expense.amount), 0));
+const netProfit = computed(() => totalSales.value - totalBase.value - totalExpenses.value);
+
+const businessCategories = [
+    {
+        key: 'saldo_digital',
+        label: 'Saldo digital',
+        icon: 'fas fa-bolt',
+        description: 'Pulsa, token, top-up',
+        accentClass: 'from-violet-500 to-indigo-500',
+        iconClass: 'text-violet-500 dark:text-violet-400',
+    },
+    {
+        key: 'atk',
+        label: 'ATK',
+        icon: 'fas fa-pen-ruler',
+        description: 'Pulpen, kertas, alat sekolah',
+        accentClass: 'from-emerald-500 to-teal-500',
+        iconClass: 'text-emerald-500 dark:text-emerald-400',
+    },
+    {
+        key: 'percetakan',
+        label: 'Percetakan',
+        icon: 'fas fa-print',
+        description: 'Spanduk, undangan, fotokopi',
+        accentClass: 'from-amber-500 to-orange-500',
+        iconClass: 'text-amber-500 dark:text-amber-400',
+    },
+    {
+        key: 'jasa',
+        label: 'Jasa',
+        icon: 'fas fa-file-signature',
+        description: 'Desain, pengetikan, edit dokumen',
+        accentClass: 'from-sky-500 to-cyan-500',
+        iconClass: 'text-sky-500 dark:text-sky-400',
+    },
+];
+
+const includesAny = (value, keywords) => keywords.some((keyword) => value.includes(keyword));
+const normalizeText = (value) => String(value ?? '').toLowerCase();
+const getItemSearchText = (item) => [
+    item.item_name,
+    item.product?.name,
+    item.product?.sku,
+    item.product?.category?.name,
+    item.product?.category?.slug,
+    item.product?.category?.type,
+    item.type,
+].map(normalizeText).join(' ');
+
+const classifyBusinessItem = (item) => {
+    const searchText = getItemSearchText(item);
+    const categoryType = item.product?.category?.type || item.type;
+
+    if (categoryType === 'ppob' || item.type === 'ppob' || includesAny(searchText, ['pulsa', 'token', 'topup', 'top-up', 'e-wallet', 'saldo digital'])) {
+        return 'saldo_digital';
+    }
+
+    if (includesAny(searchText, ['desain', 'design', 'pengetikan', 'ketik', 'edit dokumen', 'edit file', 'layout'])) {
+        return 'jasa';
+    }
+
+    if (categoryType === 'fisik' || item.type === 'fisik' || includesAny(searchText, ['atk', 'pulpen', 'pena', 'kertas', 'buku', 'alat sekolah', 'kalkulator', 'plastik'])) {
+        return 'atk';
+    }
+
+    if (includesAny(searchText, ['spanduk', 'baliho', 'undangan', 'fotokopi', 'photo copy', 'cetak', 'print', 'brosur', 'stiker', 'banner', 'jilid', 'laminating'])) {
+        return 'percetakan';
+    }
+
+    return categoryType === 'jasa' || item.type === 'jasa' ? 'percetakan' : 'jasa';
+};
+
+const classifyExpenseBusinessCategory = (expense) => {
+    const searchText = [expense.name, expense.note, expense.transaction?.invoice_number]
+        .map(normalizeText)
+        .join(' ');
+
+    if (includesAny(searchText, ['pulsa', 'token', 'topup', 'top-up', 'e-wallet', 'saldo digital'])) {
+        return 'saldo_digital';
+    }
+
+    if (includesAny(searchText, ['atk', 'pulpen', 'pena', 'kertas', 'buku', 'alat sekolah', 'kalkulator', 'plastik'])) {
+        return 'atk';
+    }
+
+    if (includesAny(searchText, ['desain', 'design', 'pengetikan', 'ketik', 'edit dokumen', 'edit file', 'layout'])) {
+        return 'jasa';
+    }
+
+    if (includesAny(searchText, ['spanduk', 'baliho', 'undangan', 'fotokopi', 'photo copy', 'cetak', 'print', 'brosur', 'stiker', 'banner', 'jilid', 'laminating'])) {
+        return 'percetakan';
+    }
+
+    const linkedTransaction = filteredTransactions.value.find((transaction) => transaction.id === expense.transaction_id);
+    const dominantCategory = linkedTransaction?.items?.reduce((best, item) => {
+        const key = classifyBusinessItem(item);
+        const omzet = toNumber(item.subtotal_price);
+
+        if (!best || omzet > best.omzet) {
+            return { key, omzet };
+        }
+
+        return best;
+    }, null);
+
+    return dominantCategory?.key || 'percetakan';
+};
+
+const businessCategoryRows = computed(() => {
+    const rows = Object.fromEntries(businessCategories.map((category) => [
+        category.key,
+        {
+            ...category,
+            omzet: 0,
+            modal: 0,
+            laba: 0,
+            margin: 0,
+            transactionIds: new Set(),
+            adjustmentTotal: 0,
+        },
+    ]));
+
+    filteredTransactions.value.forEach((transaction) => {
+        (transaction.items || []).forEach((item) => {
+            const key = classifyBusinessItem(item);
+            const row = rows[key] || rows.jasa;
+
+            row.omzet += toNumber(item.subtotal_price);
+            row.modal += toNumber(item.subtotal_base);
+            row.transactionIds.add(transaction.id);
+        });
+    });
+
+    filteredExpenses.value
+        .filter((expense) => expense.category === 'hpp_pesanan' && expense.hpp_status !== 'sudah_masuk_hpp')
+        .forEach((expense) => {
+            const key = classifyExpenseBusinessCategory(expense);
+            const row = rows[key] || rows.percetakan;
+            const amount = toNumber(expense.amount);
+
+            row.modal += amount;
+            row.adjustmentTotal += amount;
+
+            if (expense.transaction_id) {
+                row.transactionIds.add(expense.transaction_id);
+            }
+        });
+
+    return businessCategories.map((category) => {
+        const row = rows[category.key];
+        const laba = row.omzet - row.modal;
+
+        return {
+            ...row,
+            laba,
+            margin: row.omzet > 0 ? (laba / row.omzet) * 100 : 0,
+            transactionCount: row.transactionIds.size,
+        };
+    });
+});
 
 // ─── DETAIL DIALOG ────────────────────────────────────────────────
 const selectedTransaction = ref(null);
@@ -544,7 +723,7 @@ const flash = computed(() => usePage().props.flash ?? {});
                 </CardHeader>
                 <CardContent>
                     <div class="text-2xl font-black text-rose-600 dark:text-rose-400">Rp {{ formatRupiah(totalExpenses) }}</div>
-                    <p class="text-[11px] text-muted-foreground mt-1">{{ filteredExpenses.length }} catatan pengeluaran pada periode ini</p>
+                    <p class="text-[11px] text-muted-foreground mt-1">{{ profitAffectingExpenses.length }} pengeluaran berdampak laba pada periode ini</p>
                 </CardContent>
                 <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 to-red-500"></div>
             </Card>
@@ -552,7 +731,7 @@ const flash = computed(() => usePage().props.flash ?? {});
             <Card class="border-border/60 bg-gradient-to-br from-emerald-500/5 to-teal-500/5 relative overflow-hidden shadow-sm">
                 <CardHeader class="pb-2">
                     <CardTitle class="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                        <span>Keuntungan Bersih (Profit)</span>
+                        <span>Laba Kotor</span>
                         <i class="fas fa-chart-line text-emerald-500 dark:text-emerald-400 text-sm"></i>
                     </CardTitle>
                 </CardHeader>
@@ -560,11 +739,63 @@ const flash = computed(() => usePage().props.flash ?? {});
                     <div class="text-2xl font-black" :class="netProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'">
                         Rp {{ formatRupiah(netProfit) }}
                     </div>
-                    <p class="text-[11px] text-muted-foreground mt-1">Omset dikurangi total harga modal sesuai filter aktif</p>
+                    <p class="text-[11px] text-muted-foreground mt-1">Omset dikurangi modal/HPP dan pengeluaran sesuai filter aktif</p>
                 </CardContent>
                 <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500"></div>
             </Card>
         </div>
+
+        <Card class="border-border/50 shadow-sm overflow-hidden bg-card text-card-foreground">
+            <CardHeader class="border-b border-border/40 py-4 bg-muted/10">
+                <div class="flex flex-col gap-1">
+                    <CardTitle class="text-sm font-bold text-foreground">Performa per Jenis Usaha</CardTitle>
+                    <CardDescription class="text-xs text-muted-foreground">Breakdown omzet, modal, laba, margin, dan jumlah transaksi periode {{ filterLabel }}.</CardDescription>
+                </div>
+            </CardHeader>
+            <CardContent class="p-0">
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[780px] text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-border bg-muted/30 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                <th class="p-4 pl-6">Jenis Usaha</th>
+                                <th class="p-4 text-right">Omzet</th>
+                                <th class="p-4 text-right">Modal / HPP</th>
+                                <th class="p-4 text-right">Laba</th>
+                                <th class="p-4 text-right">Margin</th>
+                                <th class="p-4 text-right pr-6">Transaksi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-border text-sm">
+                            <tr v-for="category in businessCategoryRows" :key="category.key" class="hover:bg-muted/30 transition">
+                                <td class="p-4 pl-6">
+                                    <div class="flex items-center gap-3">
+                                        <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-muted/60 border border-border/60">
+                                            <i :class="[category.icon, category.iconClass]" class="text-sm"></i>
+                                        </div>
+                                        <div>
+                                            <p class="font-bold text-foreground">{{ category.label }}</p>
+                                            <p class="text-[11px] text-muted-foreground">{{ category.description }}</p>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="p-4 text-right font-bold font-mono text-foreground">Rp {{ formatRupiah(category.omzet) }}</td>
+                                <td class="p-4 text-right font-mono text-muted-foreground">
+                                    <div>Rp {{ formatRupiah(category.modal) }}</div>
+                                    <div v-if="category.adjustmentTotal > 0" class="text-[10px] text-amber-600 dark:text-amber-400">+HPP eksternal Rp {{ formatRupiah(category.adjustmentTotal) }}</div>
+                                </td>
+                                <td class="p-4 text-right font-bold font-mono" :class="category.laba >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'">
+                                    Rp {{ formatRupiah(category.laba) }}
+                                </td>
+                                <td class="p-4 text-right font-bold font-mono" :class="category.margin >= 0 ? 'text-foreground' : 'text-red-600 dark:text-red-400'">
+                                    {{ category.margin.toFixed(1) }}%
+                                </td>
+                                <td class="p-4 text-right pr-6 font-bold text-foreground">{{ category.transactionCount }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </CardContent>
+        </Card>
 
         <!-- History Table -->
         <Card class="border-border/50 shadow-sm overflow-hidden bg-card text-card-foreground">
@@ -741,7 +972,30 @@ const flash = computed(() => usePage().props.flash ?? {});
             <div ref="exportPdfRef">
                 <h1 class="mb-1 text-xl font-bold">Laporan Penjualan</h1>
                 <p class="mb-5 text-xs">Periode: {{ filterLabel }} | Jumlah transaksi: {{ filteredTransactions.length }}</p>
-                <p class="mb-3 text-xs">Pengeluaran: Rp {{ formatRupiah(totalExpenses) }} | Profit bersih: Rp {{ formatRupiah(netProfit) }}</p>
+                <p class="mb-3 text-xs">Pengeluaran: Rp {{ formatRupiah(totalExpenses) }} | Pendapatan bersih: Rp {{ formatRupiah(netProfit) }}</p>
+                <h2 class="mb-2 text-sm font-bold">Performa per Jenis Usaha</h2>
+                <table class="mb-5 w-full border-collapse text-xs">
+                    <thead>
+                        <tr>
+                            <th class="border border-gray-400 p-2 text-left">Jenis Usaha</th>
+                            <th class="border border-gray-400 p-2 text-right">Omzet</th>
+                            <th class="border border-gray-400 p-2 text-right">Modal / HPP</th>
+                            <th class="border border-gray-400 p-2 text-right">Laba</th>
+                            <th class="border border-gray-400 p-2 text-right">Margin</th>
+                            <th class="border border-gray-400 p-2 text-right">Transaksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="category in businessCategoryRows" :key="`pdf-category-${category.key}`">
+                            <td class="border border-gray-300 p-2">{{ category.label }}</td>
+                            <td class="border border-gray-300 p-2 text-right">Rp {{ formatRupiah(category.omzet) }}</td>
+                            <td class="border border-gray-300 p-2 text-right">Rp {{ formatRupiah(category.modal) }}</td>
+                            <td class="border border-gray-300 p-2 text-right">Rp {{ formatRupiah(category.laba) }}</td>
+                            <td class="border border-gray-300 p-2 text-right">{{ category.margin.toFixed(1) }}%</td>
+                            <td class="border border-gray-300 p-2 text-right">{{ category.transactionCount }}</td>
+                        </tr>
+                    </tbody>
+                </table>
                 <table class="w-full border-collapse text-xs">
                     <thead>
                         <tr>

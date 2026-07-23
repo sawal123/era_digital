@@ -18,7 +18,7 @@ class DashboardController extends Controller
         // 1. KARTU STATISTIK (HARI INI)
         $totalOmset = (float) Transaction::whereDate('created_at', $today)->sum('total_price');
         $totalModal = (float) Transaction::whereDate('created_at', $today)->sum('total_base_price');
-        $totalPengeluaran = (float) Expense::whereDate('date', $today)->sum('amount');
+        $totalPengeluaran = (float) Expense::affectsProfit()->whereDate('date', $today)->sum('amount');
         
         $totalProfitToday = (float) Transaction::whereDate('created_at', $today)->sum('total_profit');
         $keuntunganBersih = $totalProfitToday - $totalPengeluaran;
@@ -37,7 +37,7 @@ class DashboardController extends Controller
             $dateString = $date->toDateString();
             
             $profit = Transaction::whereDate('created_at', $dateString)->sum('total_profit');
-            $expense = Expense::whereDate('date', $dateString)->sum('amount');
+            $expense = Expense::affectsProfit()->whereDate('date', $dateString)->sum('amount');
             $netProfit = $profit - $expense;
 
             $ppobProfit = (float) TransactionItem::where('type', 'ppob')

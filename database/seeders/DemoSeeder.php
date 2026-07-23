@@ -111,8 +111,8 @@ class DemoSeeder extends Seeder
         Purchase::create(['product_id' => $pulpen->id, 'quantity' => 50, 'cost_price' => 2000, 'total_price' => 100000, 'purchase_date' => '2026-06-01', 'note' => 'Stok awal demo']);
         StockMovement::create(['product_id' => $pulpen->id, 'type' => 'in', 'quantity' => 50, 'reference_id' => 1, 'note' => 'Stok awal demo']);
 
-        Expense::create(['date' => '2026-06-01', 'name' => 'Bayar Tagihan WiFi', 'amount' => 350000, 'category' => 'operasional', 'note' => 'Biaya operasional demo']);
-        Expense::create(['date' => '2026-06-02', 'name' => 'Kertas A4 HVS 5 Rim', 'amount' => 200000, 'category' => 'stok', 'note' => 'Bahan baku demo']);
+        Expense::create(['date' => '2026-06-01', 'name' => 'Bayar Tagihan WiFi', 'amount' => 350000, 'category' => 'operasional_rutin', 'hpp_status' => 'not_applicable', 'note' => 'Biaya operasional demo']);
+        Expense::create(['date' => '2026-06-02', 'name' => 'Kertas A4 HVS 5 Rim', 'amount' => 200000, 'category' => 'pembelian_stok', 'hpp_status' => 'not_applicable', 'note' => 'Bahan baku demo']);
 
         $transaction = Transaction::create([
             'invoice_number' => 'TRX-DEMO-0001',
