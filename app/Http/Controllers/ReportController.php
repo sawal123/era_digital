@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Expense;
 use App\Models\Transaction;
 use App\Models\Product;
+use App\Models\Customer;
 use Inertia\Inertia;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -15,10 +16,12 @@ class ReportController extends Controller
     {
         $transactions = Transaction::with(['items.product.category', 'items.printVendor', 'paymentHistories', 'customer'])->latest()->get();
         $expenses = Expense::orderByDesc('date')->latest()->get();
+        $customers = Customer::orderBy('name')->get(['id', 'name', 'phone', 'customer_type']);
 
         return Inertia::render('Reports/Index', [
             'transactions' => $transactions,
             'expenses' => $expenses,
+            'customers' => $customers,
         ]);
     }
     
@@ -65,5 +68,33 @@ class ReportController extends Controller
 
         return redirect()->route('reports.index')
             ->with('success', "Penerima invoice {$transaction->invoice_number} berhasil diperbarui.");
+    }
+
+    public function updateCustomer(Request $request, Transaction $transaction)
+    {
+        $validated = $request->validate([
+            'customer_id' => 'nullable|exists:customers,id',
+            'customer_name' => 'nullable|string|max:255',
+            'customer_phone' => 'nullable|string|max:30',
+        ]);
+
+        if (!empty($validated['customer_id'])) {
+            $customer = Customer::findOrFail($validated['customer_id']);
+
+            $transaction->update([
+                'customer_id' => $customer->id,
+                'customer_name' => $customer->name,
+                'customer_phone' => $customer->phone,
+            ]);
+        } else {
+            $transaction->update([
+                'customer_id' => null,
+                'customer_name' => $validated['customer_name'] ?? null,
+                'customer_phone' => $validated['customer_phone'] ?? null,
+            ]);
+        }
+
+        return redirect()->route('reports.index')
+            ->with('success', "Customer nota {$transaction->invoice_number} berhasil diperbarui.");
     }
 }

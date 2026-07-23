@@ -36,6 +36,10 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    customers: {
+        type: Array,
+        default: () => [],
+    },
 });
 
 const padDatePart = (value) => String(value).padStart(2, '0');
@@ -469,6 +473,13 @@ const detailOpen = ref(false);
 const invoiceRecipientName = ref('');
 const invoiceRecipientPhone = ref('');
 const isSavingInvoiceRecipient = ref(false);
+const customerEditOpen = ref(false);
+const customerEditTarget = ref(null);
+const customerEditMode = ref('existing');
+const customerEditSelectedId = ref('');
+const customerEditName = ref('');
+const customerEditPhone = ref('');
+const isSavingCustomerEdit = ref(false);
 
 const openDetail = (trx) => {
     selectedTransaction.value = trx;
@@ -496,6 +507,46 @@ return;
         onError: () => {
  isSavingInvoiceRecipient.value = false; 
 },
+    });
+};
+
+const openCustomerEdit = (trx) => {
+    customerEditTarget.value = trx;
+    customerEditSelectedId.value = trx.customer_id || trx.customer?.id || '';
+    customerEditMode.value = customerEditSelectedId.value ? 'existing' : 'manual';
+    customerEditName.value = trx.customer_name || trx.customer?.name || '';
+    customerEditPhone.value = trx.customer_phone || trx.customer?.phone || '';
+    customerEditOpen.value = true;
+};
+
+const saveCustomerEdit = () => {
+    if (!customerEditTarget.value) {
+return;
+}
+
+    const payload = customerEditMode.value === 'existing'
+        ? {
+            customer_id: customerEditSelectedId.value || null,
+            customer_name: null,
+            customer_phone: null,
+        }
+        : {
+            customer_id: null,
+            customer_name: customerEditName.value.trim() || null,
+            customer_phone: customerEditPhone.value.trim() || null,
+        };
+
+    isSavingCustomerEdit.value = true;
+    router.patch(`/reports/${customerEditTarget.value.id}/customer`, payload, {
+        preserveScroll: true,
+        onSuccess: () => {
+            customerEditOpen.value = false;
+            customerEditTarget.value = null;
+            isSavingCustomerEdit.value = false;
+        },
+        onError: () => {
+            isSavingCustomerEdit.value = false;
+        },
     });
 };
 
@@ -926,6 +977,9 @@ const flash = computed(() => usePage().props.flash ?? {});
                                         <Button @click="openDetail(trx)" variant="ghost" size="icon-sm" title="Detail transaksi" aria-label="Detail transaksi" class="h-8 rounded-xl text-indigo-600 hover:text-indigo-900 dark:text-indigo-400">
                                             <i class="fas fa-eye"></i>
                                         </Button>
+                                        <Button @click="openCustomerEdit(trx)" variant="ghost" size="icon-sm" title="Edit customer nota" aria-label="Edit customer nota" class="h-8 rounded-xl text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">
+                                            <i class="fas fa-user-edit"></i>
+                                        </Button>
                                         <a :href="`/pos/print/${trx.invoice_number}`" target="_blank"
                                             data-click-feedback="action"
                                             title="Cetak transaksi" aria-label="Cetak transaksi"
@@ -1153,6 +1207,95 @@ const flash = computed(() => usePage().props.flash ?? {});
                     <DialogClose as-child>
                         <Button type="button" variant="secondary" class="rounded-xl">Tutup</Button>
                     </DialogClose>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
+        <!-- DIALOG EDIT CUSTOMER NOTA -->
+        <Dialog :open="customerEditOpen" @update:open="customerEditOpen = $event">
+            <DialogContent class="sm:max-w-[520px] rounded-2xl bg-card border-border text-foreground">
+                <DialogHeader v-if="customerEditTarget">
+                    <DialogTitle class="flex items-center gap-2">
+                        <i class="fas fa-user-edit text-blue-500"></i>
+                        Edit Customer Nota
+                    </DialogTitle>
+                    <DialogDescription class="text-xs">
+                        Ubah customer pada nota {{ customerEditTarget.invoice_number }}.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div v-if="customerEditTarget" class="space-y-4 py-2">
+                    <div class="rounded-2xl border border-border bg-muted/20 p-4 text-xs">
+                        <p class="text-muted-foreground">Customer saat ini</p>
+                        <p class="mt-1 font-bold text-foreground">{{ getCustomerName(customerEditTarget) }}</p>
+                        <p class="text-muted-foreground">{{ customerEditTarget.customer_phone || customerEditTarget.customer?.phone || '-' }}</p>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 rounded-xl bg-muted/40 p-1">
+                        <button
+                            type="button"
+                            class="rounded-lg px-3 py-2 text-xs font-bold transition"
+                            :class="customerEditMode === 'existing' ? 'bg-blue-600 text-white shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+                            @click="customerEditMode = 'existing'"
+                        >
+                            Customer Tersimpan
+                        </button>
+                        <button
+                            type="button"
+                            class="rounded-lg px-3 py-2 text-xs font-bold transition"
+                            :class="customerEditMode === 'manual' ? 'bg-blue-600 text-white shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+                            @click="customerEditMode = 'manual'"
+                        >
+                            Manual / Umum
+                        </button>
+                    </div>
+
+                    <div v-if="customerEditMode === 'existing'" class="space-y-1.5">
+                        <label for="report-customer-select" class="text-xs font-bold text-foreground">Pilih Customer</label>
+                        <select
+                            id="report-customer-select"
+                            v-model="customerEditSelectedId"
+                            class="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="">Pilih customer...</option>
+                            <option v-for="customer in customers" :key="customer.id" :value="customer.id">
+                                {{ customer.name }}{{ customer.phone ? ` - ${customer.phone}` : '' }}
+                            </option>
+                        </select>
+                    </div>
+
+                    <div v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div class="space-y-1.5">
+                            <label for="report-customer-name" class="text-xs font-bold text-foreground">Nama Customer</label>
+                            <input
+                                id="report-customer-name"
+                                v-model="customerEditName"
+                                type="text"
+                                placeholder="Cash / Umum"
+                                class="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
+                        <div class="space-y-1.5">
+                            <label for="report-customer-phone" class="text-xs font-bold text-foreground">Nomor HP</label>
+                            <input
+                                id="report-customer-phone"
+                                v-model="customerEditPhone"
+                                type="text"
+                                placeholder="Opsional"
+                                class="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <DialogFooter class="gap-2">
+                    <DialogClose as-child>
+                        <Button type="button" variant="secondary" class="rounded-xl" :disabled="isSavingCustomerEdit">Batal</Button>
+                    </DialogClose>
+                    <Button type="button" class="rounded-xl bg-blue-600 hover:bg-blue-700 text-white" :disabled="isSavingCustomerEdit || (customerEditMode === 'existing' && !customerEditSelectedId)" @click="saveCustomerEdit">
+                        <i class="fas fa-save text-xs"></i>
+                        {{ isSavingCustomerEdit ? 'Menyimpan...' : 'Simpan Customer' }}
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

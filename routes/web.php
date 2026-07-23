@@ -38,6 +38,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Laporan Penjualan
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
     Route::patch('/reports/{transaction}/invoice-recipient', [ReportController::class, 'updateInvoiceRecipient'])->name('reports.invoice-recipient.update');
+    Route::patch('/reports/{transaction}/customer', [ReportController::class, 'updateCustomer'])->name('reports.customer.update');
     Route::delete('/reports/{transaction}', [ReportController::class, 'destroy'])->name('reports.destroy');
 
     // Pengeluaran CRUD
