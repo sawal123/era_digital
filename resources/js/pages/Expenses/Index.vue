@@ -161,6 +161,7 @@ const initDateRangePicker = () => {
 
 // Form modal state
 const formOpen = ref(false);
+const editTarget = ref(null);
 
 const form = useForm({
     date: new Date().toISOString().split('T')[0],
@@ -172,30 +173,70 @@ const form = useForm({
     note: '',
 });
 
-const openCreateModal = () => {
+const resetExpenseForm = () => {
     form.reset();
+    form.clearErrors();
     form.date = new Date().toISOString().split('T')[0];
     form.category = 'operasional_rutin';
     form.transaction_id = '';
     form.hpp_status = 'belum_masuk_hpp';
+    form.note = '';
+};
+
+const openCreateModal = () => {
+    editTarget.value = null;
+    resetExpenseForm();
+    formOpen.value = true;
+};
+
+const openEditModal = (expense) => {
+    editTarget.value = expense;
+    form.clearErrors();
+    form.date = expense.date;
+    form.name = expense.name;
+    form.amount = expense.amount;
+    form.category = normalizeCategory(expense.category);
+    form.transaction_id = expense.transaction_id || '';
+    form.hpp_status = expense.hpp_status || (normalizeCategory(expense.category) === 'hpp_pesanan' ? 'belum_masuk_hpp' : 'not_applicable');
+    form.note = expense.note || '';
     formOpen.value = true;
 };
 
 const submitForm = () => {
-    form.post('/expenses', {
-        onSuccess: () => {
-            formOpen.value = false;
-            form.reset();
-            form.category = 'operasional_rutin';
-            form.transaction_id = '';
-            form.hpp_status = 'belum_masuk_hpp';
-        },
-    });
+    const request = editTarget.value
+        ? form.patch(`/expenses/${editTarget.value.id}`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                formOpen.value = false;
+                editTarget.value = null;
+                resetExpenseForm();
+            },
+        })
+        : form.post('/expenses', {
+            preserveScroll: true,
+            onSuccess: () => {
+                formOpen.value = false;
+                resetExpenseForm();
+            },
+        });
+
+    return request;
+};
+
+const closeFormModal = (open) => {
+    formOpen.value = open;
+
+    if (!open) {
+        editTarget.value = null;
+        resetExpenseForm();
+    }
 };
 
 const deleteExpense = (id) => {
     if (confirm('Apakah Anda yakin ingin menghapus catatan pengeluaran ini?')) {
-        form.delete(`/expenses/${id}`);
+        form.delete(`/expenses/${id}`, {
+            preserveScroll: true,
+        });
     }
 };
 
@@ -513,9 +554,14 @@ onBeforeUnmount(() => {
                                 </td>
                                 <!-- Actions -->
                                 <td class="p-4 text-right pr-6">
-                                    <Button @click="deleteExpense(exp.id)" variant="ghost" size="icon-sm" title="Hapus pengeluaran" aria-label="Hapus pengeluaran" class="h-8 rounded-lg text-red-650 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20">
-                                        <i class="fas fa-trash-alt"></i>
-                                    </Button>
+                                    <div class="flex items-center justify-end gap-1.5">
+                                        <Button @click="openEditModal(exp)" variant="ghost" size="icon-sm" title="Edit pengeluaran" aria-label="Edit pengeluaran" class="h-8 rounded-lg text-blue-600 hover:text-blue-800 hover:bg-blue-50 dark:text-blue-400 dark:hover:text-blue-300 dark:hover:bg-blue-950/20">
+                                            <i class="fas fa-pen"></i>
+                                        </Button>
+                                        <Button @click="deleteExpense(exp.id)" variant="ghost" size="icon-sm" title="Hapus pengeluaran" aria-label="Hapus pengeluaran" class="h-8 rounded-lg text-red-650 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </Button>
+                                    </div>
                                 </td>
                             </tr>
                         </tbody>
@@ -525,15 +571,15 @@ onBeforeUnmount(() => {
         </Card>
 
         <!-- DIALOG RECORD FORM -->
-        <Dialog :open="formOpen" @update:open="formOpen = $event">
+        <Dialog :open="formOpen" @update:open="closeFormModal">
             <DialogContent class="sm:max-w-[480px] rounded-2xl bg-card border-border text-foreground">
                 <DialogHeader>
                     <DialogTitle class="flex items-center gap-2">
-                        <i class="fas fa-wallet text-red-500"></i>
-                        Catat Biaya Pengeluaran Baru
+                        <i :class="editTarget ? 'fas fa-pen text-blue-500' : 'fas fa-wallet text-red-500'"></i>
+                        {{ editTarget ? 'Edit Pengeluaran' : 'Catat Biaya Pengeluaran Baru' }}
                     </DialogTitle>
                     <DialogDescription>
-                        Isi form di bawah ini untuk mencatat pengeluaran operasional toko mandiri Anda secara transparan.
+                        {{ editTarget ? 'Perbarui kategori, nominal, nota terkait, atau status HPP pengeluaran.' : 'Isi form di bawah ini untuk mencatat pengeluaran operasional toko mandiri Anda secara transparan.' }}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -604,7 +650,7 @@ onBeforeUnmount(() => {
                             <Button type="button" variant="secondary" class="rounded-xl">Batal</Button>
                         </DialogClose>
                         <Button type="submit" :disabled="form.processing" class="rounded-xl font-bold bg-red-600 hover:bg-red-700 text-white shadow-sm">
-                            <i class="fas fa-check mr-1.5"></i> Simpan Catatan
+                            <i class="fas fa-check mr-1.5"></i> {{ editTarget ? 'Simpan Perubahan' : 'Simpan Catatan' }}
                         </Button>
                     </DialogFooter>
                 </form>

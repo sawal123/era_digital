@@ -13,7 +13,18 @@ class CustomerController extends Controller
      */
     public function index()
     {
-        $customers = Customer::orderBy('name')->get();
+        $customers = Customer::with([
+                'transactions' => function ($query) {
+                    $query
+                        ->with(['items.product'])
+                        ->latest();
+                },
+            ])
+            ->withCount('transactions')
+            ->withSum('transactions as total_spent', 'total_price')
+            ->orderBy('name')
+            ->get();
+
         return Inertia::render('Customers/Index', [
             'customers' => $customers
         ]);

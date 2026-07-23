@@ -38,6 +38,26 @@ class ExpenseController extends Controller
 
     public function store(Request $request)
     {
+        Expense::create($this->validateExpense($request));
+
+        return redirect()->back()->with('success', 'Pengeluaran berhasil dicatat!');
+    }
+
+    public function update(Request $request, Expense $expense)
+    {
+        $expense->update($this->validateExpense($request));
+
+        return redirect()->back()->with('success', 'Pengeluaran berhasil diperbarui!');
+    }
+
+    public function destroy(Expense $expense)
+    {
+        $expense->delete();
+        return redirect()->back()->with('success', 'Pengeluaran berhasil dihapus!');
+    }
+
+    private function validateExpense(Request $request): array
+    {
         $validated = $request->validate([
             'date' => 'required|date',
             'name' => 'required|string|max:255',
@@ -55,14 +75,6 @@ class ExpenseController extends Controller
             $validated['hpp_status'] = $validated['hpp_status'] ?? 'belum_masuk_hpp';
         }
 
-        Expense::create($validated);
-
-        return redirect()->back()->with('success', 'Pengeluaran berhasil dicatat!');
-    }
-
-    public function destroy(Expense $expense)
-    {
-        $expense->delete();
-        return redirect()->back()->with('success', 'Pengeluaran berhasil dihapus!');
+        return $validated;
     }
 }
