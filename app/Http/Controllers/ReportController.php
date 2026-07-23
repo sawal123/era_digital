@@ -6,16 +6,34 @@ use App\Models\Expense;
 use App\Models\Transaction;
 use App\Models\Product;
 use App\Models\Customer;
+use App\Services\ProfitCalculationService;
 use Inertia\Inertia;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class ReportController extends Controller
 {
-    public function index()
+    public function index(ProfitCalculationService $profitCalculator)
     {
-        $transactions = Transaction::with(['items.product.category', 'items.printVendor', 'paymentHistories', 'customer'])->latest()->get();
-        $expenses = Expense::orderByDesc('date')->latest()->get();
+        $transactions = Transaction::with(['items.product.category', 'items.printVendor', 'paymentHistories', 'customer'])
+            ->withCount('expenseAllocations')
+            ->latest()
+            ->get();
+
+        $expenses = Expense::with([
+                'transaction.customer',
+                'allocations.transaction.customer',
+                'allocations.transactionItem.product.category',
+                'allocations.transactionItem.printVendor',
+            ])
+            ->orderByDesc('date')
+            ->latest()
+            ->get()
+            ->map(function (Expense $expense) use ($profitCalculator) {
+                $expense->setAttribute('finance', $profitCalculator->expenseImpact($expense));
+
+                return $expense;
+            });
         $customers = Customer::orderBy('name')->get(['id', 'name', 'phone', 'customer_type']);
 
         return Inertia::render('Reports/Index', [
@@ -28,6 +46,13 @@ class ReportController extends Controller
 
     public function destroy(Transaction $transaction)
     {
+        if ($transaction->expenseAllocations()->exists()) {
+            return redirect()->route('reports.index')
+                ->withErrors([
+                    'error' => 'Transaksi tidak dapat dihapus karena sudah terhubung dengan pembayaran vendor. Lepaskan alokasi pengeluaran terlebih dahulu.',
+                ]);
+        }
+
         DB::beginTransaction();
         try {
             // Kembalikan stok produk fisik yang terlibat

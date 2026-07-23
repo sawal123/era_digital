@@ -30,4 +30,9 @@ class TransactionItem extends Model
     {
         return $this->belongsTo(PrintVendor::class);
     }
+
+    public function expenseAllocations()
+    {
+        return $this->hasMany(ExpenseAllocation::class);
+    }
 }

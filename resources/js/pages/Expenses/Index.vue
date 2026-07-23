@@ -16,6 +16,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import SearchableSelect from '@/components/SearchableSelect.vue';
 import 'flatpickr/dist/flatpickr.min.css';
 
 defineOptions({
@@ -174,6 +175,7 @@ const form = useForm({
     category: 'operasional_rutin',
     transaction_id: '',
     hpp_status: 'belum_masuk_hpp',
+    allocations: [],
     note: '',
 });
 
@@ -184,6 +186,7 @@ const resetExpenseForm = () => {
     form.category = 'operasional_rutin';
     form.transaction_id = '';
     form.hpp_status = 'belum_masuk_hpp';
+    form.allocations = [];
     form.note = '';
 };
 
@@ -202,11 +205,40 @@ const openEditModal = (expense) => {
     form.category = normalizeCategory(expense.category);
     form.transaction_id = expense.transaction_id || '';
     form.hpp_status = expense.hpp_status || (normalizeCategory(expense.category) === 'hpp_pesanan' ? 'belum_masuk_hpp' : 'not_applicable');
+    form.allocations = (expense.allocations || []).map((allocation) => ({
+        transaction_id: allocation.transaction_id || '',
+        transaction_item_id: allocation.transaction_item_id || '',
+        amount: allocation.amount || '',
+        hpp_status: allocation.hpp_status || 'belum_masuk_hpp',
+        note: allocation.note || '',
+    }));
+
+    if (normalizeCategory(expense.category) === 'hpp_pesanan' && form.allocations.length === 0 && expense.transaction_id) {
+        form.allocations = [{
+            transaction_id: expense.transaction_id,
+            transaction_item_id: '',
+            amount: expense.amount || '',
+            hpp_status: expense.hpp_status || 'belum_masuk_hpp',
+            note: expense.note || '',
+        }];
+    }
+
     form.note = expense.note || '';
     formOpen.value = true;
 };
 
 const submitForm = () => {
+    if (form.category !== 'hpp_pesanan') {
+        form.allocations = [];
+        form.transaction_id = '';
+        form.hpp_status = 'not_applicable';
+    } else {
+        form.allocations = form.allocations.filter((allocation) => allocation.transaction_id
+            || allocation.transaction_item_id
+            || allocation.amount
+            || allocation.note);
+    }
+
     const request = editTarget.value
         ? form.patch(`/expenses/${editTarget.value.id}`, {
             preserveScroll: true,
@@ -301,25 +333,108 @@ const expensesByCategory = computed(() => {
 });
 
 const isDoubleCountRisk = (expense) => normalizeCategory(expense.category) === 'hpp_pesanan'
-    && expense.hpp_status === 'sudah_masuk_hpp';
+    && (expense.allocations || []).some((allocation) => allocation.hpp_status === 'sudah_masuk_hpp');
 const needsHppReview = (expense) => normalizeCategory(expense.category) === 'hpp_pesanan'
-    && expense.hpp_status !== 'sudah_masuk_hpp'
-    && expense.transaction
-    && toNumber(expense.transaction.total_base_price) > 0;
+    && (expense.allocations || []).some((allocation) => allocation.hpp_status !== 'sudah_masuk_hpp'
+        && allocation.transaction
+        && toNumber(allocation.transaction.total_base_price) > 0);
 const affectsProfit = (expense) => normalizeCategory(expense.category) !== 'pribadi_pemilik'
-    && !isDoubleCountRisk(expense);
+    && (normalizeCategory(expense.category) === 'operasional_rutin' || toNumber(expense.finance?.additional_hpp) > 0);
 const profitAffectingTotal = computed(() => filteredExpenses.value
     .filter(affectsProfit)
-    .reduce((sum, expense) => sum + toNumber(expense.amount), 0));
+    .reduce((sum, expense) => sum + toNumber(expense.finance?.additional_hpp) + toNumber(expense.finance?.operational_expense), 0));
 const doubleCountRisks = computed(() => filteredExpenses.value.filter(isDoubleCountRisk));
 const hppReviewItems = computed(() => filteredExpenses.value.filter(needsHppReview));
-const selectedTransaction = computed(() => props.transactions.find((transaction) => transaction.id == form.transaction_id));
+const allocationTotal = computed(() => form.allocations.reduce((sum, allocation) => sum + toNumber(allocation.amount), 0));
+const allocationRemaining = computed(() => Math.max(0, toNumber(form.amount) - allocationTotal.value));
+const allocationIsOverAmount = computed(() => allocationTotal.value > toNumber(form.amount));
+const formAllocationStatus = computed(() => {
+    if (allocationTotal.value <= 0) return 'Belum dialokasikan';
+    if (allocationTotal.value >= toNumber(form.amount)) return 'Dialokasikan penuh';
+
+    return 'Dialokasikan sebagian';
+});
+
+const addAllocationRow = () => {
+    form.allocations.push({
+        transaction_id: '',
+        transaction_item_id: '',
+        amount: '',
+        hpp_status: 'belum_masuk_hpp',
+        note: '',
+    });
+};
+
+const removeAllocationRow = (index) => {
+    form.allocations.splice(index, 1);
+};
+
+const getAllocationTransaction = (allocation) => props.transactions.find((transaction) => String(transaction.id) === String(allocation.transaction_id));
+const getAllocationItems = (allocation) => [
+    {
+        id: '',
+        item_name: 'Level nota / belum pilih item',
+        search_label: 'level nota belum pilih item',
+    },
+    ...(getAllocationTransaction(allocation)?.items || []),
+];
+const clearAllocationItem = (allocation) => {
+    allocation.transaction_item_id = '';
+};
 
 const getTransactionLabel = (transaction) => {
     const customerName = transaction.customer_name || transaction.customer?.name || 'Cash / Umum';
     const date = String(transaction.created_at ?? '').slice(0, 10);
 
     return `${transaction.invoice_number} - ${customerName}${date ? ` (${date})` : ''}`;
+};
+
+const getTransactionDescription = (transaction) => {
+    const customerName = transaction.customer_name || transaction.customer?.name || 'Cash / Umum';
+
+    return `Customer: ${customerName} | Omset Rp ${formatRupiah(transaction.total_price || 0)} | HPP Rp ${formatRupiah(transaction.total_base_price || 0)}`;
+};
+
+const getItemLabel = (item) => {
+    if (item.id === '') {
+        return 'Level nota / belum pilih item';
+    }
+
+    const vendorName = item.print_vendor?.name || item.printVendor?.name || 'Tanpa vendor';
+
+    return `${item.item_name} - ${item.quantity} ${item.unit || 'pcs'}`;
+};
+
+const getItemDescription = (item) => {
+    if (item.id === '') {
+        return 'Alokasi hanya dihubungkan ke nota, bukan item spesifik.';
+    }
+
+    const vendorName = item.print_vendor?.name || item.printVendor?.name || 'Tanpa vendor';
+
+    return `HPP nota Rp ${formatRupiah(item.subtotal_base || 0)} | Harga jual Rp ${formatRupiah(item.subtotal_price || 0)} | Vendor: ${vendorName}`;
+};
+
+const getExpenseAllocatedAmount = (expense) => toNumber(expense.finance?.allocated_amount ?? expense.allocated_amount);
+const getExpenseUnallocatedAmount = (expense) => toNumber(expense.finance?.unallocated_amount ?? expense.unallocated_amount);
+const getExpenseAllocationStatus = (expense) => expense.finance?.allocation_status || expense.allocation_status || 'belum_dialokasikan';
+const getExpenseAllocationStatusLabel = (expense) => ({
+    belum_dialokasikan: 'Belum dialokasikan',
+    sebagian: 'Sebagian',
+    penuh: 'Penuh',
+}[getExpenseAllocationStatus(expense)] || 'Belum dialokasikan');
+const getExpenseAllocationStatusClass = (expense) => ({
+    belum_dialokasikan: 'bg-slate-500/10 text-slate-600 dark:text-slate-300 border-slate-500/20',
+    sebagian: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+    penuh: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+}[getExpenseAllocationStatus(expense)] || 'bg-slate-500/10 text-slate-600 dark:text-slate-300 border-slate-500/20');
+const getExpenseInvoiceSummary = (expense) => {
+    const invoices = [...new Set((expense.allocations || []).map((allocation) => allocation.transaction?.invoice_number).filter(Boolean))];
+
+    if (invoices.length === 0) return '-';
+    if (invoices.length === 1) return invoices[0];
+
+    return `${invoices.length} nota terkait`;
 };
 
 const formatRupiah = (angka) => {
@@ -347,12 +462,17 @@ watch(() => form.category, (category) => {
     if (category !== 'hpp_pesanan') {
         form.transaction_id = '';
         form.hpp_status = 'not_applicable';
+        form.allocations = [];
 
         return;
     }
 
     if (form.hpp_status === 'not_applicable') {
         form.hpp_status = 'belum_masuk_hpp';
+    }
+
+    if (form.allocations.length === 0) {
+        addAllocationRow();
     }
 });
 
@@ -567,7 +687,15 @@ onBeforeUnmount(() => {
                                 </td>
                                 <!-- Linked Transaction -->
                                 <td class="p-4 text-xs">
-                                    <div v-if="exp.transaction" class="space-y-0.5">
+                                    <div v-if="normalizeCategory(exp.category) === 'hpp_pesanan'" class="space-y-1">
+                                        <p class="font-mono font-bold text-foreground">{{ getExpenseInvoiceSummary(exp) }}</p>
+                                        <p class="text-muted-foreground">Alokasi Rp {{ formatRupiah(getExpenseAllocatedAmount(exp)) }}</p>
+                                        <p class="text-muted-foreground">Sisa Rp {{ formatRupiah(getExpenseUnallocatedAmount(exp)) }}</p>
+                                        <Badge variant="outline" class="rounded-full border px-2 py-0.5 text-[10px] font-bold" :class="getExpenseAllocationStatusClass(exp)">
+                                            {{ getExpenseAllocationStatusLabel(exp) }}
+                                        </Badge>
+                                    </div>
+                                    <div v-else-if="exp.transaction" class="space-y-0.5">
                                         <p class="font-mono font-bold text-foreground">{{ exp.transaction.invoice_number }}</p>
                                         <p class="text-muted-foreground truncate max-w-[180px]">{{ exp.transaction.customer_name || exp.transaction.customer?.name || 'Cash / Umum' }}</p>
                                     </div>
@@ -601,8 +729,8 @@ onBeforeUnmount(() => {
 
         <!-- DIALOG RECORD FORM -->
         <Dialog :open="formOpen" @update:open="closeFormModal">
-            <DialogContent class="sm:max-w-[480px] rounded-2xl bg-card border-border text-foreground">
-                <DialogHeader>
+            <DialogContent class="flex max-h-[92dvh] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-2xl border-border bg-card p-0 text-foreground sm:max-w-[900px] lg:max-w-[1040px]">
+                <DialogHeader class="shrink-0 border-b border-border px-5 pb-3 pt-5">
                     <DialogTitle class="flex items-center gap-2">
                         <i :class="editTarget ? 'fas fa-pen text-blue-500' : 'fas fa-wallet text-red-500'"></i>
                         {{ editTarget ? 'Edit Pengeluaran' : 'Catat Biaya Pengeluaran Baru' }}
@@ -612,73 +740,144 @@ onBeforeUnmount(() => {
                     </DialogDescription>
                 </DialogHeader>
 
-                <form @submit.prevent="submitForm" class="space-y-4 my-2">
-                    <!-- Date -->
-                    <div class="space-y-1.5">
-                        <Label for="exp-date">Tanggal Pengeluaran</Label>
-                        <Input id="exp-date" type="date" v-model="form.date" required class="bg-background border-border text-foreground" />
-                    </div>
-
-                    <!-- Name -->
-                    <div class="space-y-1.5">
-                        <Label for="exp-name">Nama Keperluan / Detail</Label>
-                        <Input id="exp-name" type="text" v-model="form.name" placeholder="Misal: Kertas HVS 1 Rim, Bayar WiFi, token listrik" required class="bg-background border-border text-foreground" />
-                    </div>
-
-                    <!-- Amount & Category Grid -->
-                    <div class="grid grid-cols-2 gap-4">
-                        <!-- Amount -->
+                <form @submit.prevent="submitForm" class="flex min-h-0 flex-1 flex-col">
+                    <div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4 custom-scroll">
+                        <!-- Date -->
                         <div class="space-y-1.5">
-                            <Label for="exp-amount">Nominal Biaya (Rp)</Label>
-                            <Input id="exp-amount" type="number" v-model="form.amount" placeholder="0" min="0" required class="bg-background border-border text-foreground" />
+                            <Label for="exp-date">Tanggal Pengeluaran</Label>
+                            <Input id="exp-date" type="date" v-model="form.date" required class="bg-background border-border text-foreground" />
                         </div>
-                        <!-- Category -->
+
+                        <!-- Name -->
                         <div class="space-y-1.5">
-                            <Label for="exp-cat">Kategori Anggaran</Label>
-                            <select id="exp-cat" v-model="form.category" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] dark:bg-input/30 text-foreground">
-                                <option v-for="category in expenseCategories" :key="category.value" :value="category.value">
-                                    {{ category.label }}
-                                </option>
-                            </select>
+                            <Label for="exp-name">Nama Keperluan / Detail</Label>
+                            <Input id="exp-name" type="text" v-model="form.name" placeholder="Misal: Kertas HVS 1 Rim, Bayar WiFi, token listrik" required class="bg-background border-border text-foreground" />
+                        </div>
+
+                        <!-- Amount & Category Grid -->
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <!-- Amount -->
+                            <div class="space-y-1.5">
+                                <Label for="exp-amount">Nominal Biaya (Rp)</Label>
+                                <Input id="exp-amount" type="number" v-model="form.amount" placeholder="0" min="0" required class="bg-background border-border text-foreground" />
+                            </div>
+                            <!-- Category -->
+                            <div class="space-y-1.5">
+                                <Label for="exp-cat">Kategori Anggaran</Label>
+                                <select id="exp-cat" v-model="form.category" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] dark:bg-input/30 text-foreground">
+                                    <option v-for="category in expenseCategories" :key="category.value" :value="category.value">
+                                        {{ category.label }}
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div v-if="form.category === 'hpp_pesanan'" class="space-y-4 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4">
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <p class="text-sm font-bold text-foreground">Alokasi ke Nota / Pekerjaan Pelanggan</p>
+                                    <p class="text-xs text-muted-foreground">Satu pembayaran vendor dapat dibagi ke banyak nota atau item pekerjaan.</p>
+                                </div>
+                                <Button type="button" variant="outline" size="sm" class="rounded-xl text-xs" @click="addAllocationRow">
+                                    <i class="fas fa-plus text-[10px]"></i>
+                                    Tambahkan Nota/Pekerjaan
+                                </Button>
+                            </div>
+
+                            <div class="space-y-3">
+                                <div v-for="(allocation, index) in form.allocations" :key="index" class="space-y-3 rounded-xl border border-border bg-background/70 p-3">
+                                    <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                                        <div class="space-y-1.5">
+                                            <Label :for="`allocation-transaction-${index}`">Nota / Pelanggan</Label>
+                                            <SearchableSelect
+                                                :id="`allocation-transaction-${index}`"
+                                                v-model="allocation.transaction_id"
+                                                :options="transactions"
+                                                placeholder="Pilih nota..."
+                                                search-placeholder="Cari nomor nota atau customer..."
+                                                empty-text="Nota tidak ditemukan."
+                                                :option-label="getTransactionLabel"
+                                                :option-description="getTransactionDescription"
+                                                @change="clearAllocationItem(allocation)"
+                                            />
+                                        </div>
+
+                                        <div class="space-y-1.5">
+                                            <Label :for="`allocation-item-${index}`">Item Pekerjaan</Label>
+                                            <SearchableSelect
+                                                :id="`allocation-item-${index}`"
+                                                v-model="allocation.transaction_item_id"
+                                                :options="getAllocationItems(allocation)"
+                                                placeholder="Level nota / belum pilih item"
+                                                search-placeholder="Cari item pekerjaan atau vendor..."
+                                                empty-text="Item tidak ditemukan."
+                                                :disabled="!allocation.transaction_id"
+                                                :option-label="getItemLabel"
+                                                :option-description="getItemDescription"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto] lg:items-end">
+                                        <div class="space-y-1.5">
+                                            <Label :for="`allocation-amount-${index}`">Nominal Alokasi</Label>
+                                            <Input :id="`allocation-amount-${index}`" v-model="allocation.amount" type="number" min="0" class="bg-background border-border text-foreground" />
+                                        </div>
+                                        <div class="space-y-1.5">
+                                            <Label :for="`allocation-status-${index}`">Status HPP</Label>
+                                            <select :id="`allocation-status-${index}`" v-model="allocation.hpp_status" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] dark:bg-input/30 text-foreground">
+                                                <option value="belum_masuk_hpp">Belum masuk HPP</option>
+                                                <option value="sudah_masuk_hpp">Sudah masuk HPP</option>
+                                            </select>
+                                        </div>
+                                        <div class="space-y-1.5">
+                                            <Label :for="`allocation-note-${index}`">Catatan</Label>
+                                            <Input :id="`allocation-note-${index}`" v-model="allocation.note" type="text" placeholder="Opsional" class="bg-background border-border text-foreground" />
+                                        </div>
+                                        <Button type="button" variant="ghost" size="sm" class="justify-self-end rounded-xl text-red-600 hover:text-red-700" @click="removeAllocationRow(index)">
+                                            <i class="fas fa-trash-alt text-xs"></i>
+                                            Hapus baris
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-2 rounded-xl border border-border/70 bg-background/70 p-3 text-xs md:grid-cols-4">
+                                <div>
+                                    <p class="text-muted-foreground">Total pembayaran</p>
+                                    <p class="font-bold text-foreground">Rp {{ formatRupiah(form.amount || 0) }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-muted-foreground">Sudah dialokasikan</p>
+                                    <p class="font-bold text-foreground">Rp {{ formatRupiah(allocationTotal) }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-muted-foreground">Sisa belum dialokasikan</p>
+                                    <p class="font-bold" :class="allocationIsOverAmount ? 'text-red-600 dark:text-red-400' : 'text-foreground'">Rp {{ formatRupiah(allocationRemaining) }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-muted-foreground">Status</p>
+                                    <p class="font-bold text-foreground">{{ formAllocationStatus }}</p>
+                                </div>
+                            </div>
+
+                            <p v-if="allocationIsOverAmount" class="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-600 dark:text-red-400">
+                                Total alokasi melebihi nominal pembayaran vendor.
+                            </p>
+                        </div>
+
+                        <!-- Note -->
+                        <div class="space-y-1.5">
+                            <Label for="exp-note">Catatan Tambahan (Opsional)</Label>
+                            <textarea id="exp-note" v-model="form.note" rows="3" placeholder="Tambahkan catatan khusus..." class="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 text-foreground dark:bg-input/30 border-border"></textarea>
                         </div>
                     </div>
 
-                    <div v-if="form.category === 'hpp_pesanan'" class="space-y-4 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4">
-                        <div class="space-y-1.5">
-                            <Label for="exp-transaction">Hubungkan ke Nota / Pekerjaan Pelanggan</Label>
-                            <select id="exp-transaction" v-model="form.transaction_id" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] dark:bg-input/30 text-foreground">
-                                <option value="">Belum dihubungkan</option>
-                                <option v-for="transaction in transactions" :key="transaction.id" :value="transaction.id">
-                                    {{ getTransactionLabel(transaction) }}
-                                </option>
-                            </select>
-                        </div>
-
-                        <div class="space-y-1.5">
-                            <Label for="exp-hpp-status">Status Biaya terhadap HPP Nota</Label>
-                            <select id="exp-hpp-status" v-model="form.hpp_status" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] dark:bg-input/30 text-foreground">
-                                <option value="belum_masuk_hpp">Belum masuk HPP nota, kurangkan dari laba</option>
-                                <option value="sudah_masuk_hpp">Sudah masuk HPP nota, jangan kurangkan lagi</option>
-                            </select>
-                        </div>
-
-                        <div v-if="selectedTransaction" class="rounded-xl border border-border/70 bg-background/60 p-3 text-xs text-muted-foreground">
-                            <p class="font-semibold text-foreground">{{ selectedTransaction.invoice_number }}</p>
-                            <p>Omset: Rp {{ formatRupiah(selectedTransaction.total_price || 0) }} &bull; HPP nota: Rp {{ formatRupiah(selectedTransaction.total_base_price || 0) }}</p>
-                        </div>
-                    </div>
-
-                    <!-- Note -->
-                    <div class="space-y-1.5">
-                        <Label for="exp-note">Catatan Tambahan (Opsional)</Label>
-                        <textarea id="exp-note" v-model="form.note" rows="3" placeholder="Tambahkan catatan khusus..." class="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 text-foreground dark:bg-input/30 border-border"></textarea>
-                    </div>
-
-                    <DialogFooter class="pt-4 border-t border-border gap-2">
+                    <DialogFooter class="shrink-0 gap-2 border-t border-border px-5 py-4">
                         <DialogClose as-child>
                             <Button type="button" variant="secondary" class="rounded-xl">Batal</Button>
                         </DialogClose>
-                        <Button type="submit" :disabled="form.processing" class="rounded-xl font-bold bg-red-600 hover:bg-red-700 text-white shadow-sm">
+                        <Button type="submit" :disabled="form.processing || allocationIsOverAmount" class="rounded-xl font-bold bg-red-600 hover:bg-red-700 text-white shadow-sm">
                             <i class="fas fa-check mr-1.5"></i> {{ editTarget ? 'Simpan Perubahan' : 'Simpan Catatan' }}
                         </Button>
                     </DialogFooter>

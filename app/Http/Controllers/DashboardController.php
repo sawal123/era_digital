@@ -4,24 +4,23 @@ namespace App\Http\Controllers;
 
 use App\Models\Transaction;
 use App\Models\TransactionItem;
-use App\Models\Expense;
 use App\Models\Product;
+use App\Services\ProfitCalculationService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(ProfitCalculationService $profitCalculator)
     {
         $today = now()->toDateString();
+        $todaySummary = $profitCalculator->summarizePeriod($today);
 
         // 1. KARTU STATISTIK (HARI INI)
-        $totalOmset = (float) Transaction::whereDate('created_at', $today)->sum('total_price');
-        $totalModal = (float) Transaction::whereDate('created_at', $today)->sum('total_base_price');
-        $totalPengeluaran = (float) Expense::affectsProfit()->whereDate('date', $today)->sum('amount');
-        
-        $totalProfitToday = (float) Transaction::whereDate('created_at', $today)->sum('total_profit');
-        $keuntunganBersih = $totalProfitToday - $totalPengeluaran;
+        $totalOmset = $todaySummary['total_sales'];
+        $totalModal = $todaySummary['total_base'];
+        $totalPengeluaran = $todaySummary['profit_deducting_costs'];
+        $keuntunganBersih = $todaySummary['net_profit'];
 
         // Keuntungan dari Biaya Admin PPOB hari ini
         $keuntunganPpob = (float) TransactionItem::where('type', 'ppob')
@@ -35,10 +34,8 @@ class DashboardController extends Controller
         for ($i = 6; $i >= 0; $i--) {
             $date = now()->subDays($i);
             $dateString = $date->toDateString();
-            
-            $profit = Transaction::whereDate('created_at', $dateString)->sum('total_profit');
-            $expense = Expense::affectsProfit()->whereDate('date', $dateString)->sum('amount');
-            $netProfit = $profit - $expense;
+            $summary = $profitCalculator->summarizePeriod($dateString);
+            $netProfit = $summary['net_profit'];
 
             $ppobProfit = (float) TransactionItem::where('type', 'ppob')
                 ->whereHas('transaction', function ($q) use ($dateString) {
@@ -79,6 +76,9 @@ class DashboardController extends Controller
                 'total_omset'        => $totalOmset,
                 'total_modal'        => $totalModal,
                 'total_pengeluaran'  => $totalPengeluaran,
+                'hpp_tambahan'       => $todaySummary['additional_hpp'],
+                'operasional_rutin'  => $todaySummary['operational_expenses'],
+                'kas_keluar'         => $todaySummary['cash_out'],
                 'keuntungan_bersih'  => $keuntunganBersih,
                 'keuntungan_ppob'    => $keuntunganPpob,
             ],

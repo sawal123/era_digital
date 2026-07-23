@@ -37,4 +37,9 @@ class Transaction extends Model
     {
         return $this->belongsTo(PaymentMethod::class, 'payment_method_id');
     }
+
+    public function expenseAllocations()
+    {
+        return $this->hasMany(ExpenseAllocation::class);
+    }
 }

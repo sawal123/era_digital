@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// @ts-nocheck
 import { Head, router, usePage } from '@inertiajs/vue3';
 import flatpickr from 'flatpickr';
 import html2pdf from 'html2pdf.js';
@@ -7,6 +8,7 @@ import { toast } from 'vue-sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import SearchableSelect from '@/components/SearchableSelect.vue';
 import {
     Dialog,
     DialogClose,
@@ -262,7 +264,7 @@ const exportExcel = () => {
             <body>
                 <table border="1">
                     <tr><th colspan="7">Laporan Penjualan - ${escapeHtml(filterLabel.value)}</th></tr>
-                    <tr><td colspan="7">Pengeluaran: ${Number(totalExpenses.value)} | Pendapatan Bersih: ${Number(netProfit.value)}</td></tr>
+                    <tr><td colspan="7">Biaya Pengurang Laba: ${Number(totalExpenses.value)} | Arus Kas Keluar: ${Number(totalCashOut.value)} | Pendapatan Bersih: ${Number(netProfit.value)}</td></tr>
                     <tr><td colspan="7"></td></tr>
                     <tr><th colspan="6">Performa per Jenis Usaha</th></tr>
                     <tr>
@@ -302,11 +304,18 @@ return;
 const totalSales  = computed(() => filteredTransactions.value.reduce((sum, transaction) => sum + toNumber(transaction.total_price), 0));
 const totalBase   = computed(() => filteredTransactions.value.reduce((sum, transaction) => sum + toNumber(transaction.total_base_price), 0));
 const totalTransactionProfit = computed(() => filteredTransactions.value.reduce((sum, transaction) => sum + toNumber(transaction.total_profit), 0));
-const affectsProfit = (expense) => expense.category !== 'pribadi_pemilik'
-    && !(expense.category === 'hpp_pesanan' && expense.hpp_status === 'sudah_masuk_hpp');
-const profitAffectingExpenses = computed(() => filteredExpenses.value.filter(affectsProfit));
-const totalExpenses = computed(() => profitAffectingExpenses.value.reduce((sum, expense) => sum + toNumber(expense.amount), 0));
-const netProfit = computed(() => totalSales.value - totalBase.value - totalExpenses.value);
+const getExpenseFinance = (expense) => expense.finance || {
+    additional_hpp: expense.category === 'hpp_pesanan' && expense.hpp_status !== 'sudah_masuk_hpp' ? toNumber(expense.amount) : 0,
+    unallocated_hpp: expense.category === 'hpp_pesanan' ? Math.max(0, toNumber(expense.amount) - toNumber(expense.allocated_amount)) : 0,
+    operational_expense: expense.category === 'operasional_rutin' ? toNumber(expense.amount) : 0,
+    cash_out: toNumber(expense.amount),
+};
+const hppAdditionalTotal = computed(() => filteredExpenses.value.reduce((sum, expense) => sum + toNumber(getExpenseFinance(expense).additional_hpp), 0));
+const unallocatedHppTotal = computed(() => filteredExpenses.value.reduce((sum, expense) => sum + toNumber(getExpenseFinance(expense).unallocated_hpp), 0));
+const operationalExpenseTotal = computed(() => filteredExpenses.value.reduce((sum, expense) => sum + toNumber(getExpenseFinance(expense).operational_expense), 0));
+const totalCashOut = computed(() => filteredExpenses.value.reduce((sum, expense) => sum + toNumber(expense.amount), 0));
+const totalExpenses = computed(() => hppAdditionalTotal.value + operationalExpenseTotal.value);
+const netProfit = computed(() => totalTransactionProfit.value - hppAdditionalTotal.value - operationalExpenseTotal.value);
 
 const businessCategories = [
     {
@@ -378,29 +387,9 @@ const classifyBusinessItem = (item) => {
     return categoryType === 'jasa' || item.type === 'jasa' ? 'percetakan' : 'jasa';
 };
 
-const classifyExpenseBusinessCategory = (expense) => {
-    const searchText = [expense.name, expense.note, expense.transaction?.invoice_number]
-        .map(normalizeText)
-        .join(' ');
-
-    if (includesAny(searchText, ['pulsa', 'token', 'topup', 'top-up', 'e-wallet', 'saldo digital'])) {
-        return 'saldo_digital';
-    }
-
-    if (includesAny(searchText, ['atk', 'pulpen', 'pena', 'kertas', 'buku', 'alat sekolah', 'kalkulator', 'plastik'])) {
-        return 'atk';
-    }
-
-    if (includesAny(searchText, ['desain', 'design', 'pengetikan', 'ketik', 'edit dokumen', 'edit file', 'layout'])) {
-        return 'jasa';
-    }
-
-    if (includesAny(searchText, ['spanduk', 'baliho', 'undangan', 'fotokopi', 'photo copy', 'cetak', 'print', 'brosur', 'stiker', 'banner', 'jilid', 'laminating'])) {
-        return 'percetakan';
-    }
-
-    const linkedTransaction = filteredTransactions.value.find((transaction) => transaction.id === expense.transaction_id);
-    const dominantCategory = linkedTransaction?.items?.reduce((best, item) => {
+const getTransactionById = (transactionId) => filteredTransactions.value.find((transaction) => String(transaction.id) === String(transactionId));
+const getDominantTransactionBusinessCategory = (transaction) => {
+    const dominantCategory = transaction?.items?.reduce((best, item) => {
         const key = classifyBusinessItem(item);
         const omzet = toNumber(item.subtotal_price);
 
@@ -414,6 +403,32 @@ const classifyExpenseBusinessCategory = (expense) => {
     return dominantCategory?.key || 'percetakan';
 };
 
+const classifyAllocationBusinessCategory = (allocation) => {
+    if (allocation.transaction_item_id && allocation.transaction_item) {
+        return {
+            key: classifyBusinessItem(allocation.transaction_item),
+            isNoteLevel: false,
+        };
+    }
+
+    const linkedTransaction = getTransactionById(allocation.transaction_id) || allocation.transaction;
+    const dominantCategory = linkedTransaction?.items?.reduce((best, item) => {
+        const key = classifyBusinessItem(item);
+        const omzet = toNumber(item.subtotal_price);
+
+        if (!best || omzet > best.omzet) {
+            return { key, omzet };
+        }
+
+        return best;
+    }, null);
+
+    return {
+        key: dominantCategory?.key || getDominantTransactionBusinessCategory(linkedTransaction),
+        isNoteLevel: true,
+    };
+};
+
 const businessCategoryRows = computed(() => {
     const rows = Object.fromEntries(businessCategories.map((category) => [
         category.key,
@@ -425,6 +440,7 @@ const businessCategoryRows = computed(() => {
             margin: 0,
             transactionIds: new Set(),
             adjustmentTotal: 0,
+            noteLevelAdjustmentTotal: 0,
         },
     ]));
 
@@ -439,20 +455,30 @@ const businessCategoryRows = computed(() => {
         });
     });
 
-    filteredExpenses.value
-        .filter((expense) => expense.category === 'hpp_pesanan' && expense.hpp_status !== 'sudah_masuk_hpp')
-        .forEach((expense) => {
-            const key = classifyExpenseBusinessCategory(expense);
-            const row = rows[key] || rows.percetakan;
-            const amount = toNumber(expense.amount);
+    filteredExpenses.value.forEach((expense) => {
+        if (expense.category !== 'hpp_pesanan') {
+            return;
+        }
 
-            row.modal += amount;
-            row.adjustmentTotal += amount;
+        (expense.allocations || [])
+            .filter((allocation) => allocation.hpp_status === 'belum_masuk_hpp')
+            .forEach((allocation) => {
+                const classification = classifyAllocationBusinessCategory(allocation);
+                const row = rows[classification.key] || rows.percetakan;
+                const amount = toNumber(allocation.amount);
 
-            if (expense.transaction_id) {
-                row.transactionIds.add(expense.transaction_id);
-            }
-        });
+                row.modal += amount;
+                row.adjustmentTotal += amount;
+
+                if (classification.isNoteLevel) {
+                    row.noteLevelAdjustmentTotal += amount;
+                }
+
+                if (allocation.transaction_id) {
+                    row.transactionIds.add(allocation.transaction_id);
+                }
+            });
+    });
 
     return businessCategories.map((category) => {
         const row = rows[category.key];
@@ -480,6 +506,11 @@ const customerEditSelectedId = ref('');
 const customerEditName = ref('');
 const customerEditPhone = ref('');
 const isSavingCustomerEdit = ref(false);
+const getCustomerOptionLabel = (customer) => customer.name || 'Tanpa nama';
+const getCustomerOptionDescription = (customer) => [
+    customer.phone ? `HP: ${customer.phone}` : '',
+    customer.customer_type ? `Tipe: ${customer.customer_type}` : '',
+].filter(Boolean).join(' | ');
 
 const openDetail = (trx) => {
     selectedTransaction.value = trx;
@@ -599,9 +630,11 @@ const filterFileLabel = computed(() => {
 const deleteTarget    = ref(null);
 const deleteConfirmOpen = ref(false);
 const isDeleting      = ref(false);
+const deleteError = ref('');
 
 const openDeleteConfirm = (trx) => {
     deleteTarget.value = trx;
+    deleteError.value = '';
     deleteConfirmOpen.value = true;
 };
 
@@ -617,9 +650,11 @@ return;
             deleteTarget.value = null;
             isDeleting.value = false;
         },
-        onError: () => {
- isDeleting.value = false; 
-},
+        onError: (errors) => {
+            deleteError.value = errors.error || 'Transaksi gagal dihapus.';
+            toast.error(deleteError.value);
+            isDeleting.value = false;
+        },
     });
 };
 
@@ -768,13 +803,14 @@ const flash = computed(() => usePage().props.flash ?? {});
             <Card class="border-border/60 bg-gradient-to-br from-rose-500/5 to-red-500/5 relative overflow-hidden shadow-sm">
                 <CardHeader class="pb-2">
                     <CardTitle class="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                        <span>Total Pengeluaran</span>
+                        <span>Biaya Pengurang Laba</span>
                         <i class="fas fa-file-invoice-dollar text-rose-500 dark:text-rose-400 text-sm"></i>
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div class="text-2xl font-black text-rose-600 dark:text-rose-400">Rp {{ formatRupiah(totalExpenses) }}</div>
-                    <p class="text-[11px] text-muted-foreground mt-1">{{ profitAffectingExpenses.length }} pengeluaran berdampak laba pada periode ini</p>
+                    <p class="text-[11px] text-muted-foreground mt-1">HPP tambahan Rp {{ formatRupiah(hppAdditionalTotal) }} + operasional Rp {{ formatRupiah(operationalExpenseTotal) }}</p>
+                    <p class="text-[10px] text-muted-foreground mt-0.5">Arus kas keluar: Rp {{ formatRupiah(totalCashOut) }}</p>
                 </CardContent>
                 <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 to-red-500"></div>
             </Card>
@@ -790,10 +826,20 @@ const flash = computed(() => usePage().props.flash ?? {});
                     <div class="text-2xl font-black" :class="netProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'">
                         Rp {{ formatRupiah(netProfit) }}
                     </div>
-                    <p class="text-[11px] text-muted-foreground mt-1">Omset dikurangi modal/HPP dan pengeluaran sesuai filter aktif</p>
+                    <p class="text-[11px] text-muted-foreground mt-1">Laba kotor transaksi dikurangi HPP tambahan dan operasional rutin</p>
                 </CardContent>
                 <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500"></div>
             </Card>
+        </div>
+
+        <div v-if="unallocatedHppTotal > 0" class="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+            <div class="flex items-start gap-3">
+                <i class="fas fa-triangle-exclamation mt-0.5"></i>
+                <div>
+                    <p class="font-bold">HPP belum dialokasikan: Rp {{ formatRupiah(unallocatedHppTotal) }}</p>
+                    <p class="text-xs mt-0.5">Nilai ini tetap mengurangi laba bersih, tetapi laba per jenis usaha belum sepenuhnya terekspos sampai sisa pembayaran vendor dialokasikan ke nota atau item.</p>
+                </div>
+            </div>
         </div>
 
         <Card class="border-border/50 shadow-sm overflow-hidden bg-card text-card-foreground">
@@ -833,6 +879,7 @@ const flash = computed(() => usePage().props.flash ?? {});
                                 <td class="p-4 text-right font-mono text-muted-foreground">
                                     <div>Rp {{ formatRupiah(category.modal) }}</div>
                                     <div v-if="category.adjustmentTotal > 0" class="text-[10px] text-amber-600 dark:text-amber-400">+HPP eksternal Rp {{ formatRupiah(category.adjustmentTotal) }}</div>
+                                    <div v-if="category.noteLevelAdjustmentTotal > 0" class="text-[10px] text-muted-foreground">Rp {{ formatRupiah(category.noteLevelAdjustmentTotal) }} tingkat nota</div>
                                 </td>
                                 <td class="p-4 text-right font-bold font-mono" :class="category.laba >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'">
                                     Rp {{ formatRupiah(category.laba) }}
@@ -1026,7 +1073,8 @@ const flash = computed(() => usePage().props.flash ?? {});
             <div ref="exportPdfRef">
                 <h1 class="mb-1 text-xl font-bold">Laporan Penjualan</h1>
                 <p class="mb-5 text-xs">Periode: {{ filterLabel }} | Jumlah transaksi: {{ filteredTransactions.length }}</p>
-                <p class="mb-3 text-xs">Pengeluaran: Rp {{ formatRupiah(totalExpenses) }} | Pendapatan bersih: Rp {{ formatRupiah(netProfit) }}</p>
+                <p class="mb-3 text-xs">Biaya pengurang laba: Rp {{ formatRupiah(totalExpenses) }} | Arus kas keluar: Rp {{ formatRupiah(totalCashOut) }} | Pendapatan bersih: Rp {{ formatRupiah(netProfit) }}</p>
+                <p v-if="unallocatedHppTotal > 0" class="mb-3 text-xs">HPP belum dialokasikan: Rp {{ formatRupiah(unallocatedHppTotal) }}</p>
                 <h2 class="mb-2 text-sm font-bold">Performa per Jenis Usaha</h2>
                 <table class="mb-5 w-full border-collapse text-xs">
                     <thead>
@@ -1252,16 +1300,16 @@ const flash = computed(() => usePage().props.flash ?? {});
 
                     <div v-if="customerEditMode === 'existing'" class="space-y-1.5">
                         <label for="report-customer-select" class="text-xs font-bold text-foreground">Pilih Customer</label>
-                        <select
+                        <SearchableSelect
                             id="report-customer-select"
                             v-model="customerEditSelectedId"
-                            class="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                            <option value="">Pilih customer...</option>
-                            <option v-for="customer in customers" :key="customer.id" :value="customer.id">
-                                {{ customer.name }}{{ customer.phone ? ` - ${customer.phone}` : '' }}
-                            </option>
-                        </select>
+                            :options="customers"
+                            placeholder="Pilih customer..."
+                            search-placeholder="Cari nama atau nomor HP..."
+                            empty-text="Customer tidak ditemukan."
+                            :option-label="getCustomerOptionLabel"
+                            :option-description="getCustomerOptionDescription"
+                        />
                     </div>
 
                     <div v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1316,6 +1364,9 @@ const flash = computed(() => usePage().props.flash ?? {});
                         </DialogDescription>
                     </div>
                 </div>
+                <p v-if="deleteError" class="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
+                    {{ deleteError }}
+                </p>
                 <DialogFooter class="grid grid-cols-2 gap-3 mt-5">
                     <Button
                         @click="deleteConfirmOpen = false"

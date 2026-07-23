@@ -191,7 +191,7 @@ const handleMouseLeave = () => {
             <div class="relative overflow-hidden bg-card border border-border p-5 rounded-2xl shadow-xs group transition hover:border-rose-500/20">
                 <div class="flex justify-between items-start">
                     <div class="space-y-1">
-                        <span class="text-xs font-bold text-muted-foreground uppercase tracking-wider block">Total Pengeluaran</span>
+                        <span class="text-xs font-bold text-muted-foreground uppercase tracking-wider block">Biaya Pengurang Laba</span>
                         <h2 class="text-xl md:text-2xl font-black text-foreground">Rp {{ formatRupiah(stats.total_pengeluaran) }}</h2>
                     </div>
                     <div class="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-600 flex items-center justify-center dark:bg-rose-500/20 dark:text-rose-400">
@@ -200,7 +200,7 @@ const handleMouseLeave = () => {
                 </div>
                 <div class="mt-4 flex items-center gap-1.5 text-xs text-muted-foreground font-semibold">
                     <span class="text-rose-500 bg-rose-500/10 px-1.5 py-0.5 rounded-md flex items-center gap-0.5 font-bold">Hari Ini</span>
-                    <span>Biaya & belanja restock</span>
+                    <span>HPP tambahan + operasional rutin</span>
                 </div>
                 <div class="absolute bottom-0 left-0 right-0 h-1 bg-rose-500 opacity-60 group-hover:opacity-100 transition"></div>
             </div>
@@ -218,7 +218,7 @@ const handleMouseLeave = () => {
                 </div>
                 <div class="mt-4 flex items-center gap-1.5 text-xs text-muted-foreground font-semibold">
                     <span class="text-cyan-500 bg-cyan-500/10 px-1.5 py-0.5 rounded-md flex items-center gap-0.5 font-bold">Hari Ini</span>
-                    <span>Omset - Modal - Pengeluaran</span>
+                    <span>Laba kotor - HPP tambahan - operasional</span>
                 </div>
                 <div class="absolute bottom-0 left-0 right-0 h-1 bg-cyan-500 opacity-60 group-hover:opacity-100 transition"></div>
             </div>
@@ -250,7 +250,7 @@ const handleMouseLeave = () => {
                 <div class="flex justify-between items-center pb-4 mb-4 border-b border-border/60">
                     <div>
                         <h3 class="text-base font-bold text-foreground">Tren Keuntungan Bersih</h3>
-                        <p class="text-xs text-muted-foreground">Grafik performa profit bersih 7 hari terakhir pasca dipotong pengeluaran harian.</p>
+                        <p class="text-xs text-muted-foreground">Grafik laba bersih 7 hari terakhir setelah HPP tambahan dan operasional rutin.</p>
                     </div>
                     <span class="text-xs font-semibold px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-lg flex items-center gap-1.5 border border-indigo-200/40 dark:border-indigo-900/30">
                         <i class="fas fa-history text-[10px]"></i> 7 Hari Terakhir
