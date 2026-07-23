@@ -1,6 +1,7 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from 'vue';
 import { Head, useForm } from '@inertiajs/vue3';
+import flatpickr from 'flatpickr';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -15,6 +16,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import 'flatpickr/dist/flatpickr.min.css';
 
 defineOptions({
     layout: {
@@ -34,6 +36,73 @@ defineOptions({
 const props = defineProps({
     expenses: Array,
 });
+
+const padDatePart = (value) => String(value).padStart(2, '0');
+const getTodayString = () => {
+    const now = new Date();
+
+    return `${now.getFullYear()}-${padDatePart(now.getMonth() + 1)}-${padDatePart(now.getDate())}`;
+};
+const getCurrentMonthString = () => {
+    const now = new Date();
+
+    return `${now.getFullYear()}-${padDatePart(now.getMonth() + 1)}`;
+};
+const getCurrentYearString = () => String(new Date().getFullYear());
+const todayString = getTodayString();
+
+// Filter state
+const filterMode = ref('bulanan');
+const filterDateRange = ref(`${todayString} to ${todayString}`);
+const filterMonth = ref(getCurrentMonthString());
+const filterYear = ref(getCurrentYearString());
+const dateRangeInput = ref(null);
+let dateRangePickerInstance = null;
+
+const setMode = (mode) => {
+    filterMode.value = mode;
+};
+const toNumber = (value) => Number.parseFloat(value ?? 0) || 0;
+const parseDateRange = (value) => {
+    const [start = '', end = ''] = String(value ?? '').split(' to ');
+    const normalizedStart = start || todayString;
+    const normalizedEnd = end || normalizedStart;
+
+    return {
+        start: normalizedStart,
+        end: normalizedEnd,
+    };
+};
+const selectedDateRange = computed(() => parseDateRange(filterDateRange.value));
+const setDateRange = (start, end = start) => {
+    filterDateRange.value = end && end !== start ? `${start} to ${end}` : start;
+
+    if (dateRangePickerInstance) {
+        dateRangePickerInstance.setDate([start, end || start], false);
+    }
+};
+const initDateRangePicker = () => {
+    if (!dateRangeInput.value) {
+        return;
+    }
+
+    dateRangePickerInstance?.destroy();
+    dateRangePickerInstance = flatpickr(dateRangeInput.value, {
+        mode: 'range',
+        dateFormat: 'Y-m-d',
+        defaultDate: [selectedDateRange.value.start, selectedDateRange.value.end],
+        onChange: (selectedDates, _dateStr, instance) => {
+            if (selectedDates.length === 0) {
+                setDateRange(todayString);
+
+                return;
+            }
+
+            const [startDate, endDate = startDate] = selectedDates.map((date) => instance.formatDate(date, 'Y-m-d'));
+            filterDateRange.value = startDate === endDate ? startDate : `${startDate} to ${endDate}`;
+        },
+    });
+};
 
 // Form modal state
 const formOpen = ref(false);
@@ -67,16 +136,30 @@ const deleteExpense = (id) => {
     }
 };
 
+const filteredExpenses = computed(() => {
+    const { start, end } = selectedDateRange.value;
+
+    return props.expenses.filter((expense) => {
+        const expenseDate = String(expense.date ?? '');
+
+        return filterMode.value === 'harian'
+            ? expenseDate >= start && expenseDate <= end
+            : filterMode.value === 'bulanan'
+                ? expenseDate.slice(0, 7) === filterMonth.value
+                : expenseDate.slice(0, 4) === filterYear.value;
+    });
+});
+
 // Summary metrics
 const totalExpenses = computed(() => {
-    return props.expenses.reduce((sum, e) => sum + parseFloat(e.amount), 0);
+    return filteredExpenses.value.reduce((sum, e) => sum + toNumber(e.amount), 0);
 });
 
 const expensesByCategory = computed(() => {
     const categories = { operasional: 0, stok: 0, lainnya: 0 };
-    props.expenses.forEach(e => {
+    filteredExpenses.value.forEach(e => {
         if (categories[e.category] !== undefined) {
-            categories[e.category] += parseFloat(e.amount);
+            categories[e.category] += toNumber(e.amount);
         }
     });
     return categories;
@@ -90,6 +173,40 @@ const formatDate = (dateString) => {
     const options = { year: 'numeric', month: 'long', day: 'numeric' };
     return new Date(dateString).toLocaleDateString('id-ID', options);
 };
+
+const yearOptions = Array.from({ length: 5 }, (_, i) => String(new Date().getFullYear() - i));
+
+const filterLabel = computed(() => {
+    if (filterMode.value === 'harian') {
+        const { start, end } = selectedDateRange.value;
+
+        return start === end ? start : `${start} s/d ${end}`;
+    }
+
+    return filterMode.value === 'bulanan' ? filterMonth.value : filterYear.value;
+});
+
+watch(filterMode, async (mode) => {
+    if (mode !== 'harian') {
+        dateRangePickerInstance?.destroy();
+        dateRangePickerInstance = null;
+
+        return;
+    }
+
+    await nextTick();
+    initDateRangePicker();
+});
+
+onMounted(() => {
+    if (filterMode.value === 'harian') {
+        initDateRangePicker();
+    }
+});
+
+onBeforeUnmount(() => {
+    dateRangePickerInstance?.destroy();
+});
 </script>
 
 <template>
@@ -99,15 +216,88 @@ const formatDate = (dateString) => {
     </Head>
 
     <div class="flex flex-col gap-6 p-4 md:p-6 pb-8 font-inter">
-        <!-- Header -->
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-            <div>
-                <h1 class="text-2xl font-bold tracking-tight text-foreground">Operasional & Pengeluaran</h1>
-                <p class="text-sm text-muted-foreground">Catat dan pantau pengeluaran bulanan, biaya kulakan barang, listrik, internet, dan kertas fotokopi.</p>
+        <!-- Header + Filter Bar -->
+        <div class="flex flex-col gap-4">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div>
+                    <h1 class="text-2xl font-bold tracking-tight text-foreground">Operasional & Pengeluaran</h1>
+                    <p class="text-sm text-muted-foreground">Catat dan pantau pengeluaran bulanan, biaya kulakan barang, listrik, internet, dan kertas fotokopi.</p>
+                </div>
+                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                    <span class="text-xs bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 px-3 py-1.5 rounded-full font-semibold">
+                        <i class="fas fa-file-invoice-dollar mr-1"></i>
+                        {{ filteredExpenses.length }} pengeluaran &bull; {{ filterLabel }}
+                    </span>
+                    <Button @click="openCreateModal" class="rounded-xl font-semibold shadow-md bg-red-600 hover:bg-red-700 text-white shrink-0">
+                        <i class="fas fa-plus mr-2 text-xs"></i> Catat Pengeluaran
+                    </Button>
+                </div>
             </div>
-            <Button @click="openCreateModal" class="rounded-xl font-semibold shadow-md bg-red-600 hover:bg-red-700 text-white shrink-0">
-                <i class="fas fa-plus mr-2 text-xs"></i> Catat Pengeluaran
-            </Button>
+
+            <!-- Filter Panel -->
+            <div class="bg-card border border-border rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4 shadow-xs">
+                <div class="flex gap-1.5 bg-muted/50 p-1 rounded-xl border border-border/50">
+                    <button
+                        v-for="m in [
+                            { key: 'harian', label: 'Harian', icon: 'fas fa-calendar-day' },
+                            { key: 'bulanan', label: 'Bulanan', icon: 'fas fa-calendar-alt' },
+                            { key: 'tahunan', label: 'Tahunan', icon: 'fas fa-calendar' },
+                        ]"
+                        :key="m.key"
+                        @click="setMode(m.key)"
+                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200"
+                        :class="filterMode === m.key
+                            ? 'bg-red-600 text-white shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-muted'"
+                    >
+                        <i :class="m.icon" class="text-[10px]"></i>
+                        {{ m.label }}
+                    </button>
+                </div>
+
+                <div class="flex-1 flex items-center gap-3">
+                    <div v-if="filterMode === 'harian'" class="relative flex-1 max-w-sm">
+                        <i class="fas fa-calendar-day absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
+                        <input
+                            ref="dateRangeInput"
+                            type="text"
+                            :value="filterDateRange"
+                            placeholder="Pilih rentang tanggal"
+                            class="h-9 w-full rounded-xl border border-input bg-background px-3 pl-8 text-sm text-foreground transition focus:outline-none focus:ring-2 focus:ring-red-500"
+                        />
+                    </div>
+
+                    <div v-else-if="filterMode === 'bulanan'" class="relative flex-1 max-w-xs">
+                        <i class="fas fa-calendar-alt absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
+                        <input
+                            type="month"
+                            v-model="filterMonth"
+                            class="pl-8 h-9 w-full rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-red-500 transition px-3"
+                        />
+                    </div>
+
+                    <div v-else class="relative flex-1 max-w-xs">
+                        <i class="fas fa-calendar absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
+                        <select
+                            v-model="filterYear"
+                            class="pl-8 h-9 w-full rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-red-500 transition px-3 appearance-none"
+                        >
+                            <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
+                        </select>
+                    </div>
+
+                    <button
+                        @click="
+                            filterMode === 'harian' ? setDateRange(todayString) :
+                            filterMode === 'bulanan' ? filterMonth = getCurrentMonthString() :
+                            filterYear = getCurrentYearString()
+                        "
+                        class="text-xs text-red-500 hover:text-red-700 dark:hover:text-red-300 font-semibold whitespace-nowrap transition underline underline-offset-2"
+                    >
+                        {{ filterMode === 'harian' ? 'Hari ini' : filterMode === 'bulanan' ? 'Bulan ini' : 'Tahun ini' }}
+                    </button>
+                </div>
+            </div>
         </div>
 
         <!-- Metrics Grid -->
@@ -122,7 +312,7 @@ const formatDate = (dateString) => {
                 </CardHeader>
                 <CardContent>
                     <div class="text-2xl font-black text-red-600 dark:text-red-400">Rp {{ formatRupiah(totalExpenses) }}</div>
-                    <p class="text-[11px] text-muted-foreground mt-1">Akumulasi pengeluaran biaya operasional</p>
+                    <p class="text-[11px] text-muted-foreground mt-1">Akumulasi pengeluaran pada periode aktif</p>
                 </CardContent>
                 <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500 to-orange-500"></div>
             </Card>
@@ -174,7 +364,7 @@ const formatDate = (dateString) => {
         <Card class="border-border/50 shadow-sm overflow-hidden bg-card text-card-foreground">
             <CardHeader class="border-b border-border/40 py-4 bg-muted/10">
                 <CardTitle class="text-sm font-bold text-foreground">Riwayat Catatan Biaya</CardTitle>
-                <CardDescription class="text-xs text-muted-foreground">Semua pos anggaran pengeluaran yang terdokumentasi.</CardDescription>
+                <CardDescription class="text-xs text-muted-foreground">Daftar pengeluaran periode {{ filterLabel }}.</CardDescription>
             </CardHeader>
             <CardContent class="p-0">
                 <div class="overflow-x-auto">
@@ -190,14 +380,14 @@ const formatDate = (dateString) => {
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border text-sm">
-                            <tr v-if="expenses.length === 0">
+                            <tr v-if="filteredExpenses.length === 0">
                                 <td colspan="6" class="p-12 text-center text-muted-foreground">
                                     <i class="fas fa-hand-holding-usd text-4xl mb-3 opacity-20"></i>
-                                    <p class="font-medium">Belum ada pengeluaran dicatat.</p>
-                                    <p class="text-xs text-muted-foreground mt-1">Gunakan tombol "Catat Pengeluaran" di atas untuk menambahkan data.</p>
+                                    <p class="font-medium">Belum ada pengeluaran pada periode ini.</p>
+                                    <p class="text-xs text-muted-foreground mt-1">Ubah filter tanggal atau catat pengeluaran baru.</p>
                                 </td>
                             </tr>
-                            <tr v-for="exp in expenses" :key="exp.id" class="hover:bg-muted/30 transition">
+                            <tr v-for="exp in filteredExpenses" :key="exp.id" class="hover:bg-muted/30 transition">
                                 <!-- Date -->
                                 <td class="p-4 pl-6 text-muted-foreground font-mono text-xs">
                                     {{ formatDate(exp.date) }}
