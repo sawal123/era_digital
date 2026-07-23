@@ -47,6 +47,10 @@ const isEditing = ref(false);
 const selectedCustomerId = ref(null);
 const historyOpen = ref(false);
 const selectedHistoryCustomer = ref(null);
+const deleteConfirmOpen = ref(false);
+const deleteTarget = ref(null);
+const deleteProcessing = ref(false);
+const deleteError = ref('');
 
 const form = useForm({
     name: '',
@@ -91,10 +95,39 @@ const handleSubmit = () => {
     }
 };
 
-const deleteCustomer = (id) => {
-    if (confirm('Apakah Anda yakin ingin menghapus data customer ini?')) {
-        router.delete(`/customers/${id}`);
+const openDeleteConfirm = (customer) => {
+    deleteTarget.value = customer;
+    deleteError.value = '';
+    deleteConfirmOpen.value = true;
+};
+
+const closeDeleteConfirm = () => {
+    if (deleteProcessing.value) return;
+    deleteConfirmOpen.value = false;
+    deleteTarget.value = null;
+    deleteError.value = '';
+};
+
+const confirmDeleteCustomer = () => {
+    if (!deleteTarget.value || (deleteTarget.value.transactions_count || 0) > 0) {
+        return;
     }
+
+    deleteProcessing.value = true;
+    router.delete(`/customers/${deleteTarget.value.id}`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            deleteConfirmOpen.value = false;
+            deleteTarget.value = null;
+            deleteError.value = '';
+        },
+        onError: (errors) => {
+            deleteError.value = errors.error || 'Customer gagal dihapus.';
+        },
+        onFinish: () => {
+            deleteProcessing.value = false;
+        },
+    });
 };
 
 const openHistoryModal = (customer) => {
@@ -210,7 +243,7 @@ const customerTypeLabel = (type) => ({
                                 <Button @click="openEditModal(c)" variant="ghost" size="icon-sm" title="Edit customer" aria-label="Edit customer" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">
                                     <i class="fas fa-edit"></i>
                                 </Button>
-                                <Button @click="deleteCustomer(c.id)" variant="ghost" size="icon-sm" title="Hapus customer" aria-label="Hapus customer" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
+                                <Button @click="openDeleteConfirm(c)" variant="ghost" size="icon-sm" title="Hapus customer" aria-label="Hapus customer" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
                                     <i class="fas fa-trash-alt"></i>
                                 </Button>
                             </td>
@@ -360,6 +393,43 @@ const customerTypeLabel = (type) => ({
                     <DialogClose as-child>
                         <Button type="button" variant="secondary" class="rounded-xl">Tutup</Button>
                     </DialogClose>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
+        <!-- DIALOG KONFIRMASI HAPUS CUSTOMER -->
+        <Dialog :open="deleteConfirmOpen" @update:open="(open) => open ? deleteConfirmOpen = true : closeDeleteConfirm()">
+            <DialogContent class="sm:max-w-[440px] rounded-2xl bg-card border-border text-foreground">
+                <DialogHeader>
+                    <DialogTitle class="flex items-center gap-2">
+                        <i class="fas fa-triangle-exclamation text-red-500"></i>
+                        {{ (deleteTarget?.transactions_count || 0) > 0 ? 'Customer Tidak Bisa Dihapus' : 'Hapus Customer?' }}
+                    </DialogTitle>
+                    <DialogDescription v-if="(deleteTarget?.transactions_count || 0) > 0">
+                        {{ deleteTarget?.name }} sudah memiliki {{ deleteTarget?.transactions_count || 0 }} transaksi. Data customer tetap disimpan agar riwayat nota dan laporan tidak rusak.
+                    </DialogDescription>
+                    <DialogDescription v-else>
+                        Data customer {{ deleteTarget?.name }} akan dihapus permanen dari daftar customer.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <p v-if="deleteError" class="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
+                    {{ deleteError }}
+                </p>
+
+                <DialogFooter class="gap-2">
+                    <Button type="button" variant="secondary" class="rounded-xl" @click="closeDeleteConfirm">
+                        {{ (deleteTarget?.transactions_count || 0) > 0 ? 'Tutup' : 'Batal' }}
+                    </Button>
+                    <Button
+                        v-if="(deleteTarget?.transactions_count || 0) === 0"
+                        type="button"
+                        :disabled="deleteProcessing"
+                        class="rounded-xl bg-red-600 text-white hover:bg-red-700"
+                        @click="confirmDeleteCustomer"
+                    >
+                        {{ deleteProcessing ? 'Menghapus...' : 'Ya, Hapus' }}
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

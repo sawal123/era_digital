@@ -31,6 +31,10 @@ const searchQuery = ref('');
 const formOpen = ref(false);
 const isEditing = ref(false);
 const selectedId = ref(null);
+const deleteConfirmOpen = ref(false);
+const deleteTarget = ref(null);
+const deleteProcessing = ref(false);
+const deleteError = ref('');
 
 const form = useForm({
     name: '',
@@ -87,10 +91,37 @@ const handleSubmit = () => {
     }
 };
 
-const deleteMethod = (method) => {
-    if (confirm(`Hapus metode pembayaran "${method.name}"?`)) {
-        router.delete(`/payment-methods/${method.id}`);
-    }
+const openDeleteConfirm = (method) => {
+    deleteTarget.value = method;
+    deleteError.value = '';
+    deleteConfirmOpen.value = true;
+};
+
+const closeDeleteConfirm = () => {
+    if (deleteProcessing.value) return;
+    deleteConfirmOpen.value = false;
+    deleteTarget.value = null;
+    deleteError.value = '';
+};
+
+const confirmDeleteMethod = () => {
+    if (!deleteTarget.value) return;
+
+    deleteProcessing.value = true;
+    router.delete(`/payment-methods/${deleteTarget.value.id}`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            deleteConfirmOpen.value = false;
+            deleteTarget.value = null;
+            deleteError.value = '';
+        },
+        onError: (errors) => {
+            deleteError.value = errors.error || 'Gagal menghapus metode pembayaran.';
+        },
+        onFinish: () => {
+            deleteProcessing.value = false;
+        },
+    });
 };
 </script>
 
@@ -156,7 +187,7 @@ const deleteMethod = (method) => {
                                 <Button @click="openEditModal(method)" variant="ghost" size="icon-sm" title="Edit metode pembayaran" aria-label="Edit metode pembayaran" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400">
                                     <i class="fas fa-edit"></i>
                                 </Button>
-                                <Button @click="deleteMethod(method)" variant="ghost" size="icon-sm" title="Hapus metode pembayaran" aria-label="Hapus metode pembayaran" class="text-red-600 hover:text-red-900 dark:text-red-400">
+                                <Button @click="openDeleteConfirm(method)" variant="ghost" size="icon-sm" title="Hapus metode pembayaran" aria-label="Hapus metode pembayaran" class="text-red-600 hover:text-red-900 dark:text-red-400">
                                     <i class="fas fa-trash-alt"></i>
                                 </Button>
                             </td>
@@ -218,6 +249,29 @@ const deleteMethod = (method) => {
                         </Button>
                     </DialogFooter>
                 </form>
+            </DialogContent>
+        </Dialog>
+
+        <Dialog :open="deleteConfirmOpen" @update:open="(open) => open ? deleteConfirmOpen = true : closeDeleteConfirm()">
+            <DialogContent class="sm:max-w-[420px] rounded-2xl bg-card border-border text-foreground">
+                <DialogHeader>
+                    <DialogTitle class="flex items-center gap-2">
+                        <i class="fas fa-triangle-exclamation text-red-500"></i>
+                        Hapus Metode Pembayaran?
+                    </DialogTitle>
+                    <DialogDescription>
+                        Metode pembayaran {{ deleteTarget?.name }} akan dihapus dari pilihan POS kasir.
+                    </DialogDescription>
+                </DialogHeader>
+                <p v-if="deleteError" class="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
+                    {{ deleteError }}
+                </p>
+                <DialogFooter class="gap-2">
+                    <Button type="button" variant="secondary" class="rounded-xl" @click="closeDeleteConfirm">Batal</Button>
+                    <Button type="button" :disabled="deleteProcessing" class="rounded-xl bg-red-600 text-white hover:bg-red-700" @click="confirmDeleteMethod">
+                        {{ deleteProcessing ? 'Menghapus...' : 'Ya, Hapus' }}
+                    </Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     </div>

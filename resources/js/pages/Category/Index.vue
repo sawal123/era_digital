@@ -49,6 +49,10 @@ const filteredCategories = computed(() => {
 const formOpen = ref(false);
 const isEditing = ref(false);
 const selectedCategoryId = ref(null);
+const deleteConfirmOpen = ref(false);
+const deleteTarget = ref(null);
+const deleteProcessing = ref(false);
+const deleteError = ref('');
 
 const form = useForm({
     name: '',
@@ -92,18 +96,38 @@ const handleSubmit = () => {
     }
 };
 
+const openDeleteConfirm = (category) => {
+    deleteTarget.value = category;
+    deleteError.value = '';
+    deleteConfirmOpen.value = true;
+};
+
+const closeDeleteConfirm = () => {
+    if (deleteProcessing.value) return;
+    deleteConfirmOpen.value = false;
+    deleteTarget.value = null;
+    deleteError.value = '';
+};
+
 // Handle delete
-const deleteCategory = (id) => {
-    if (confirm('Apakah Anda yakin ingin menghapus kategori ini?')) {
-        router.delete(`/categories/${id}`, {
-            onSuccess: () => {
-                // Success toast or alert
-            },
-            onError: (errors) => {
-                alert(errors.error || 'Gagal menghapus kategori.');
-            }
-        });
-    }
+const confirmDeleteCategory = () => {
+    if (!deleteTarget.value) return;
+
+    deleteProcessing.value = true;
+    router.delete(`/categories/${deleteTarget.value.id}`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            deleteConfirmOpen.value = false;
+            deleteTarget.value = null;
+            deleteError.value = '';
+        },
+        onError: (errors) => {
+            deleteError.value = errors.error || 'Gagal menghapus kategori.';
+        },
+        onFinish: () => {
+            deleteProcessing.value = false;
+        },
+    });
 };
 
 const getTypeBadgeClass = (type) => {
@@ -183,7 +207,7 @@ const getTypeLabel = (type) => {
                                 <Button @click="openEditModal(category)" variant="ghost" size="icon-sm" title="Edit kategori" aria-label="Edit kategori" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">
                                     <i class="fas fa-edit"></i>
                                 </Button>
-                                <Button @click="deleteCategory(category.id)" variant="ghost" size="icon-sm" title="Hapus kategori" aria-label="Hapus kategori" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
+                                <Button @click="openDeleteConfirm(category)" variant="ghost" size="icon-sm" title="Hapus kategori" aria-label="Hapus kategori" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
                                     <i class="fas fa-trash-alt"></i>
                                 </Button>
                             </td>
@@ -243,6 +267,30 @@ const getTypeLabel = (type) => {
                         </Button>
                     </DialogFooter>
                 </form>
+            </DialogContent>
+        </Dialog>
+
+        <!-- DIALOG KONFIRMASI HAPUS KATEGORI -->
+        <Dialog :open="deleteConfirmOpen" @update:open="(open) => open ? deleteConfirmOpen = true : closeDeleteConfirm()">
+            <DialogContent class="sm:max-w-[420px] rounded-2xl bg-card border-border text-foreground">
+                <DialogHeader>
+                    <DialogTitle class="flex items-center gap-2">
+                        <i class="fas fa-triangle-exclamation text-red-500"></i>
+                        Hapus Kategori?
+                    </DialogTitle>
+                    <DialogDescription>
+                        Kategori {{ deleteTarget?.name }} akan dihapus permanen. Pastikan tidak ada produk yang masih memakai kategori ini.
+                    </DialogDescription>
+                </DialogHeader>
+                <p v-if="deleteError" class="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
+                    {{ deleteError }}
+                </p>
+                <DialogFooter class="gap-2">
+                    <Button type="button" variant="secondary" class="rounded-xl" @click="closeDeleteConfirm">Batal</Button>
+                    <Button type="button" :disabled="deleteProcessing" class="rounded-xl bg-red-600 text-white hover:bg-red-700" @click="confirmDeleteCategory">
+                        {{ deleteProcessing ? 'Menghapus...' : 'Ya, Hapus' }}
+                    </Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     </div>

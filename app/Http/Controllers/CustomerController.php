@@ -69,7 +69,12 @@ class CustomerController extends Controller
      */
     public function destroy(Customer $customer)
     {
-        // Set null or restrict transactions, onDelete is set null in migration
+        if ($customer->transactions()->exists()) {
+            return redirect()
+                ->back()
+                ->withErrors(['error' => 'Customer tidak bisa dihapus karena sudah memiliki riwayat transaksi.']);
+        }
+
         $customer->delete();
 
         return redirect()->back()->with('success', 'Customer berhasil dihapus!');

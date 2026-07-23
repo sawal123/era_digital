@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from 'vue';
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head, router, useForm } from '@inertiajs/vue3';
 import flatpickr from 'flatpickr';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -162,6 +162,10 @@ const initDateRangePicker = () => {
 // Form modal state
 const formOpen = ref(false);
 const editTarget = ref(null);
+const deleteConfirmOpen = ref(false);
+const deleteTarget = ref(null);
+const deleteProcessing = ref(false);
+const deleteError = ref('');
 
 const form = useForm({
     date: new Date().toISOString().split('T')[0],
@@ -232,12 +236,37 @@ const closeFormModal = (open) => {
     }
 };
 
-const deleteExpense = (id) => {
-    if (confirm('Apakah Anda yakin ingin menghapus catatan pengeluaran ini?')) {
-        form.delete(`/expenses/${id}`, {
-            preserveScroll: true,
-        });
-    }
+const openDeleteConfirm = (expense) => {
+    deleteTarget.value = expense;
+    deleteError.value = '';
+    deleteConfirmOpen.value = true;
+};
+
+const closeDeleteConfirm = () => {
+    if (deleteProcessing.value) return;
+    deleteConfirmOpen.value = false;
+    deleteTarget.value = null;
+    deleteError.value = '';
+};
+
+const confirmDeleteExpense = () => {
+    if (!deleteTarget.value) return;
+
+    deleteProcessing.value = true;
+    router.delete(`/expenses/${deleteTarget.value.id}`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            deleteConfirmOpen.value = false;
+            deleteTarget.value = null;
+            deleteError.value = '';
+        },
+        onError: (errors) => {
+            deleteError.value = errors.error || 'Gagal menghapus catatan pengeluaran.';
+        },
+        onFinish: () => {
+            deleteProcessing.value = false;
+        },
+    });
 };
 
 const filteredExpenses = computed(() => {
@@ -558,7 +587,7 @@ onBeforeUnmount(() => {
                                         <Button @click="openEditModal(exp)" variant="ghost" size="icon-sm" title="Edit pengeluaran" aria-label="Edit pengeluaran" class="h-8 rounded-lg text-blue-600 hover:text-blue-800 hover:bg-blue-50 dark:text-blue-400 dark:hover:text-blue-300 dark:hover:bg-blue-950/20">
                                             <i class="fas fa-pen"></i>
                                         </Button>
-                                        <Button @click="deleteExpense(exp.id)" variant="ghost" size="icon-sm" title="Hapus pengeluaran" aria-label="Hapus pengeluaran" class="h-8 rounded-lg text-red-650 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20">
+                                        <Button @click="openDeleteConfirm(exp)" variant="ghost" size="icon-sm" title="Hapus pengeluaran" aria-label="Hapus pengeluaran" class="h-8 rounded-lg text-red-650 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20">
                                             <i class="fas fa-trash-alt"></i>
                                         </Button>
                                     </div>
@@ -654,6 +683,30 @@ onBeforeUnmount(() => {
                         </Button>
                     </DialogFooter>
                 </form>
+            </DialogContent>
+        </Dialog>
+
+        <!-- DIALOG KONFIRMASI HAPUS PENGELUARAN -->
+        <Dialog :open="deleteConfirmOpen" @update:open="(open) => open ? deleteConfirmOpen = true : closeDeleteConfirm()">
+            <DialogContent class="sm:max-w-[440px] rounded-2xl bg-card border-border text-foreground">
+                <DialogHeader>
+                    <DialogTitle class="flex items-center gap-2">
+                        <i class="fas fa-triangle-exclamation text-red-500"></i>
+                        Hapus Pengeluaran?
+                    </DialogTitle>
+                    <DialogDescription>
+                        Catatan {{ deleteTarget?.name }} senilai Rp {{ formatRupiah(deleteTarget?.amount || 0) }} akan dihapus permanen dari riwayat biaya.
+                    </DialogDescription>
+                </DialogHeader>
+                <p v-if="deleteError" class="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
+                    {{ deleteError }}
+                </p>
+                <DialogFooter class="gap-2">
+                    <Button type="button" variant="secondary" class="rounded-xl" @click="closeDeleteConfirm">Batal</Button>
+                    <Button type="button" :disabled="deleteProcessing" class="rounded-xl bg-red-600 text-white hover:bg-red-700" @click="confirmDeleteExpense">
+                        {{ deleteProcessing ? 'Menghapus...' : 'Ya, Hapus' }}
+                    </Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     </div>
