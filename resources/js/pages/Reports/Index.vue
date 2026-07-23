@@ -282,7 +282,7 @@ const totalSales  = computed(() => filteredTransactions.value.reduce((sum, trans
 const totalBase   = computed(() => filteredTransactions.value.reduce((sum, transaction) => sum + toNumber(transaction.total_base_price), 0));
 const totalTransactionProfit = computed(() => filteredTransactions.value.reduce((sum, transaction) => sum + toNumber(transaction.total_profit), 0));
 const totalExpenses = computed(() => filteredExpenses.value.reduce((sum, expense) => sum + toNumber(expense.amount), 0));
-const netProfit = computed(() => totalSales.value - totalExpenses.value);
+const netProfit = computed(() => totalSales.value - totalBase.value);
 
 // ─── DETAIL DIALOG ────────────────────────────────────────────────
 const selectedTransaction = ref(null);
@@ -560,7 +560,7 @@ const flash = computed(() => usePage().props.flash ?? {});
                     <div class="text-2xl font-black" :class="netProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'">
                         Rp {{ formatRupiah(netProfit) }}
                     </div>
-                    <p class="text-[11px] text-muted-foreground mt-1">Omset dikurangi total pengeluaran sesuai filter aktif</p>
+                    <p class="text-[11px] text-muted-foreground mt-1">Omset dikurangi total harga modal sesuai filter aktif</p>
                 </CardContent>
                 <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500"></div>
             </Card>
