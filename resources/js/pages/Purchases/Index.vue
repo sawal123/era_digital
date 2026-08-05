@@ -57,6 +57,14 @@ const getCurrentMonthString = () => {
 const getCurrentYearString = () => String(new Date().getFullYear());
 const todayString = getTodayString();
 
+const yearOptions = Array.from({ length: 5 }, (_, i) => String(new Date().getFullYear() - i));
+
+const modeOptions = [
+    { key: 'harian', label: 'Harian', icon: 'fas fa-calendar-day' },
+    { key: 'bulanan', label: 'Bulanan', icon: 'fas fa-calendar-alt' },
+    { key: 'tahunan', label: 'Tahunan', icon: 'fas fa-calendar' },
+];
+
 // Filter state (template from Reports)
 const filterMode = ref('harian'); // 'harian' | 'bulanan' | 'tahunan'
 const filterDateRange = ref(`${todayString} to ${todayString}`);
@@ -293,11 +301,7 @@ const parseFloatAsString = (val) => {
             <div class="bg-card border border-border rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4 shadow-xs">
                 <div class="flex gap-1.5 bg-muted/50 p-1 rounded-xl border border-border/50">
                     <button
-                        v-for="m in [
-                            { key: 'harian', label: 'Harian', icon: 'fas fa-calendar-day' },
-                            { key: 'bulanan', label: 'Bulanan', icon: 'fas fa-calendar-alt' },
-                            { key: 'tahunan', label: 'Tahunan', icon: 'fas fa-calendar' },
-                        ]"
+                        v-for="m in modeOptions"
                         :key="m.key"
                         @click="setMode(m.key)"
                         class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200"
@@ -337,7 +341,7 @@ const parseFloatAsString = (val) => {
                             v-model="filterYear"
                             class="pl-8 h-9 w-full rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 transition px-3 appearance-none"
                         >
-                            <option v-for="y in [getCurrentYearString(), String(Number(getCurrentYearString())-1), String(Number(getCurrentYearString())-2)]" :key="y" :value="y">{{ y }}</option>
+                            <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
                         </select>
                     </div>
 
