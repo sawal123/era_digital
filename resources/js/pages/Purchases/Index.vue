@@ -1,5 +1,6 @@
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import flatpickr from 'flatpickr';
 import { Head, useForm } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +41,110 @@ defineOptions({
 const props = defineProps({
     products: Array,
     purchases: Array,
+});
+
+const padDatePart = (value) => String(value).padStart(2, '0');
+const getTodayString = () => {
+    const now = new Date();
+
+    return `${now.getFullYear()}-${padDatePart(now.getMonth() + 1)}-${padDatePart(now.getDate())}`;
+};
+const getCurrentMonthString = () => {
+    const now = new Date();
+
+    return `${now.getFullYear()}-${padDatePart(now.getMonth() + 1)}`;
+};
+const getCurrentYearString = () => String(new Date().getFullYear());
+const todayString = getTodayString();
+
+// Filter state (template from Reports)
+const filterMode = ref('harian'); // 'harian' | 'bulanan' | 'tahunan'
+const filterDateRange = ref(`${todayString} to ${todayString}`);
+const filterMonth = ref(getCurrentMonthString());
+const filterYear = ref(getCurrentYearString());
+const dateRangeInput = ref(null);
+let dateRangePickerInstance = null;
+
+const setMode = (mode) => {
+    filterMode.value = mode;
+};
+
+const parseDateRange = (value) => {
+    const [start = '', end = ''] = String(value ?? '').split(' to ');
+    const normalizedStart = start || todayString;
+    const normalizedEnd = end || normalizedStart;
+
+    return {
+        start: normalizedStart,
+        end: normalizedEnd,
+    };
+};
+
+const selectedDateRange = computed(() => parseDateRange(filterDateRange.value));
+const setDateRange = (start, end = start) => {
+    filterDateRange.value = end && end !== start ? `${start} to ${end}` : start;
+
+    if (dateRangePickerInstance) {
+        dateRangePickerInstance.setDate([start, end || start], false);
+    }
+};
+
+const initDateRangePicker = () => {
+    if (!dateRangeInput.value) return;
+
+    dateRangePickerInstance?.destroy();
+    dateRangePickerInstance = flatpickr(dateRangeInput.value, {
+        mode: 'range',
+        dateFormat: 'Y-m-d',
+        defaultDate: [selectedDateRange.value.start, selectedDateRange.value.end],
+        onChange: (selectedDates, _dateStr, instance) => {
+            if (selectedDates.length === 0) {
+                setDateRange(todayString);
+
+                return;
+            }
+
+            const [startDate, endDate = startDate] = selectedDates.map((date) => instance.formatDate(date, 'Y-m-d'));
+            filterDateRange.value = startDate === endDate ? startDate : `${startDate} to ${endDate}`;
+        },
+    });
+};
+
+watch(filterMode, async (mode) => {
+    if (mode !== 'harian') {
+        dateRangePickerInstance?.destroy();
+        dateRangePickerInstance = null;
+
+        return;
+    }
+
+    await nextTick();
+    initDateRangePicker();
+});
+
+onMounted(() => {
+    if (filterMode.value === 'harian') {
+        initDateRangePicker();
+    }
+});
+
+onBeforeUnmount(() => {
+    dateRangePickerInstance?.destroy();
+});
+
+// Filtered purchases
+const filteredPurchases = computed(() => {
+    const { start, end } = selectedDateRange.value;
+
+    return props.purchases.filter((p) => {
+        const purchaseDate = String(p.purchase_date ?? '').slice(0, 10);
+
+        return filterMode.value === 'harian'
+            ? purchaseDate >= start && purchaseDate <= end
+            : filterMode.value === 'bulanan'
+                ? String(p.purchase_date ?? '').slice(0, 7) === filterMonth.value
+                : String(p.purchase_date ?? '').slice(0, 4) === filterYear.value;
+    });
 });
 
 // Form state
@@ -129,14 +234,14 @@ const deletePurchase = (pc) => {
 
 // Summary metrics
 const totalPurchaseAmount = computed(() => {
-    return props.purchases.reduce(
-        (sum, p) => sum + parseFloat(p.total_price),
+    return filteredPurchases.value.reduce(
+        (sum, p) => sum + parseFloat(p.total_price || 0),
         0,
     );
 });
 
 const totalItemsRestocked = computed(() => {
-    return props.purchases.reduce((sum, p) => sum + parseFloat(p.quantity), 0);
+    return filteredPurchases.value.reduce((sum, p) => sum + parseFloat(p.quantity || 0), 0);
 });
 
 const formatRupiah = (angka) => {
@@ -184,8 +289,68 @@ const parseFloatAsString = (val) => {
                 <i class="fas fa-plus mr-2 text-xs"></i> Restock Barang
             </Button>
         </div>
+            <!-- Filter Panel (Hari / Bulan / Tahun) -->
+            <div class="bg-card border border-border rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4 shadow-xs">
+                <div class="flex gap-1.5 bg-muted/50 p-1 rounded-xl border border-border/50">
+                    <button
+                        v-for="m in [
+                            { key: 'harian', label: 'Harian', icon: 'fas fa-calendar-day' },
+                            { key: 'bulanan', label: 'Bulanan', icon: 'fas fa-calendar-alt' },
+                            { key: 'tahunan', label: 'Tahunan', icon: 'fas fa-calendar' },
+                        ]"
+                        :key="m.key"
+                        @click="setMode(m.key)"
+                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200"
+                        :class="filterMode === m.key
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-muted'"
+                    >
+                        <i :class="m.icon" class="text-[10px]"></i>
+                        {{ m.label }}
+                    </button>
+                </div>
 
-        <!-- Metrics Grid -->
+                <div class="flex-1 flex items-center gap-3">
+                    <div v-if="filterMode === 'harian'" class="relative flex-1 max-w-sm">
+                        <i class="fas fa-calendar-day absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
+                        <input
+                            ref="dateRangeInput"
+                            type="text"
+                            :value="filterDateRange"
+                            placeholder="Pilih rentang tanggal"
+                            class="h-9 w-full rounded-xl border border-input bg-background px-3 pl-8 text-sm text-foreground transition focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                    </div>
+
+                    <div v-else-if="filterMode === 'bulanan'" class="relative flex-1 max-w-xs">
+                        <i class="fas fa-calendar-alt absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
+                        <input
+                            type="month"
+                            v-model="filterMonth"
+                            class="pl-8 h-9 w-full rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 transition px-3"
+                        />
+                    </div>
+
+                    <div v-else class="relative flex-1 max-w-xs">
+                        <i class="fas fa-calendar absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
+                        <select
+                            v-model="filterYear"
+                            class="pl-8 h-9 w-full rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 transition px-3 appearance-none"
+                        >
+                            <option v-for="y in [getCurrentYearString(), String(Number(getCurrentYearString())-1), String(Number(getCurrentYearString())-2)]" :key="y" :value="y">{{ y }}</option>
+                        </select>
+                    </div>
+
+                    <button
+                        @click="filterMode === 'harian' ? setDateRange(todayString) : filterMode === 'bulanan' ? filterMonth = getCurrentMonthString() : filterYear = getCurrentYearString()"
+                        class="text-xs text-indigo-600 hover:text-indigo-800 font-semibold whitespace-nowrap transition underline underline-offset-2"
+                    >
+                        {{ filterMode === 'harian' ? 'Hari ini' : filterMode === 'bulanan' ? 'Bulan ini' : 'Tahun ini' }}
+                    </button>
+                </div>
+            </div>
+
+            <!-- Metrics Grid -->
         <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
             <!-- Total Anggaran Restock -->
             <Card
@@ -259,7 +424,7 @@ const parseFloatAsString = (val) => {
                 </CardHeader>
                 <CardContent>
                     <div class="text-2xl font-black text-foreground">
-                        {{ purchases.length }} Kali
+                        {{ filteredPurchases.length }} Kali
                     </div>
                     <p class="mt-1 text-[11px] text-muted-foreground">
                         Jumlah kali pencatatan belanja stok dari supplier
@@ -302,7 +467,7 @@ const parseFloatAsString = (val) => {
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border text-sm">
-                            <tr v-if="purchases.length === 0">
+                            <tr v-if="filteredPurchases.length === 0">
                                 <td
                                     colspan="8"
                                     class="p-12 text-center text-muted-foreground"
@@ -322,7 +487,7 @@ const parseFloatAsString = (val) => {
                                 </td>
                             </tr>
                             <tr
-                                v-for="pc in purchases"
+                                v-for="pc in filteredPurchases"
                                 :key="pc.id"
                                 class="transition hover:bg-muted/30"
                             >

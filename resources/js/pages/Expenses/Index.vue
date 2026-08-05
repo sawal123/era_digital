@@ -391,8 +391,16 @@ const getTransactionLabel = (transaction) => {
 
 const getTransactionDescription = (transaction) => {
     const customerName = transaction.customer_name || transaction.customer?.name || 'Cash / Umum';
+    const itemTypes = [...new Set((transaction.items || []).map((it) => String(it.type || '').trim()).filter(Boolean))];
+    const vendorNames = [...new Set((transaction.items || []).map((it) => String(it.print_vendor?.name || it.printVendor?.name || '').trim()).filter(Boolean))];
 
-    return `Customer: ${customerName} | Omset Rp ${formatRupiah(transaction.total_price || 0)} | HPP Rp ${formatRupiah(transaction.total_base_price || 0)}`;
+    const extras = [];
+    if (itemTypes.length) extras.push(`Tipe: ${itemTypes.join(', ')}`);
+    if (vendorNames.length) extras.push(`Vendor: ${vendorNames.join(', ')}`);
+
+    const extrasLabel = extras.length ? ` | ${extras.join(' | ')}` : '';
+
+    return `Customer: ${customerName}${extrasLabel} | Omset Rp ${formatRupiah(transaction.total_price || 0)} | HPP Rp ${formatRupiah(transaction.total_base_price || 0)}`;
 };
 
 const getItemLabel = (item) => {
