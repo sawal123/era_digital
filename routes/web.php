@@ -50,6 +50,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Restock / Belanja Barang (Stok Masuk)
     Route::get('/purchases', [PurchaseController::class, 'index'])->name('purchases.index');
     Route::post('/purchases', [PurchaseController::class, 'store'])->name('purchases.store');
+    Route::patch('/purchases/{purchase}', [PurchaseController::class, 'update'])->name('purchases.update');
+    Route::delete('/purchases/{purchase}', [PurchaseController::class, 'destroy'])->name('purchases.destroy');
 
     // Catatan Piutang & Pelunasan
     Route::get('/receivables', [ReceivableController::class, 'index'])->name('receivables.index');
@@ -62,4 +64,4 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('settings.store.update');
 });
 
-require __DIR__.'/settings.php';
+require __DIR__ . '/settings.php';

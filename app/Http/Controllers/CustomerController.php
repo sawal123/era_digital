@@ -14,12 +14,12 @@ class CustomerController extends Controller
     public function index()
     {
         $customers = Customer::with([
-                'transactions' => function ($query) {
-                    $query
-                        ->with(['items.product'])
-                        ->latest();
-                },
-            ])
+            'transactions' => function ($query) {
+                $query
+                    ->with(['items.product'])
+                    ->latest();
+            },
+        ])
             ->withCount('transactions')
             ->withSum('transactions as total_spent', 'total_price')
             ->orderBy('name')

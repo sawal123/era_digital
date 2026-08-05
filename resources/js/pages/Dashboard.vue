@@ -152,7 +152,7 @@ const handleMouseLeave = () => {
         <!-- 1. KARTU STATISTIK (HARI INI) -->
         <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
             <!-- Omset Card -->
-            <div class="relative overflow-hidden bg-card border border-border p-5 rounded-2xl shadow-xs group transition hover:border-emerald-500/20">
+            <Link href="/reports" aria-label="Lihat laporan omset" class="relative overflow-hidden bg-card border border-border p-5 rounded-2xl shadow-xs group transition transform hover:scale-[1.02] hover:border-emerald-500/20 focus:outline-none focus:ring-2 focus:ring-emerald-300">
                 <div class="flex justify-between items-start">
                     <div class="space-y-1">
                         <span class="text-xs font-bold text-muted-foreground uppercase tracking-wider block">Total Omset</span>
@@ -167,10 +167,16 @@ const handleMouseLeave = () => {
                     <span>Ringkasan pendapatan kotor</span>
                 </div>
                 <div class="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500 opacity-60 group-hover:opacity-100 transition"></div>
-            </div>
+
+                <!-- Quick Actions -->
+                <div class="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition flex gap-2">
+                    <Link href="/reports" class="text-[11px] px-2 py-1 rounded-md bg-white/5 hover:bg-white/10">Lihat</Link>
+                    <Link href="/pos" class="text-[11px] px-2 py-1 rounded-md bg-white/5 hover:bg-white/10">Kasir</Link>
+                </div>
+            </Link>
 
             <!-- Modal Card -->
-            <div class="relative overflow-hidden bg-card border border-border p-5 rounded-2xl shadow-xs group transition hover:border-indigo-500/20">
+            <Link href="/products" aria-label="Lihat produk" class="relative overflow-hidden bg-card border border-border p-5 rounded-2xl shadow-xs group transition transform hover:scale-[1.02] hover:border-indigo-500/20 focus:outline-none focus:ring-2 focus:ring-indigo-300">
                 <div class="flex justify-between items-start">
                     <div class="space-y-1">
                         <span class="text-xs font-bold text-muted-foreground uppercase tracking-wider block">Total Modal</span>
@@ -185,10 +191,15 @@ const handleMouseLeave = () => {
                     <span>Harga modal pokok produk</span>
                 </div>
                 <div class="absolute bottom-0 left-0 right-0 h-1 bg-indigo-500 opacity-60 group-hover:opacity-100 transition"></div>
-            </div>
+
+                <div class="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition flex gap-2">
+                    <Link href="/products" class="text-[11px] px-2 py-1 rounded-md bg-white/5 hover:bg-white/10">Daftar</Link>
+                    <Link href="/products/create" class="text-[11px] px-2 py-1 rounded-md bg-white/5 hover:bg-white/10">Tambah</Link>
+                </div>
+            </Link>
 
             <!-- Pengeluaran Card -->
-            <div class="relative overflow-hidden bg-card border border-border p-5 rounded-2xl shadow-xs group transition hover:border-rose-500/20">
+            <Link href="/expenses" aria-label="Lihat pengeluaran" class="relative overflow-hidden bg-card border border-border p-5 rounded-2xl shadow-xs group transition transform hover:scale-[1.02] hover:border-rose-500/20 focus:outline-none focus:ring-2 focus:ring-rose-300">
                 <div class="flex justify-between items-start">
                     <div class="space-y-1">
                         <span class="text-xs font-bold text-muted-foreground uppercase tracking-wider block">Biaya Pengurang Laba</span>
@@ -203,10 +214,15 @@ const handleMouseLeave = () => {
                     <span>HPP tambahan + operasional rutin</span>
                 </div>
                 <div class="absolute bottom-0 left-0 right-0 h-1 bg-rose-500 opacity-60 group-hover:opacity-100 transition"></div>
-            </div>
+
+                <div class="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition flex gap-2">
+                    <Link href="/expenses" class="text-[11px] px-2 py-1 rounded-md bg-white/5 hover:bg-white/10">Lihat</Link>
+                    <Link href="/expenses/create" class="text-[11px] px-2 py-1 rounded-md bg-white/5 hover:bg-white/10">Tambah</Link>
+                </div>
+            </Link>
 
             <!-- Keuntungan Bersih Card -->
-            <div class="relative overflow-hidden bg-card border border-border p-5 rounded-2xl shadow-xs group transition hover:border-cyan-500/20">
+            <Link href="/reports" aria-label="Lihat laporan keuntungan" class="relative overflow-hidden bg-card border border-border p-5 rounded-2xl shadow-xs group transition transform hover:scale-[1.02] hover:border-cyan-500/20 focus:outline-none focus:ring-2 focus:ring-cyan-300">
                 <div class="flex justify-between items-start">
                     <div class="space-y-1">
                         <span class="text-xs font-bold text-muted-foreground uppercase tracking-wider block">Keuntungan Bersih</span>
@@ -221,10 +237,15 @@ const handleMouseLeave = () => {
                     <span>Laba kotor - HPP tambahan - operasional</span>
                 </div>
                 <div class="absolute bottom-0 left-0 right-0 h-1 bg-cyan-500 opacity-60 group-hover:opacity-100 transition"></div>
-            </div>
+
+                <div class="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition flex gap-2">
+                    <Link href="/reports" class="text-[11px] px-2 py-1 rounded-md bg-white/5 hover:bg-white/10">Lihat</Link>
+                    <Link href="/reports?view=profit-detail" class="text-[11px] px-2 py-1 rounded-md bg-white/5 hover:bg-white/10">Rincian</Link>
+                </div>
+            </Link>
 
             <!-- Admin Fee PPOB Card -->
-            <div class="relative overflow-hidden bg-card border border-border p-5 rounded-2xl shadow-xs group transition hover:border-violet-500/20">
+            <Link href="/reports" aria-label="Lihat PPOB" class="relative overflow-hidden bg-card border border-border p-5 rounded-2xl shadow-xs group transition transform hover:scale-[1.02] hover:border-violet-500/20 focus:outline-none focus:ring-2 focus:ring-violet-300">
                 <div class="flex justify-between items-start">
                     <div class="space-y-1">
                         <span class="text-xs font-bold text-muted-foreground uppercase tracking-wider block">Admin Fee PPOB</span>
@@ -239,7 +260,12 @@ const handleMouseLeave = () => {
                     <span>Profit dari biaya admin digital</span>
                 </div>
                 <div class="absolute bottom-0 left-0 right-0 h-1 bg-violet-500 opacity-60 group-hover:opacity-100 transition"></div>
-            </div>
+
+                <div class="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition flex gap-2">
+                    <Link href="/reports" class="text-[11px] px-2 py-1 rounded-md bg-white/5 hover:bg-white/10">Lihat</Link>
+                    <Link href="/reports?filter=ppob" class="text-[11px] px-2 py-1 rounded-md bg-white/5 hover:bg-white/10">Filter</Link>
+                </div>
+            </Link>
         </div>
 
         <!-- 2. GRAFIK PERFORMA & 3. STOK KRITIS GRID -->
