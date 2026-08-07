@@ -81,7 +81,7 @@ class UndanganController extends Controller
     {
         $files = collect($request->file('gambar', []))
             ->flatten()
-            ->filter(fn ($file) => $file instanceof UploadedFile);
+            ->filter(fn($file) => $file instanceof UploadedFile);
 
         $http = $this->client();
         foreach ($files as $file) {
@@ -113,9 +113,9 @@ class UndanganController extends Controller
         // 1. Hapus gambar per index (jika user menandai penghapusan di form edit)
         $hapusGambar = $request->input('hapus_gambar', []);
         if (is_string($hapusGambar)) {
-            $hapusGambar = array_filter(explode(',', $hapusGambar), fn ($v) => is_numeric($v));
+            $hapusGambar = array_filter(explode(',', $hapusGambar), fn($v) => is_numeric($v));
         }
-        $hapusGambar = collect($hapusGambar)->map(fn ($v) => (int) $v)->sortDesc()->values();
+        $hapusGambar = collect($hapusGambar)->map(fn($v) => (int) $v)->sortDesc()->values();
 
         foreach ($hapusGambar as $imageIndex) {
             $this->client()->delete("/undangan-cetak/{$id}/gambar/{$imageIndex}");
@@ -124,7 +124,7 @@ class UndanganController extends Controller
         // 2. Siapkan payload update
         $files = collect($request->file('gambar', []))
             ->flatten()
-            ->filter(fn ($file) => $file instanceof UploadedFile);
+            ->filter(fn($file) => $file instanceof UploadedFile);
 
         $payload = $request->except(['gambar', '_method', '_token', 'hapus_gambar', 'hapus_gambar_lama']);
 
@@ -163,7 +163,7 @@ class UndanganController extends Controller
      */
     public function destroy($id)
     {
-        $response = $this->client()->delete('/undangan-cetak/'.(int) $id);
+        $response = $this->client()->delete('/undangan-cetak/' . (int) $id);
         $body = $response->json() ?? [];
 
         if ($response->failed()) {
@@ -183,7 +183,7 @@ class UndanganController extends Controller
      */
     public function destroyImage($id, $imageIndex)
     {
-        $response = $this->client()->delete('/undangan-cetak/'.(int) $id.'/gambar/'.(int) $imageIndex);
+        $response = $this->client()->delete('/undangan-cetak/' . (int) $id . '/gambar/' . (int) $imageIndex);
         $body = $response->json() ?? [];
 
         if ($response->failed()) {
@@ -203,7 +203,7 @@ class UndanganController extends Controller
      */
     protected function handleApiError(int $status, array $body, string $action)
     {
-        $message = $body['message'] ?? 'Terjadi kesalahan saat '.$action.' data undangan.';
+        $message = $body['message'] ?? 'Terjadi kesalahan saat ' . $action . ' data undangan.';
         $errors = $body['errors'] ?? [];
 
         if ($status === 422 && is_array($errors)) {
