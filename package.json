@@ -36,6 +36,10 @@
     "dependencies": {
         "@inertiajs/vite": "^3.0.0",
         "@inertiajs/vue3": "^3.0.0",
+        "@tiptap/extension-link": "^3.29.2",
+        "@tiptap/extension-placeholder": "^3.29.2",
+        "@tiptap/starter-kit": "^3.29.2",
+        "@tiptap/vue-3": "^3.29.2",
         "@vueuse/core": "^12.8.2",
         "axios": "^1.16.1",
         "class-variance-authority": "^0.7.1",

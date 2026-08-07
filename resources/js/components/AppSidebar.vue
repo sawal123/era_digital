@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
-import { LayoutGrid, MonitorSmartphone, Layers, Package, BarChart3, Wallet, RefreshCw, Users, Settings, Receipt, CreditCard, Handshake } from 'lucide-vue-next';
+import { LayoutGrid, MonitorSmartphone, Layers, Package, BarChart3, Wallet, RefreshCw, Users, Settings, Receipt, CreditCard, Handshake, MailOpen } from 'lucide-vue-next';
 import AppLogo from '@/components/AppLogo.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
@@ -85,6 +85,11 @@ const masterNavItems: NavItem[] = [
         title: 'Mitra Percetakan',
         href: '/print-vendors',
         icon: Handshake,
+    },
+    {
+        title: 'Undangan Cetak',
+        href: '/undangan',
+        icon: MailOpen,
     },
 ];
 

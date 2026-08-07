@@ -21,7 +21,8 @@ import {
     X,
     Receipt,
     CreditCard,
-    Handshake
+    Handshake,
+    MailOpen
 } from 'lucide-vue-next';
 
 type Props = {
@@ -108,6 +109,11 @@ const masterNavItems = [
         title: 'Mitra Cetak',
         href: '/print-vendors',
         icon: Handshake,
+    },
+    {
+        title: 'Undangan',
+        href: '/undangan',
+        icon: MailOpen,
     },
 ];
 

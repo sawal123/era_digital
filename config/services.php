@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    'undangan' => [
+        'base_url' => env('UNDANGAN_API_URL', 'https://wayaenikah.com/api/v1'),
+        'api_key' => env('UNDANGAN_API_KEY', env('API_KEY')),
+    ],
+
 ];

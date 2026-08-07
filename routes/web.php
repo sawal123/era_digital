@@ -12,6 +12,7 @@ use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\ReceivableController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\StoreProfileController;
+use App\Http\Controllers\UndanganController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
@@ -56,6 +57,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Catatan Piutang & Pelunasan
     Route::get('/receivables', [ReceivableController::class, 'index'])->name('receivables.index');
     Route::post('/receivables/{transaction}/pay', [ReceivableController::class, 'pay'])->name('receivables.pay');
+
+    // Undangan Cetak (data dari API eksternal wayaenikah.com)
+    Route::get('/undangan', [UndanganController::class, 'index'])->name('undangan.index');
+    Route::post('/undangan', [UndanganController::class, 'store'])->name('undangan.store');
+    Route::put('/undangan/{id}', [UndanganController::class, 'update'])->name('undangan.update');
+    Route::delete('/undangan/{id}', [UndanganController::class, 'destroy'])->name('undangan.destroy');
+    Route::delete('/undangan/{id}/gambar/{imageIndex}', [UndanganController::class, 'destroyImage'])->name('undangan.gambar.destroy');
 
     // Pengaturan Toko
     Route::get('/settings/store', [StoreProfileController::class, 'edit'])->name('settings.store.edit');
