@@ -46,7 +46,7 @@ class PosController extends Controller
     {
         $request->validate([
             'cart' => 'required|array|min:1',
-            'cart.*.id' => 'required',
+            'cart.*.id' => 'required|integer|exists:products,id',
             'cart.*.quantity' => 'required|numeric|min:0.1',
             'cart.*.price' => 'required|numeric|min:0',
             'cart.*.print_vendor_id' => 'nullable|exists:print_vendors,id',
@@ -72,6 +72,13 @@ class PosController extends Controller
         $computedItems = [];
         foreach ($request->cart as $index => $item) {
             $product = $productsById[(int) ($item['id'] ?? 0)] ?? null;
+
+            if (! $product || ! $product->is_active) {
+                throw ValidationException::withMessages([
+                    "cart.{$index}.id" => 'Produk tidak ditemukan atau tidak aktif.',
+                ]);
+            }
+
             $computedItems[] = $this->computeCartItem($item, $product, $index);
         }
 
@@ -288,7 +295,8 @@ class PosController extends Controller
             }
             $id = (int) $id;
             if (! array_key_exists($id, $productsById)) {
-                $productsById[$id] = Product::find($id);
+                // Eager-load category karena item type diambil dari kategori produk.
+                $productsById[$id] = Product::with('category')->find($id);
             }
         }
 
@@ -304,16 +312,17 @@ class PosController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function computeCartItem(array $item, ?Product $product, int $index): array
+    private function computeCartItem(array $item, Product $product, int $index): array
     {
-        $itemType = $item['type'] ?? 'fisik';
-        if ($itemType === 'cetak' || $itemType === 'fotokopi') {
-            $itemType = 'jasa';
-        } elseif ($itemType === 'digital') {
-            $itemType = 'ppob';
-        }
+        // Tipe item diambil dari KATEGORI produk DB (bukan dari request),
+        // sehingga manipulasi `type` dari frontend tidak berpengaruh.
+        $itemType = $product->category->type;
 
-        $unit = $product ? $product->unit : 'pcs';
+        $isAreaBased = AreaPricingService::isAreaBased($product);
+
+        // Untuk produk area, quantity disimpan sebagai jumlah pcs, sehingga
+        // snapshot `unit` = pcs (bukan meter). Satuan pricing disimpan di metadata.
+        $unit = $isAreaBased ? 'pcs' : ($product->unit ?: 'pcs');
         $quantity = (float) ($item['quantity'] ?? 0);
 
         $metadata = [
@@ -322,32 +331,20 @@ class PosController extends Controller
             'nominal'   => $item['nominal'] ?? null,
         ];
 
-        $isAreaBased = $product
-            ? AreaPricingService::isAreaBased($product)
-            : (bool) ($item['is_area_based'] ?? false);
-
-        if ($isAreaBased && $product) {
+        if ($isAreaBased) {
             return $this->computeDbAreaItem($item, $product, $index, $itemType, $unit, $metadata);
         }
 
-        if ($isAreaBased) {
-            // Item area tanpa produk DB (custom): tidak ada master, pakai rate
-            // dari request dengan fallback lama. Hanya berlaku untuk item custom.
-            return $this->computeCustomAreaItem($item, $index, $itemType, $unit, $metadata);
-        }
-
         // ---- Non-area (per piece / lembar / rim) — behavior lama dipertahankan ----
-        $basePrice = $product ? $product->base_price : ($item['base_price'] ?? 0);
+        $basePrice = $product->base_price;
 
-        if (isset($item['type']) && $item['type'] === 'cetak') {
-            // Modal cetak = estimasi biaya vendor jika tidak ada produk DB
-            if (! $product || $product->base_price <= 0) {
-                $basePrice = $item['price'] / 1.3;
-            }
-        } elseif (isset($item['type']) && ($item['type'] === 'digital' || $item['type'] === 'ppob')) {
+        if ($itemType === 'ppob') {
             // Modal PPOB = nominal yang dikirim ke pelanggan/distributor
             // Keuntungan = admin_fee = total_harga - nominal
             $basePrice = $item['nominal'] ?? 0;
+        } elseif ($itemType === 'jasa' && $product->base_price <= 0) {
+            // Estimasi biaya vendor untuk jasa non-area tanpa HPP master
+            $basePrice = $item['price'] / 1.3;
         }
 
         $subtotalBase = $basePrice * $quantity;
@@ -355,9 +352,18 @@ class PosController extends Controller
         $profit = $subtotalPrice - $subtotalBase;
 
         return $this->buildComputedItem(
-            $item, $product, $itemType, $unit, $quantity,
-            $basePrice, $item['price'], $subtotalBase, $subtotalPrice, $profit,
-            $metadata, false
+            $item,
+            $product,
+            $itemType,
+            $unit,
+            $quantity,
+            $basePrice,
+            $item['price'],
+            $subtotalBase,
+            $subtotalPrice,
+            $profit,
+            $metadata,
+            false
         );
     }
 
@@ -416,75 +422,24 @@ class PosController extends Controller
             'width'          => $width,
             'area_per_piece' => $areaPerPiece,
             'total_area'     => AreaPricingService::totalArea($areaPerPiece, $quantity),
+            'pricing_unit'   => 'm2',
             'selling_rate'   => $sellingRate,
             'base_rate'      => $baseRate,
         ]);
 
         return $this->buildComputedItem(
-            $item, $product, $itemType, $unit, $quantity,
-            $basePricePerPiece, $sellingPricePerPiece, $subtotalBase, $subtotalPrice, $profit,
-            $metadata, true
-        );
-    }
-
-    /**
-     * Item area tanpa produk DB (custom): memakai rate dari request karena
-     * tidak ada master. Disediakan agar custom cart lama tetap bekerja.
-     *
-     * @return array<string, mixed>
-     */
-    private function computeCustomAreaItem(array $item, int $index, string $itemType, string $unit, array $metadata): array
-    {
-        $length = (float) ($item['length'] ?? 0);
-        $width = (float) ($item['width'] ?? 0);
-        $quantity = (float) ($item['quantity'] ?? 0);
-
-        if ($length <= 0) {
-            throw ValidationException::withMessages([
-                "cart.{$index}.length" => 'Panjang harus lebih besar dari 0 (nol) untuk produk berbasis luas.',
-            ]);
-        }
-
-        if ($width <= 0) {
-            throw ValidationException::withMessages([
-                "cart.{$index}.width" => 'Lebar harus lebih besar dari 0 (nol) untuk produk berbasis luas.',
-            ]);
-        }
-
-        if ($quantity < 1 || floor($quantity) !== $quantity) {
-            throw ValidationException::withMessages([
-                "cart.{$index}.quantity" => 'Jumlah pcs produk berbasis luas harus bilangan bulat minimal 1.',
-            ]);
-        }
-
-        $areaPerPiece = AreaPricingService::areaPerPiece($length, $width);
-        $sellingRate = (float) ($item['selling_rate'] ?? $item['price'] ?? 0);
-        $baseRate = (float) ($item['base_rate'] ?? 0);
-        if ($baseRate <= 0) {
-            $baseRate = $sellingRate / 1.3;
-        }
-
-        $sellingPricePerPiece = AreaPricingService::pricePerPiece($sellingRate, $areaPerPiece);
-        $basePricePerPiece = AreaPricingService::pricePerPiece($baseRate, $areaPerPiece);
-
-        $quantity = (int) $quantity; // pcs
-        $subtotalPrice = round($sellingPricePerPiece * $quantity, 2);
-        $subtotalBase = round($basePricePerPiece * $quantity, 2);
-        $profit = round($subtotalPrice - $subtotalBase, 2);
-
-        $metadata = array_merge($metadata, [
-            'length'         => $length,
-            'width'          => $width,
-            'area_per_piece' => $areaPerPiece,
-            'total_area'     => AreaPricingService::totalArea($areaPerPiece, $quantity),
-            'selling_rate'   => $sellingRate,
-            'base_rate'      => $baseRate,
-        ]);
-
-        return $this->buildComputedItem(
-            $item, null, $itemType, $unit, $quantity,
-            $basePricePerPiece, $sellingPricePerPiece, $subtotalBase, $subtotalPrice, $profit,
-            $metadata, true
+            $item,
+            $product,
+            $itemType,
+            $unit,
+            $quantity,
+            $basePricePerPiece,
+            $sellingPricePerPiece,
+            $subtotalBase,
+            $subtotalPrice,
+            $profit,
+            $metadata,
+            true
         );
     }
 

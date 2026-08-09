@@ -119,9 +119,13 @@ it('CASE 1: 2x1 m qty 1 pcs -> quantity pcs, harga & HPP efektif per pcs', funct
         ->and((float) $metadata['width'])->toBe(1.0)
         ->and((float) $metadata['area_per_piece'])->toBe(2.0)
         ->and((float) $metadata['total_area'])->toBe(2.0)
+        ->and($metadata['pricing_unit'])->toBe('m2')
         ->and((float) $metadata['selling_rate'])->toBe(25000.0)
         ->and((float) $metadata['base_rate'])->toBe(15000.0)
         ->and($metadata['detail'])->toBe('Ukuran: 2 x 1 m');
+
+    // Snapshot unit area = pcs (bukan meter), karena quantity bermakna pcs.
+    expect($item->unit)->toBe('pcs');
 });
 
 // ---------------------------------------------------------------------------
@@ -498,4 +502,62 @@ it('J: area_per_piece mismatch diabaikan (1.6 x 1.2 -> 1.92)', function () {
         ->and((float) $item->selling_price)->toBe(48000.0)
         ->and((float) $item->base_price)->toBe(28800.0)
         ->and((float) $item->profit)->toBe(19200.0);
+});
+
+// ---------------------------------------------------------------------------
+// BLOCKER: produk wajib berasal dari DB & aktif (server-authoritative)
+// ---------------------------------------------------------------------------
+it('menolak cart dengan product id yang tidak ada di database', function () {
+    $this->actingAs(User::factory()->create());
+    posCashMethod();
+
+    $payload = posAreaCartPayload(makeAreaProduct('Spanduk Biasa', 25000, 15000));
+    $payload['cart'][0]['id'] = 999999; // id tidak ada di database
+
+    $this->from('/pos')->post('/pos', $payload)->assertSessionHasErrors('cart.0.id');
+
+    expect(Transaction::count())->toBe(0)
+        ->and(TransactionItem::count())->toBe(0);
+});
+
+it('menolak cart dengan produk non-aktif', function () {
+    $this->actingAs(User::factory()->create());
+    $product = makeAreaProduct('Spanduk Biasa', 25000, 15000);
+    $product->update(['is_active' => false]);
+    posCashMethod();
+
+    $this->from('/pos')->post('/pos', posAreaCartPayload($product))->assertSessionHasErrors('cart.0.id');
+
+    expect(Transaction::count())->toBe(0)
+        ->and(TransactionItem::count())->toBe(0);
+});
+
+// ---------------------------------------------------------------------------
+// BLOCKER: tipe item diambil dari kategori produk, bukan dari request
+// ---------------------------------------------------------------------------
+it('mengabaikan manipulasi type dari frontend (tipe berasal dari kategori produk)', function () {
+    $this->actingAs(User::factory()->create());
+    $product = makeAreaProduct('Spanduk Biasa', 25000, 15000);
+    posCashMethod();
+
+    // StoreProfile dibuat agar kita bisa membuktikan jalur PPOB TIDAK terpanggil
+    // (saldo digital tidak boleh berkurang untuk spanduk).
+    \App\Models\StoreProfile::create([
+        'store_name' => 'Toko Test',
+        'address' => 'Alamat',
+        'phone' => '0812',
+        'saldo_digital' => 100000,
+    ]);
+
+    $this->from('/pos')->post('/pos', posAreaCartPayload($product, [], [
+        'type' => 'digital', // manipulasi: spanduk dicoba dianggap digital/ppob
+    ]))->assertRedirect();
+
+    $item = TransactionItem::first();
+    expect($item)->not->toBeNull()
+        ->and($item->type)->toBe('jasa') // dari kategori jasa-cetak
+        ->and((float) $item->subtotal_price)->toBe(50000.0);
+
+    // Jalur PPOB tidak boleh berjalan untuk spanduk.
+    expect((float) \App\Models\StoreProfile::first()->saldo_digital)->toBe(100000.0);
 });
