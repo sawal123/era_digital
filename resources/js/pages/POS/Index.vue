@@ -51,6 +51,15 @@ const formatQuantity = (value) => new Intl.NumberFormat('id-ID', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
 }).format(normalizeQuantity(value));
+
+// ---------- AREA-BASED (per m²) PRINTING HELPERS ----------
+// Area & harga dibulatkan dengan cara yang SAMA di frontend dan backend
+// (AreaPricingService PHP), agar estimasi == nilai snapshot transaksi.
+const roundMoney = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+const roundArea = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+const isAreaBasedProduct = (product) => product && product.unit === 'meter';
+const areaPerPiece = (length, width) => roundArea(Number(length) * Number(width));
+const pricePerPiece = (rate, area) => roundMoney(Number(rate) * Number(area));
 const cartItemCount = computed(() => {
     return normalizeQuantity(cart.value.reduce((sum, item) => sum + item.quantity, 0));
 });
@@ -330,10 +339,13 @@ const hargaJasaCetak = computed(() => {
     const prod = selectedJasaProduct.value;
     if (!prod) return 0;
 
-    if (prod.unit === 'meter') {
-        let p = parseFloat(cetakPanjang.value) || 1;
-        let l = parseFloat(cetakLebar.value) || 1;
-        return parseFloat(prod.selling_price) * p * l;
+    if (isAreaBasedProduct(prod)) {
+        const p = parseFloat(cetakPanjang.value) || 1;
+        const l = parseFloat(cetakLebar.value) || 1;
+        const qty = parseInt(cetakQty.value) || 1;
+        const ap = areaPerPiece(p, l);
+        // harga per pcs = rate × luas; total = harga per pcs × jumlah pcs
+        return roundMoney(pricePerPiece(parseFloat(prod.selling_price), ap) * qty);
     } else {
         let qty = parseInt(cetakQty.value) || 1;
         return parseFloat(prod.selling_price) * qty;
@@ -347,24 +359,57 @@ const addCetakToCart = () => {
     let quantity = 1;
     let detail = '';
 
-    if (prod.unit === 'meter') {
-        let p = parseFloat(cetakPanjang.value) || 1;
-        let l = parseFloat(cetakLebar.value) || 1;
-        quantity = normalizeQuantity(p * l);
-        detail = `Ukuran: ${formatQuantity(p)}x${formatQuantity(l)} m`;
+    if (isAreaBasedProduct(prod)) {
+        const p = parseFloat(cetakPanjang.value) || 1;
+        const l = parseFloat(cetakLebar.value) || 1;
+        const qty = parseInt(cetakQty.value) || 1;
+
+        if (p <= 0 || l <= 0) {
+            showNotification("Panjang dan lebar harus lebih besar dari 0 (nol) untuk produk berbasis luas.", "Ukuran Tidak Valid", "warning");
+            return;
+        }
+        if (qty < 1) {
+            showNotification("Jumlah pcs minimal 1 (satu).", "Jumlah Tidak Valid", "warning");
+            return;
+        }
+
+        const ap = areaPerPiece(p, l);       // luas per pcs (m²)
+        const rate = parseFloat(prod.selling_price) || 0; // harga jual per m²
+        const baseRate = parseFloat(prod.base_price) || 0; // HPP per m²
+        const perPiece = pricePerPiece(rate, ap); // harga efektif per pcs
+
+        quantity = qty; // jumlah pcs — BUKAN luas
+        detail = `Ukuran: ${formatQuantity(p)} x ${formatQuantity(l)} m`;
+
+        addToCart({
+            id: prod.id,
+            name: prod.name,
+            price: perPiece,
+            quantity: quantity,
+            type: 'cetak',
+            detail: detail,
+            print_vendor_id: cetakVendorId.value || null,
+            is_area_based: true,
+            length: p,
+            width: l,
+            area_per_piece: ap,
+            total_area: roundArea(ap * qty),
+            selling_rate: rate,
+            base_rate: baseRate,
+        });
     } else {
         quantity = parseInt(cetakQty.value) || 1;
-    }
 
-    addToCart({
-        id: prod.id,
-        name: prod.name,
-        price: parseFloat(prod.selling_price),
-        quantity: quantity,
-        type: 'cetak',
-        detail: detail,
-        print_vendor_id: cetakVendorId.value || null,
-    });
+        addToCart({
+            id: prod.id,
+            name: prod.name,
+            price: parseFloat(prod.selling_price),
+            quantity: quantity,
+            type: 'cetak',
+            detail: detail,
+            print_vendor_id: cetakVendorId.value || null,
+        });
+    }
 };
 
 // ---------- TAB SALDO DIGITAL ----------
@@ -588,6 +633,10 @@ const updateQty = (item, delta) => {
         cart.value.splice(idx, 1);
     } else {
         cart.value[idx].quantity = newQty;
+        if (cart.value[idx].is_area_based) {
+            // Ukuran & luas per pcs TETAP; hanya jumlah pcs yang berubah.
+            cart.value[idx].total_area = roundArea((cart.value[idx].area_per_piece || 0) * newQty);
+        }
     }
 };
 
@@ -1105,15 +1154,19 @@ const alertFeature = (fitur) => {
                                             </div>
                                         </div>
                                         
-                                        <!-- Kalkulator Dinamis jika unit meter -->
-                                        <div class="flex gap-4" v-if="selectedJasaProduct?.unit === 'meter'">
-                                            <div class="w-1/2 space-y-1.5">
+                                        <!-- Kalkulator Dinamis jika unit meter (pricing per m²) -->
+                                        <div class="flex gap-4" v-if="isAreaBasedProduct(selectedJasaProduct)">
+                                            <div class="w-1/3 space-y-1.5">
                                                 <Label class="text-xs font-semibold text-foreground">Panjang (meter)</Label>
-                                                <Input type="number" step="0.1" v-model.number="cetakPanjang" class="w-full bg-background border-border text-foreground" />
+                                                <Input type="number" step="0.1" min="0.1" v-model.number="cetakPanjang" class="w-full bg-background border-border text-foreground" />
                                             </div>
-                                            <div class="w-1/2 space-y-1.5">
+                                            <div class="w-1/3 space-y-1.5">
                                                 <Label class="text-xs font-semibold text-foreground">Lebar (meter)</Label>
-                                                <Input type="number" step="0.1" v-model.number="cetakLebar" class="w-full bg-background border-border text-foreground" />
+                                                <Input type="number" step="0.1" min="0.1" v-model.number="cetakLebar" class="w-full bg-background border-border text-foreground" />
+                                            </div>
+                                            <div class="w-1/3 space-y-1.5">
+                                                <Label class="text-xs font-semibold text-foreground">Jumlah (pcs)</Label>
+                                                <Input type="number" step="1" min="1" v-model.number="cetakQty" class="w-full bg-background border-border text-foreground" />
                                             </div>
                                         </div>
                                         <!-- Input Quantity biasa jika unit rim / lembar / pcs dll -->
@@ -1160,9 +1213,29 @@ const alertFeature = (fitur) => {
                                             <p class="text-[10px] text-muted-foreground">Nama mitra hanya untuk pencatatan internal dan tidak dicetak pada invoice.</p>
                                         </div>
                                         
-                                        <div class="bg-muted/50 p-4 rounded-xl flex justify-between items-center border border-border shadow-inner mt-2">
-                                            <span class="text-sm text-muted-foreground font-medium"><i class="fas fa-calculator mr-1"></i> Estimasi Harga</span>
-                                            <span class="font-bold text-lg text-foreground">Rp {{ formatRupiah(hargaJasaCetak) }}</span>
+                                        <div class="bg-muted/50 p-4 rounded-xl border border-border shadow-inner mt-2">
+                                            <div class="flex flex-col gap-1.5" v-if="isAreaBasedProduct(selectedJasaProduct)">
+                                                <div class="flex justify-between text-xs text-muted-foreground">
+                                                    <span><i class="fas fa-calculator mr-1"></i> Luas / pcs</span>
+                                                    <span class="font-mono font-semibold text-foreground">{{ formatQuantity(areaPerPiece(cetakPanjang, cetakLebar)) }} m²</span>
+                                                </div>
+                                                <div class="flex justify-between text-xs text-muted-foreground">
+                                                    <span>Harga / pcs</span>
+                                                    <span class="font-mono font-semibold text-foreground">Rp {{ formatRupiah(pricePerPiece(selectedJasaProduct.selling_price, areaPerPiece(cetakPanjang, cetakLebar))) }}</span>
+                                                </div>
+                                                <div class="flex justify-between text-xs text-muted-foreground" v-if="parseInt(cetakQty) > 1">
+                                                    <span>Total luas ({{ parseInt(cetakQty) }} pcs)</span>
+                                                    <span class="font-mono font-semibold text-foreground">{{ formatQuantity(roundArea(areaPerPiece(cetakPanjang, cetakLebar) * (parseInt(cetakQty) || 1))) }} m²</span>
+                                                </div>
+                                                <div class="border-t border-border/60 pt-1.5 mt-0.5 flex justify-between items-center">
+                                                    <span class="text-sm text-muted-foreground font-medium"><i class="fas fa-calculator mr-1"></i> Estimasi Total</span>
+                                                    <span class="font-bold text-lg text-foreground">Rp {{ formatRupiah(hargaJasaCetak) }}</span>
+                                                </div>
+                                            </div>
+                                            <div v-else class="flex justify-between items-center">
+                                                <span class="text-sm text-muted-foreground font-medium"><i class="fas fa-calculator mr-1"></i> Estimasi Harga</span>
+                                                <span class="font-bold text-lg text-foreground">Rp {{ formatRupiah(hargaJasaCetak) }}</span>
+                                            </div>
                                         </div>
                                         
                                         <Button @click="addCetakToCart" data-loading-mode="spinner-only" class="w-full py-6 rounded-xl text-white font-bold shadow-md text-sm transition-all hover:opacity-90 mt-2 bg-orange-600 hover:bg-orange-700">
@@ -1353,6 +1426,11 @@ const alertFeature = (fitur) => {
                                         class="w-full bg-muted/40 dark:bg-muted/20 border-none rounded-md px-1.5 py-0.5 text-[10px] font-medium text-foreground focus:ring-1 focus:ring-indigo-500/50 outline-none placeholder:text-muted-foreground/60"
                                     />
                                 </div>
+                                <template v-if="item.is_area_based">
+                                    <p class="text-[10px] text-muted-foreground font-medium mt-1">
+                                        Luas/pcs: {{ formatQuantity(item.area_per_piece) }} m² &middot; Total luas: {{ formatQuantity(item.total_area) }} m²
+                                    </p>
+                                </template>
                                 <div class="flex items-center gap-1.5 mt-1.5">
                                     <Button @click="updateQty(item, -1)" variant="ghost" size="sm" data-click-feedback="none" class="w-5 h-5 p-0 flex items-center justify-center rounded-full bg-muted hover:bg-accent text-foreground text-[10px] transition">-</Button>
                                     <span class="text-xs font-bold min-w-4 text-center text-foreground">{{ formatQuantity(item.quantity) }}</span>

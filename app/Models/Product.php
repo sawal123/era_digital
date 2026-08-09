@@ -16,6 +16,14 @@ class Product extends Model
         return $this->belongsTo(Category::class);
     }
 
+    /**
+     * Whether this product is priced per m² (area-based), e.g. spanduk/banner.
+     */
+    public function isAreaBased(): bool
+    {
+        return \App\Services\AreaPricingService::isAreaBased($this);
+    }
+
     public function stockMovements()
     {
         return $this->hasMany(StockMovement::class);

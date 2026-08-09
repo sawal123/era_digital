@@ -12,7 +12,8 @@ use App\Models\PaymentMethod;
 use App\Models\PrintVendor;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use App\Services\AreaPricingService;
 
 class PosController extends Controller
 {
@@ -57,6 +58,44 @@ class PosController extends Controller
             'invoice_customer_phone' => 'nullable|string|max:30',
             'keterangan' => 'nullable|string',
         ]);
+
+        // Area-based items (per m²): quantity = pcs (integer >= 1), length & width > 0.
+        foreach ($request->cart as $index => $item) {
+            $product = null;
+            if (is_numeric($item['id'] ?? null) && ($item['id'] ?? 0) < 10000000000) {
+                $product = Product::find($item['id']);
+            }
+
+            $isAreaBased = $product
+                ? AreaPricingService::isAreaBased($product)
+                : (bool) ($item['is_area_based'] ?? false);
+
+            if (! $isAreaBased) {
+                continue;
+            }
+
+            $length = (float) ($item['length'] ?? 0);
+            $width = (float) ($item['width'] ?? 0);
+            $quantity = (float) ($item['quantity'] ?? 0);
+
+            if ($length <= 0) {
+                throw ValidationException::withMessages([
+                    "cart.{$index}.length" => 'Panjang harus lebih besar dari 0 (nol) untuk produk berbasis luas.',
+                ]);
+            }
+
+            if ($width <= 0) {
+                throw ValidationException::withMessages([
+                    "cart.{$index}.width" => 'Lebar harus lebih besar dari 0 (nol) untuk produk berbasis luas.',
+                ]);
+            }
+
+            if ($quantity < 1 || floor($quantity) !== $quantity) {
+                throw ValidationException::withMessages([
+                    "cart.{$index}.quantity" => 'Jumlah pcs produk berbasis luas harus bilangan bulat minimal 1.',
+                ]);
+            }
+        }
 
         DB::beginTransaction();
 
@@ -173,6 +212,7 @@ class PosController extends Controller
 
             $totalBasePrice = 0;
             $totalProfit = 0;
+            $totalPriceComputed = 0;
 
             foreach ($request->cart as $item) {
                 $product = null;
@@ -181,9 +221,12 @@ class PosController extends Controller
                 }
 
                 $basePrice = $product ? $product->base_price : ($item['base_price'] ?? 0);
-                
+                $isAreaBased = $product
+                    ? AreaPricingService::isAreaBased($product)
+                    : (bool) ($item['is_area_based'] ?? false);
+
                 if (isset($item['type']) && $item['type'] === 'cetak') {
-                    // Modal cetak = 77% dari harga jual (estimasi biaya vendor) jika tidak ada produk DB
+                    // Modal cetak = estimasi biaya vendor jika tidak ada produk DB
                     if (!$product || $product->base_price <= 0) {
                         $basePrice = $item['price'] / 1.3;
                     }
@@ -193,9 +236,51 @@ class PosController extends Controller
                     $basePrice = $item['nominal'] ?? 0;
                 }
 
-                $subtotalBase = $basePrice * $item['quantity'];
-                $subtotalPrice = $item['price'] * $item['quantity']; // price = nominal + admin_fee
-                $profit = $subtotalPrice - $subtotalBase; // profit = admin_fee ✓
+                $metadata = [
+                    'detail'    => $item['detail'] ?? '',
+                    'admin_fee' => $item['admin_fee'] ?? 0,
+                    'nominal'   => $item['nominal'] ?? null,
+                ];
+
+                $quantity = (float) $item['quantity'];
+                $unit = $product ? $product->unit : 'pcs';
+                $basePricePerPiece = 0.0;
+                $sellingPricePerPiece = 0.0;
+
+                if ($isAreaBased) {
+                    // AREA-BASED PRINTING (spanduk/banner/stiker per m²).
+                    // product.selling_price = RATE per m², product.base_price = HPP rate per m².
+                    // quantity = jumlah pcs (validated integer >= 1), ukuran disimpan di metadata.
+                    $length = (float) ($item['length'] ?? 0);
+                    $width = (float) ($item['width'] ?? 0);
+                    $areaPerPiece = AreaPricingService::roundArea(
+                        (float) ($item['area_per_piece'] ?? AreaPricingService::areaPerPiece($length, $width))
+                    );
+
+                    $sellingRate = (float) ($item['selling_rate'] ?? ($product ? $product->selling_price : $item['price']));
+                    $baseRate = (float) ($item['base_rate'] ?? ($product && $product->base_price > 0 ? $product->base_price : 0));
+
+                    $sellingPricePerPiece = AreaPricingService::pricePerPiece($sellingRate, $areaPerPiece);
+                    $basePricePerPiece = AreaPricingService::pricePerPiece($baseRate, $areaPerPiece);
+
+                    $quantity = (int) $quantity; // pcs
+                    $subtotalPrice = round($sellingPricePerPiece * $quantity, 2);
+                    $subtotalBase = round($basePricePerPiece * $quantity, 2);
+                    $profit = round($subtotalPrice - $subtotalBase, 2);
+
+                    $metadata = array_merge($metadata, [
+                        'length'         => $length,
+                        'width'          => $width,
+                        'area_per_piece' => $areaPerPiece,
+                        'total_area'     => AreaPricingService::totalArea($areaPerPiece, $quantity),
+                        'selling_rate'   => $sellingRate,
+                        'base_rate'      => $baseRate,
+                    ]);
+                } else {
+                    $subtotalBase = $basePrice * $quantity;
+                    $subtotalPrice = $item['price'] * $quantity; // price = nominal + admin_fee untuk ppob
+                    $profit = $subtotalPrice - $subtotalBase; // profit = admin_fee ✓
+                }
 
                 $itemType = $item['type'] ?? 'fisik';
                 if ($itemType === 'cetak' || $itemType === 'fotokopi') {
@@ -210,19 +295,15 @@ class PosController extends Controller
                     'print_vendor_id' => $item['print_vendor_id'] ?? null,
                     'item_name' => $item['name'],
                     'type' => $itemType,
-                    'unit' => $product ? $product->unit : 'pcs',
-                    'quantity' => $item['quantity'],
-                    'base_price' => $basePrice,
-                    'selling_price' => $item['price'],
+                    'unit' => $unit,
+                    'quantity' => $quantity,
+                    'base_price' => $isAreaBased ? $basePricePerPiece : $basePrice,
+                    'selling_price' => $isAreaBased ? $sellingPricePerPiece : $item['price'],
                     'subtotal_base' => $subtotalBase,
                     'subtotal_price' => $subtotalPrice,
                     'profit' => $profit,
                     'service_status' => $itemType === 'jasa' ? 'menunggu_file' : 'none',
-                    'metadata' => [
-                        'detail'    => $item['detail'] ?? '',
-                        'admin_fee' => $item['admin_fee'] ?? 0,
-                        'nominal'   => $item['nominal'] ?? null,
-                    ]
+                    'metadata' => $metadata,
                 ]);
 
                 if ($itemType === 'ppob') {
@@ -249,6 +330,7 @@ class PosController extends Controller
                 }
 
                 $totalBasePrice += $subtotalBase;
+                $totalPriceComputed += $subtotalPrice;
                 $totalProfit += $profit;
                 
                 if ($product && $product->category->type === 'fisik') {
@@ -256,9 +338,11 @@ class PosController extends Controller
                 }
             }
 
+            // Rekonsiliasi total transaksi dengan jumlah seluruh item (authoritative).
             $transaction->update([
-                'total_base_price' => $totalBasePrice,
-                'total_profit' => $totalProfit,
+                'total_base_price' => round($totalBasePrice, 2),
+                'total_price' => round($totalPriceComputed, 2),
+                'total_profit' => round($totalProfit, 2),
             ]);
 
             // Record payment history for initial paid amount
