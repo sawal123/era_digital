@@ -319,3 +319,183 @@ it('menolak produk area dengan quantity 0, negatif, atau desimal', function () {
 
     expect(TransactionItem::count())->toBe(0);
 });
+
+it('menolak quantity non-numeric untuk produk area', function () {
+    $this->actingAs(User::factory()->create());
+    $product = makeAreaProduct('Spanduk Biasa', 25000, 15000);
+
+    $this->from('/pos')->post('/pos', posAreaCartPayload($product, [], [
+        'quantity' => 'abc',
+    ]))->assertSessionHasErrors('cart.0.quantity');
+
+    expect(Transaction::count())->toBe(0);
+});
+
+// ---------------------------------------------------------------------------
+// SECURITY / MANIPULATION: nilai finansial dari frontend harus diabaikan
+// untuk produk area yang ada di database.
+// ---------------------------------------------------------------------------
+
+it('A: area_per_piece dari frontend diabaikan (dihitung dari length x width)', function () {
+    $this->actingAs(User::factory()->create());
+    $product = makeAreaProduct('Spanduk Biasa', 25000, 15000);
+
+    $this->from('/pos')->post('/pos', posAreaCartPayload($product, [], [
+        'price' => 50000,
+        'quantity' => 1,
+        'area_per_piece' => 0.01, // manipulasi
+    ]))->assertRedirect();
+
+    $item = TransactionItem::first();
+    $metadata = $item->metadata;
+
+    expect((float) $metadata['area_per_piece'])->toBe(2.0)
+        ->and((float) $metadata['total_area'])->toBe(2.0)
+        ->and((float) $item->selling_price)->toBe(50000.0)
+        ->and((float) $item->base_price)->toBe(30000.0);
+});
+
+it('B: selling_rate dari frontend diabaikan (pakai product.selling_price)', function () {
+    $this->actingAs(User::factory()->create());
+    $product = makeAreaProduct('Spanduk Biasa', 25000, 15000);
+
+    $this->from('/pos')->post('/pos', posAreaCartPayload($product, [], [
+        'selling_rate' => 1, // manipulasi
+        'price' => 2,
+    ]))->assertRedirect();
+
+    $item = TransactionItem::first();
+
+    expect((float) $item->metadata['selling_rate'])->toBe(25000.0)
+        ->and((float) $item->selling_price)->toBe(50000.0);
+});
+
+it('C: base_rate dari frontend diabaikan (pakai product.base_price)', function () {
+    $this->actingAs(User::factory()->create());
+    $product = makeAreaProduct('Spanduk Biasa', 25000, 15000);
+
+    $this->from('/pos')->post('/pos', posAreaCartPayload($product, [], [
+        'base_rate' => 0, // manipulasi
+    ]))->assertRedirect();
+
+    $item = TransactionItem::first();
+
+    expect((float) $item->metadata['base_rate'])->toBe(15000.0)
+        ->and((float) $item->base_price)->toBe(30000.0);
+});
+
+it('D: price dari frontend diabaikan untuk area DB (selling_price dihitung server)', function () {
+    $this->actingAs(User::factory()->create());
+    $product = makeAreaProduct('Spanduk Biasa', 25000, 15000);
+
+    $this->from('/pos')->post('/pos', posAreaCartPayload($product, [], [
+        'price' => 100, // manipulasi
+    ]))->assertRedirect();
+
+    $item = TransactionItem::first();
+
+    expect((float) $item->selling_price)->toBe(50000.0)
+        ->and((float) $item->subtotal_price)->toBe(50000.0);
+});
+
+it('E: request.total palsu diabaikan (total_price = jumlah item server)', function () {
+    $this->actingAs(User::factory()->create());
+    $product = makeAreaProduct('Spanduk Biasa', 25000, 15000);
+
+    $this->from('/pos')->post('/pos', posAreaCartPayload($product, [
+        'total' => 1000, // manipulasi
+        'uang_diterima' => 1000,
+    ]))->assertRedirect();
+
+    $transaction = Transaction::first();
+
+    expect((float) $transaction->total_price)->toBe(50000.0);
+});
+
+it('F: status pembayaran memakai total server (dp/partial)', function () {
+    $this->actingAs(User::factory()->create());
+    $product = makeAreaProduct('Spanduk Biasa', 25000, 15000);
+
+    // Server total 50.000, bayar 20.000 -> dp/partial
+    $this->from('/pos')->post('/pos', posAreaCartPayload($product, [
+        'total' => 1000, // manipulasi, diabaikan
+        'uang_diterima' => 20000,
+    ]))->assertRedirect();
+
+    $transaction = Transaction::first();
+
+    expect((float) $transaction->total_price)->toBe(50000.0)
+        ->and((float) $transaction->jumlah_dibayar)->toBe(20000.0)
+        ->and((float) $transaction->sisa_tagihan)->toBe(30000.0)
+        ->and($transaction->status_bayar)->toBe('dp')
+        ->and($transaction->payment_status)->toBe('partial');
+
+    $history = $transaction->paymentHistories()->first();
+    expect((float) $history->jumlah_bayar)->toBe(20000.0);
+});
+
+it('G: pelunasan memakai total server (lunas/paid)', function () {
+    $this->actingAs(User::factory()->create());
+    $product = makeAreaProduct('Spanduk Biasa', 25000, 15000);
+
+    $this->from('/pos')->post('/pos', posAreaCartPayload($product, [
+        'total' => 1000, // manipulasi
+        'uang_diterima' => 50000,
+    ]))->assertRedirect();
+
+    $transaction = Transaction::first();
+
+    expect((float) $transaction->total_price)->toBe(50000.0)
+        ->and((float) $transaction->jumlah_dibayar)->toBe(50000.0)
+        ->and((float) $transaction->sisa_tagihan)->toBe(0.0)
+        ->and($transaction->status_bayar)->toBe('lunas')
+        ->and($transaction->payment_status)->toBe('paid');
+
+    $history = $transaction->paymentHistories()->first();
+    expect((float) $history->jumlah_bayar)->toBe(50000.0);
+});
+
+it('H: produk area DB dengan base_price 0 ditolak', function () {
+    $this->actingAs(User::factory()->create());
+    $product = makeAreaProduct('Spanduk Biasa', 25000, 0);
+
+    $this->from('/pos')->post('/pos', posAreaCartPayload($product))->assertSessionHasErrors('cart.0.base_rate');
+
+    expect(Transaction::count())->toBe(0)
+        ->and(TransactionItem::count())->toBe(0);
+});
+
+it('I: quantity desimal ditolak backend untuk produk area', function () {
+    $this->actingAs(User::factory()->create());
+    $product = makeAreaProduct('Spanduk Biasa', 25000, 15000);
+
+    $this->from('/pos')->post('/pos', posAreaCartPayload($product, [], [
+        'quantity' => 1.5,
+    ]))->assertSessionHasErrors('cart.0.quantity');
+
+    expect(Transaction::count())->toBe(0);
+});
+
+it('J: area_per_piece mismatch diabaikan (1.6 x 1.2 -> 1.92)', function () {
+    $this->actingAs(User::factory()->create());
+    $product = makeAreaProduct('Spanduk Biasa', 25000, 15000);
+
+    $this->from('/pos')->post('/pos', posAreaCartPayload($product, [
+        'total' => 48000,
+        'uang_diterima' => 48000,
+    ], [
+        'price' => 48000,
+        'quantity' => 1,
+        'length' => 1.6,
+        'width' => 1.2,
+        'area_per_piece' => 2, // mismatch dengan kalkulasi server
+    ]))->assertRedirect();
+
+    $item = TransactionItem::first();
+
+    expect((float) $item->metadata['area_per_piece'])->toBe(1.92)
+        ->and((float) $item->metadata['total_area'])->toBe(1.92)
+        ->and((float) $item->selling_price)->toBe(48000.0)
+        ->and((float) $item->base_price)->toBe(28800.0)
+        ->and((float) $item->profit)->toBe(19200.0);
+});

@@ -5,7 +5,7 @@ import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
     Dialog,
@@ -337,39 +337,68 @@ const selectPrintVendor = (vendor) => {
 
 const hargaJasaCetak = computed(() => {
     const prod = selectedJasaProduct.value;
-    if (!prod) return 0;
+
+    if (!prod) {
+        return 0;
+    }
 
     if (isAreaBasedProduct(prod)) {
-        const p = parseFloat(cetakPanjang.value) || 1;
-        const l = parseFloat(cetakLebar.value) || 1;
-        const qty = parseInt(cetakQty.value) || 1;
+        const p = Number(cetakPanjang.value);
+        const l = Number(cetakLebar.value);
+        const qty = Number(cetakQty.value);
+
+        // Estimasi menampilkan 0 selama input belum lengkap/valid
+        // (jangan paksa nilai invalid menjadi 1).
+        if (!Number.isFinite(p) || p <= 0 || !Number.isFinite(l) || l <= 0 || !Number.isFinite(qty) || qty < 1) {
+            return 0;
+        }
+
         const ap = areaPerPiece(p, l);
+
         // harga per pcs = rate × luas; total = harga per pcs × jumlah pcs
         return roundMoney(pricePerPiece(parseFloat(prod.selling_price), ap) * qty);
-    } else {
-        let qty = parseInt(cetakQty.value) || 1;
-        return parseFloat(prod.selling_price) * qty;
     }
+
+    const qty = Number(cetakQty.value);
+
+    if (!Number.isFinite(qty) || qty < 1) {
+        return 0;
+    }
+
+    return parseFloat(prod.selling_price) * qty;
 });
 
 const addCetakToCart = () => {
     const prod = selectedJasaProduct.value;
-    if (!prod) return;
+
+    if (!prod) {
+        return;
+    }
 
     let quantity = 1;
     let detail = '';
 
     if (isAreaBasedProduct(prod)) {
-        const p = parseFloat(cetakPanjang.value) || 1;
-        const l = parseFloat(cetakLebar.value) || 1;
-        const qty = parseInt(cetakQty.value) || 1;
+        const p = Number(cetakPanjang.value);
+        const l = Number(cetakLebar.value);
+        const qty = Number(cetakQty.value);
 
-        if (p <= 0 || l <= 0) {
-            showNotification("Panjang dan lebar harus lebih besar dari 0 (nol) untuk produk berbasis luas.", "Ukuran Tidak Valid", "warning");
+        // Validasi eksplisit — bukan parseFloat/parseInt || 1
+        if (!Number.isFinite(p) || p <= 0) {
+            showNotification("Panjang harus lebih besar dari 0 (nol).", "Ukuran Tidak Valid", "warning");
+
             return;
         }
-        if (qty < 1) {
-            showNotification("Jumlah pcs minimal 1 (satu).", "Jumlah Tidak Valid", "warning");
+
+        if (!Number.isFinite(l) || l <= 0) {
+            showNotification("Lebar harus lebih besar dari 0 (nol).", "Ukuran Tidak Valid", "warning");
+
+            return;
+        }
+
+        if (!Number.isInteger(qty) || qty < 1) {
+            showNotification("Jumlah pcs harus bilangan bulat minimal 1.", "Jumlah Tidak Valid", "warning");
+
             return;
         }
 
@@ -398,7 +427,15 @@ const addCetakToCart = () => {
             base_rate: baseRate,
         });
     } else {
-        quantity = parseInt(cetakQty.value) || 1;
+        const qty = Number(cetakQty.value);
+
+        if (!Number.isFinite(qty) || qty < 1) {
+            showNotification("Jumlah harus minimal 1.", "Jumlah Tidak Valid", "warning");
+
+            return;
+        }
+
+        quantity = qty;
 
         addToCart({
             id: prod.id,
@@ -893,10 +930,6 @@ const prosesBayar = () => {
 
 const formatRupiah = (angka) => {
     return new Intl.NumberFormat('id-ID').format(angka);
-};
-
-const alertFeature = (fitur) => {
-    showNotification(`Fitur "${fitur}" sedang dalam tahap finalisasi dan akan segera hadir pada pembaharuan sistem versi berikutnya.`, "Fitur Segera Hadir", "info");
 };
 </script>
 
