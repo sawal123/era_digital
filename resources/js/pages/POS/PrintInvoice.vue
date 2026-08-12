@@ -55,10 +55,16 @@ const getItemNote = (item) => {
         return null;
     }
 
-    // Format legacy: "Ukuran: 1 x 1 m - catatan" / "Ukuran: 1.5x2 m - catatan" / "Ukuran: 1 × 1 m - catatan"
-    const noteMatch = detail.match(/^Ukuran:\s*\d+(?:\.\d+)?\s*[×x]\s*\d+(?:\.\d+)?\s*m\s*[-–—]\s*(.+)$/i);
+    // Format legacy area: "Ukuran: 1 x 1 m - catatan" / "Ukuran: 1.5x2 m - catatan" /
+    // "Ukuran: 1,5 x 2 m - catatan" / "Ukuran: 1 × 1 m — catatan"
+    const noteMatch = detail.match(/^Ukuran:\s*\d+(?:[.,]\d+)?\s*[×x]\s*\d+(?:[.,]\d+)?\s*m\s*[-–—]\s*(.+)$/iu);
     if (noteMatch && noteMatch[1] && noteMatch[1].trim()) {
         return noteMatch[1].trim();
+    }
+
+    // 3. Fallback: detail bukan format ukuran → tampilkan sebagai catatan bebas
+    if (!/^Ukuran:/.test(detail)) {
+        return detail;
     }
 
     return null;
