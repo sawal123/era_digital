@@ -3,7 +3,7 @@
 > **Base URL:** `https://undangan-digital.test/api/v1`  
 > **Versi:** v1  
 > **Format:** JSON  
-> **Auth:** API Key via Header  
+> **Auth:** API Key via Header
 
 ---
 
@@ -26,6 +26,7 @@ Hubungi administrator untuk mendapatkan key yang valid.
 ## 📦 Format Response
 
 ### Sukses
+
 ```json
 {
     "success": true,
@@ -35,6 +36,7 @@ Hubungi administrator untuk mendapatkan key yang valid.
 ```
 
 ### Error Validasi (422)
+
 ```json
 {
     "success": false,
@@ -47,6 +49,7 @@ Hubungi administrator untuk mendapatkan key yang valid.
 ```
 
 ### Not Found (404)
+
 ```json
 {
     "success": false,
@@ -55,6 +58,7 @@ Hubungi administrator untuk mendapatkan key yang valid.
 ```
 
 ### Unauthorized (401)
+
 ```json
 {
     "success": false,
@@ -66,14 +70,15 @@ Hubungi administrator untuk mendapatkan key yang valid.
 
 ## 📋 Daftar Endpoint
 
-| #   | Method   | Endpoint                                      | Keterangan                          |
-|-----|----------|-----------------------------------------------|-------------------------------------|
-| 1   | `GET`    | `/undangan-cetak`                             | List semua undangan (paginated)     |
-| 2   | `POST`   | `/undangan-cetak`                             | Tambah undangan baru                |
-| 3   | `GET`    | `/undangan-cetak/{id}`                        | Detail satu undangan                |
-| 4   | `PUT`    | `/undangan-cetak/{id}`                        | Update undangan                     |
-| 5   | `DELETE` | `/undangan-cetak/{id}`                        | Hapus undangan + semua gambar       |
-| 6   | `DELETE` | `/undangan-cetak/{id}/gambar/{imageIndex}`    | Hapus satu gambar (by index)        |
+| #   | Method   | Endpoint                                   | Keterangan                      |
+| --- | -------- | ------------------------------------------ | ------------------------------- |
+| 1   | `GET`    | `/undangan-cetak`                          | List semua undangan (paginated) |
+| 2   | `POST`   | `/undangan-cetak`                          | Tambah undangan baru            |
+| 3   | `GET`    | `/undangan-cetak/{id}`                     | Detail satu undangan            |
+| 4   | `PUT`    | `/undangan-cetak/{id}`                     | Update undangan                 |
+| 5   | `DELETE` | `/undangan-cetak/{id}`                     | Hapus undangan + semua gambar   |
+| 6   | `DELETE` | `/undangan-cetak/{id}/gambar/{imageIndex}` | Hapus satu gambar (by index)    |
+| 7   | `GET`    | `/jenis-undangan`                          | List semua jenis undangan       |
 
 ---
 
@@ -87,18 +92,18 @@ Mengembalikan daftar undangan cetak dengan **pagination**, **pencarian**, dan **
 
 ### 🔍 Query Parameters
 
-| Parameter  | Type    | Default | Keterangan                                                    |
-|------------|---------|---------|---------------------------------------------------------------|
-| `search`   | string  | —       | Cari berdasarkan `nama` (partial match, case-insensitive)     |
-| `jenis`    | string  | —       | Filter exact berdasarkan `jenis`                              |
-| `favorite` | bool    | —       | `1` / `true` = favorit, `0` / `false` = non-favorit           |
-| `promo`    | string  | —       | `1` / `true` = ada promo, `0` / `false` = tidak ada promo     |
-| `sort_by`  | string  | `id`    | Field untuk sorting                                           |
-| `sort_dir` | string  | `desc`  | Arah sorting: `asc` atau `desc`                               |
-| `per_page` | integer | `15`    | Jumlah item per halaman (max: **100**)                        |
+| Parameter  | Type    | Default | Keterangan                                                |
+| ---------- | ------- | ------- | --------------------------------------------------------- |
+| `search`   | string  | —       | Cari berdasarkan `nama` (partial match, case-insensitive) |
+| `jenis_id` | integer | —       | Filter berdasarkan `jenis_id` (FK ke `jenis_udangans.id`) |
+| `favorite` | bool    | —       | `1` / `true` = favorit, `0` / `false` = non-favorit       |
+| `promo`    | string  | —       | `1` / `true` = ada promo, `0` / `false` = tidak ada promo |
+| `sort_by`  | string  | `id`    | Field untuk sorting                                       |
+| `sort_dir` | string  | `desc`  | Arah sorting: `asc` atau `desc`                           |
+| `per_page` | integer | `15`    | Jumlah item per halaman (max: **100**)                    |
 
 **`sort_by` yang didukung:**  
-`id`, `nama`, `jenis`, `harga`, `promo`, `stok`, `terjual`, `favorite`, `created_at`
+`id`, `nama`, `harga`, `promo`, `stok`, `terjual`, `favorite`, `created_at`
 
 ### 📤 Response `200 OK`
 
@@ -112,7 +117,11 @@ Mengembalikan daftar undangan cetak dengan **pagination**, **pencarian**, dan **
             {
                 "id": 209,
                 "nama": "Maliq 112",
-                "jenis": "Maliq",
+                "jenis_id": 1,
+                "jenis_undangan": {
+                    "id": 1,
+                    "jenis": "Maliq"
+                },
                 "stok": "1000",
                 "terjual": "100",
                 "harga": 1200,
@@ -151,7 +160,7 @@ curl -H "X-API-Key: YOUR_KEY" \
 
 # Dengan search & filter
 curl -H "X-API-Key: YOUR_KEY" \
-     "https://domain.test/api/v1/undangan-cetak?search=Maliq&jenis=Maliq&favorite=1&per_page=20"
+     "https://domain.test/api/v1/undangan-cetak?search=Maliq&jenis_id=1&favorite=1&per_page=20"
 
 # Sorting by harga ascending
 curl -H "X-API-Key: YOUR_KEY" \
@@ -169,21 +178,22 @@ Content-Type: multipart/form-data
 
 ### 📥 Body Parameters
 
-| Field         | Type    | Wajib | Keterangan                                      |
-|---------------|---------|-------|-------------------------------------------------|
-| `nama`        | string  | ✅    | Nama undangan (max 255)                         |
-| `jenis`       | string  | ✅    | Jenis/kategori undangan (max 255)               |
-| `stok`        | integer | ✅    | Jumlah stok (min 0)                             |
-| `harga`       | integer | ✅    | Harga jual (min 0)                              |
-| `terjual`     | integer | ❌    | Jumlah terjual (default: 0)                     |
-| `harga_modal` | integer | ❌    | Harga modal (min 0)                             |
-| `ukuran_opp`  | string  | ❌    | Ukuran OPP (max 100), contoh: `"14,5 x 22"`     |
-| `promo`       | integer | ❌    | Harga promo (default: 0)                        |
-| `favorite`    | boolean | ❌    | Tandai favorit (default: false)                 |
-| `deskripsi`   | string  | ❌    | Deskripsi (boleh HTML)                          |
-| `gambar[]`    | file    | ❌    | Array file gambar (jpeg, png, jpg, gif, webp)   |
+| Field         | Type    | Wajib | Keterangan                                    |
+| ------------- | ------- | ----- | --------------------------------------------- |
+| `nama`        | string  | ✅    | Nama undangan (max 255)                       |
+| `jenis_id`    | integer | ✅    | ID jenis undangan (FK ke `jenis_udangans.id`) |
+| `stok`        | integer | ✅    | Jumlah stok (min 0)                           |
+| `harga`       | integer | ✅    | Harga jual (min 0)                            |
+| `terjual`     | integer | ❌    | Jumlah terjual (default: 0)                   |
+| `harga_modal` | integer | ❌    | Harga modal (min 0)                           |
+| `ukuran_opp`  | string  | ❌    | Ukuran OPP (max 100), contoh: `"14,5 x 22"`   |
+| `promo`       | integer | ❌    | Harga promo (default: 0)                      |
+| `favorite`    | boolean | ❌    | Tandai favorit (default: false)               |
+| `deskripsi`   | string  | ❌    | Deskripsi (boleh HTML)                        |
+| `gambar[]`    | file    | ❌    | Array file gambar (jpeg, png, jpg, gif, webp) |
 
 **Batasan file gambar:**
+
 - Format: `jpeg`, `png`, `jpg`, `gif`, `webp`
 - Maksimal ukuran: **2 MB** per file
 - Bisa upload multiple file sekaligus (`gambar[]`)
@@ -197,7 +207,11 @@ Content-Type: multipart/form-data
     "data": {
         "id": 210,
         "nama": "Undangan Premium",
-        "jenis": "Premium",
+        "jenis_id": 2,
+        "jenis_undangan": {
+            "id": 2,
+            "jenis": "Premium"
+        },
         "stok": 500,
         "terjual": 0,
         "harga": 2500,
@@ -221,7 +235,7 @@ Content-Type: multipart/form-data
 curl -X POST \
      -H "X-API-Key: YOUR_KEY" \
      -F "nama=Undangan Premium" \
-     -F "jenis=Premium" \
+     -F "jenis_id=2" \
      -F "stok=500" \
      -F "harga=2500" \
      -F "harga_modal=1800" \
@@ -249,7 +263,11 @@ GET /api/v1/undangan-cetak/{id}
     "data": {
         "id": 209,
         "nama": "Maliq 112",
-        "jenis": "Maliq",
+        "jenis_id": 1,
+        "jenis_undangan": {
+            "id": 1,
+            "jenis": "Maliq"
+        },
         "stok": "1000",
         "terjual": "100",
         "harga": 1200,
@@ -294,20 +312,20 @@ Content-Type: multipart/form-data
 
 **Semua field opsional** — cukup kirim field yang ingin diupdate saja.
 
-| Field              | Type    | Keterangan                                                    |
-|--------------------|---------|---------------------------------------------------------------|
-| `nama`             | string  | Nama undangan (max 255)                                       |
-| `jenis`            | string  | Jenis/kategori (max 255)                                      |
-| `stok`             | integer | Jumlah stok (min 0)                                           |
-| `terjual`          | integer | Jumlah terjual (min 0)                                        |
-| `harga`            | integer | Harga jual (min 0)                                            |
-| `harga_modal`      | integer | Harga modal (min 0)                                           |
-| `ukuran_opp`       | string  | Ukuran OPP (max 100)                                          |
-| `promo`            | integer | Harga promo (min 0)                                           |
-| `favorite`         | boolean | Tandai favorit                                                |
-| `deskripsi`        | string  | Deskripsi (boleh HTML)                                        |
-| `gambar[]`         | file    | Tambah gambar baru (ditambahkan ke array existing)            |
-| `hapus_gambar_lama` | boolean | `true` = hapus SEMUA gambar lama sebelum upload yang baru    |
+| Field               | Type    | Keterangan                                                |
+| ------------------- | ------- | --------------------------------------------------------- |
+| `nama`              | string  | Nama undangan (max 255)                                   |
+| `jenis_id`          | integer | ID jenis undangan (FK ke `jenis_udangans.id`)             |
+| `stok`              | integer | Jumlah stok (min 0)                                       |
+| `terjual`           | integer | Jumlah terjual (min 0)                                    |
+| `harga`             | integer | Harga jual (min 0)                                        |
+| `harga_modal`       | integer | Harga modal (min 0)                                       |
+| `ukuran_opp`        | string  | Ukuran OPP (max 100)                                      |
+| `promo`             | integer | Harga promo (min 0)                                       |
+| `favorite`          | boolean | Tandai favorit                                            |
+| `deskripsi`         | string  | Deskripsi (boleh HTML)                                    |
+| `gambar[]`          | file    | Tambah gambar baru (ditambahkan ke array existing)        |
+| `hapus_gambar_lama` | boolean | `true` = hapus SEMUA gambar lama sebelum upload yang baru |
 
 ### 🔄 Logika Gambar
 
@@ -371,10 +389,10 @@ DELETE /api/v1/undangan-cetak/{id}/gambar/{imageIndex}
 
 Menghapus **satu gambar** berdasarkan index array (0-based) tanpa menghapus data undangan.
 
-| Parameter      | Type    | Keterangan                         |
-|----------------|---------|------------------------------------|
-| `id`           | integer | ID undangan                        |
-| `imageIndex`   | integer | Index gambar di array (dimulai 0)  |
+| Parameter    | Type    | Keterangan                        |
+| ------------ | ------- | --------------------------------- |
+| `id`         | integer | ID undangan                       |
+| `imageIndex` | integer | Index gambar di array (dimulai 0) |
 
 ### 📤 Response `200 OK`
 
@@ -402,44 +420,92 @@ curl -X DELETE \
 
 ---
 
+## 7. GET — List Jenis Undangan
+
+```
+GET /api/v1/jenis-undangan
+```
+
+Mengembalikan daftar seluruh jenis undangan yang tersedia. Endpoint ini **read-only**.
+
+### 📤 Response `200 OK`
+
+```json
+{
+    "success": true,
+    "message": "Data jenis undangan berhasil diambil.",
+    "data": [
+        {
+            "id": 1,
+            "jenis": "Maliq",
+            "created_at": "2025-09-18T09:24:04.000000Z",
+            "updated_at": "2025-09-18T09:24:04.000000Z"
+        },
+        {
+            "id": 2,
+            "jenis": "Premium",
+            "created_at": "2025-09-18T09:24:04.000000Z",
+            "updated_at": "2025-09-18T09:24:04.000000Z"
+        }
+    ]
+}
+```
+
+> ℹ️ Data diurutkan berdasarkan nama `jenis` secara ascending.
+
+### 🧪 Contoh Request
+
+```bash
+curl -H "X-API-Key: YOUR_KEY" \
+     "https://domain.test/api/v1/jenis-undangan"
+```
+
+---
+
 ## 🗂 Model Reference — `UndanganCetak`
 
-| Field         | Type             | Keterangan                                  |
-|---------------|------------------|---------------------------------------------|
-| `id`          | integer (PK)     | Primary key auto-increment                  |
-| `nama`        | string (255)     | Nama undangan                               |
-| `jenis`       | string (255)     | Jenis / kategori                            |
-| `stok`        | integer          | Jumlah stok tersedia                        |
-| `terjual`     | integer          | Jumlah sudah terjual                        |
-| `harga`       | integer          | Harga jual (Rupiah)                         |
-| `harga_modal` | decimal          | Harga modal / beli                          |
-| `ukuran_opp`  | string (100)     | Ukuran dalam OPP                            |
-| `promo`       | integer          | Harga promo (0 = tidak ada promo)           |
-| `favorite`    | boolean          | Status favorit (0/1)                        |
-| `deskripsi`   | text             | Deskripsi produk (boleh HTML)               |
-| `gambar`      | json (array)     | Array path gambar di storage                |
-| `created_at`  | datetime         | Timestamp dibuat                            |
-| `updated_at`  | datetime         | Timestamp diupdate                          |
+| Field         | Type         | Keterangan                         |
+| ------------- | ------------ | ---------------------------------- |
+| `id`          | integer (PK) | Primary key auto-increment         |
+| `nama`        | string (255) | Nama undangan                      |
+| `jenis_id`    | integer (FK) | Foreign key ke `jenis_udangans.id` |
+| `stok`        | integer      | Jumlah stok tersedia               |
+| `terjual`     | integer      | Jumlah sudah terjual               |
+| `harga`       | integer      | Harga jual (Rupiah)                |
+| `harga_modal` | decimal      | Harga modal / beli                 |
+| `ukuran_opp`  | string (100) | Ukuran dalam OPP                   |
+| `promo`       | integer      | Harga promo (0 = tidak ada promo)  |
+| `favorite`    | boolean      | Status favorit (0/1)               |
+| `deskripsi`   | text         | Deskripsi produk (boleh HTML)      |
+| `gambar`      | json (array) | Array path gambar di storage       |
+| `created_at`  | datetime     | Timestamp dibuat                   |
+| `updated_at`  | datetime     | Timestamp diupdate                 |
+
+### 🔗 Relasi
+
+| Relation         | Type      | Keterangan                      |
+| ---------------- | --------- | ------------------------------- |
+| `jenis_undangan` | BelongsTo | Relasi ke model `JenisUndangan` |
 
 ### 🔗 Computed Attributes (hanya di response, bukan field DB)
 
-| Attribute        | Type   | Keterangan                                      |
-|------------------|--------|-------------------------------------------------|
-| `thumbnail_url`  | string | URL gambar pertama (untuk thumbnail)            |
-| `image_urls`     | array  | Array URL semua gambar (full URL siap pakai)    |
+| Attribute       | Type   | Keterangan                                   |
+| --------------- | ------ | -------------------------------------------- |
+| `thumbnail_url` | string | URL gambar pertama (untuk thumbnail)         |
+| `image_urls`    | array  | Array URL semua gambar (full URL siap pakai) |
 
 ---
 
 ## ⚠️ Kode Error
 
-| HTTP Code | Arti                        |
-|-----------|-----------------------------|
-| `200`     | Sukses                      |
-| `201`     | Berhasil dibuat (POST)      |
+| HTTP Code | Arti                                |
+| --------- | ----------------------------------- |
+| `200`     | Sukses                              |
+| `201`     | Berhasil dibuat (POST)              |
 | `401`     | API Key tidak valid / tidak dikirim |
-| `404`     | Data tidak ditemukan        |
-| `422`     | Validasi gagal              |
-| `500`     | Server error                |
+| `404`     | Data tidak ditemukan                |
+| `422`     | Validasi gagal                      |
+| `500`     | Server error                        |
 
 ---
 
