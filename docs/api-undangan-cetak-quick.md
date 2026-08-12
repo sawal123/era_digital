@@ -163,11 +163,11 @@ curl -H "X-API-Key: KEY" "https://domain.test/api/v1/jenis-undangan"
 
 ```json
 {
-  "success": true,
-  "data": [
-    { "id": 1, "jenis": "Maliq" },
-    { "id": 2, "jenis": "Premium" }
-  ]
+    "success": true,
+    "data": [
+        { "id": 1, "jenis": "Maliq" },
+        { "id": 2, "jenis": "Premium" }
+    ]
 }
 ```
 
