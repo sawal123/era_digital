@@ -27,17 +27,46 @@ const formatNumber = (value) => {
     return new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 }).format(n);
 };
 
-// Area-based item (spanduk dll.): metadata berisi length/width/area_per_piece.
+// Area-based item (spanduk dll.): metadata berisi length/width.
 // Jika metadata belum tersedia (transaksi lama) kembalikan null -> fallback tampilan lama.
 const getItemAreaInfo = (item) => {
     const md = item.metadata || {};
     if (md.length && md.width) {
-        const areaPerPiece = md.area_per_piece ?? (Number(md.length) * Number(md.width));
         return {
             size: `Ukuran: ${formatNumber(md.length)} × ${formatNumber(md.width)} m`,
-            areaPerPiece: `Luas / pcs: ${formatNumber(areaPerPiece)} m²`,
         };
     }
+    return null;
+};
+
+// Ambil catatan item: prioritas metadata.note (baru), fallback metadata.detail (legacy).
+// Untuk legacy, hilangkan prefix ukuran agar tidak tampil ganda.
+const getItemNote = (item) => {
+    const md = item.metadata || {};
+
+    // 1. metadata.note (transaksi baru)
+    if (md.note && String(md.note).trim()) {
+        return String(md.note).trim();
+    }
+
+    // 2. Fallback: metadata.detail (transaksi lama area)
+    const detail = String(md.detail || '').trim();
+    if (!detail) {
+        return null;
+    }
+
+    // Format legacy area: "Ukuran: 1 x 1 m - catatan" / "Ukuran: 1.5x2 m - catatan" /
+    // "Ukuran: 1,5 x 2 m - catatan" / "Ukuran: 1 × 1 m — catatan"
+    const noteMatch = detail.match(/^Ukuran:\s*\d+(?:[.,]\d+)?\s*[×x]\s*\d+(?:[.,]\d+)?\s*m\s*[-–—]\s*(.+)$/iu);
+    if (noteMatch && noteMatch[1] && noteMatch[1].trim()) {
+        return noteMatch[1].trim();
+    }
+
+    // 3. Fallback: detail bukan format ukuran → tampilkan sebagai catatan bebas
+    if (!/^Ukuran:/.test(detail)) {
+        return detail;
+    }
+
     return null;
 };
 
@@ -194,7 +223,7 @@ const closeWindow = () => {
                         <div class="font-bold inv-text-darkest leading-tight">{{ item.item_name }}</div>
                         <div v-if="getItemAreaInfo(item)" class="text-[8px] inv-text-light italic mt-0.5 leading-snug">
                             {{ getItemAreaInfo(item).size }}<br/>
-                            {{ getItemAreaInfo(item).areaPerPiece }}
+                            <span v-if="getItemNote(item)">Catatan: {{ getItemNote(item) }}</span>
                         </div>
                         <div v-else-if="item.metadata && item.metadata.detail" class="text-[8px] inv-text-light italic mt-0.5">
                             {{ item.metadata.detail }}
