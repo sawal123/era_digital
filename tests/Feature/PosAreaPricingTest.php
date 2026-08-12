@@ -717,7 +717,7 @@ it('invoice: metadata.note baru tersimpan dan invoice route OK', function () {
     $transaction = \App\Models\Transaction::first();
     $this->get("/pos/print/{$transaction->invoice_number}")
         ->assertOk()
-        ->assertInertia(fn ($page) => $page->component('POS/PrintInvoice')->has('transaction.items', 1));
+        ->assertInertia(fn($page) => $page->component('POS/PrintInvoice')->has('transaction.items', 1));
 
     $item = \App\Models\TransactionItem::first();
     $metadata = $item->metadata ?? [];
@@ -738,7 +738,7 @@ it('invoice: legacy metadata.detail tetap utuh & invoice route OK', function () 
     $transaction = \App\Models\Transaction::first();
     $this->get("/pos/print/{$transaction->invoice_number}")
         ->assertOk()
-        ->assertInertia(fn ($page) => $page->component('POS/PrintInvoice')->has('transaction.items', 1));
+        ->assertInertia(fn($page) => $page->component('POS/PrintInvoice')->has('transaction.items', 1));
 
     $item = \App\Models\TransactionItem::first();
     $metadata = $item->metadata ?? [];
