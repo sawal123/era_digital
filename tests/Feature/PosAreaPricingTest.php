@@ -631,3 +631,116 @@ it('ukuran dari length/width tetap tersimpan terpisah dari note', function () {
         ->and((float) $item->base_price)->toBe(60000.0)
         ->and((float) $item->profit)->toBe(30000.0);
 });
+
+// ---------------------------------------------------------------------------
+// BACKWARD COMPAT: invoice menampilkan catatan dari metadata.note (baru)
+// maupun metadata.detail (legacy) tanpa duplikasi ukuran
+// ---------------------------------------------------------------------------
+it('invoice menampilkan catatan dari metadata.note transaksi baru', function () {
+    $this->actingAs(User::factory()->create());
+    \App\Models\StoreProfile::create([
+        'store_name' => 'Toko Test',
+        'address' => 'Alamat',
+        'phone' => '0812',
+    ]);
+    $product = makeAreaProduct('Spanduk Biasa', 25000, 15000);
+
+    $this->from('/pos')->post('/pos', posAreaCartPayload($product, [], [
+        'note' => 'agen 1 spanduk',
+    ]))->assertRedirect();
+
+    $transaction = \App\Models\Transaction::first();
+    $resp = $this->get("/pos/print/{$transaction->invoice_number}")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('POS/PrintInvoice')
+            ->has('transaction.items', 1)
+        );
+
+    $item = \App\Models\TransactionItem::first();
+    $metadata = $item->metadata ?? [];
+    expect($metadata['note'])->toBe('agen 1 spanduk')
+        ->and((float) $metadata['length'])->toBe(2.0)
+        ->and((float) $metadata['width'])->toBe(1.0);
+});
+
+it('invoice legacy: metadata.detail dengan catatan diekstrak tanpa prefix ukuran', function () {
+    $this->actingAs(User::factory()->create());
+    \App\Models\StoreProfile::create([
+        'store_name' => 'Toko Test',
+        'address' => 'Alamat',
+        'phone' => '0812',
+    ]);
+    $product = makeAreaProduct('Spanduk Biasa', 25000, 15000);
+
+    // Simulasi transaksi lama: hanya metadata.detail (tanpa metadata.note)
+    $this->from('/pos')->post('/pos', posAreaCartPayload($product, [], [
+        'detail' => 'Ukuran: 1 x 1 m - agen 1 spanduk',
+        'note' => '', // note kosong — fallback ke detail
+    ]))->assertRedirect();
+
+    $transaction = \App\Models\Transaction::first();
+    $resp = $this->get("/pos/print/{$transaction->invoice_number}")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('POS/PrintInvoice')
+            ->has('transaction.items', 1)
+        );
+
+    $item = \App\Models\TransactionItem::first();
+    $metadata = $item->metadata ?? [];
+
+    // metadata.note kosong
+    expect($metadata['note'] ?? '')->toBe('')
+        // metadata.detail masih menyimpan format legacy
+        ->and($metadata['detail'])->toBe('Ukuran: 1 x 1 m - agen 1 spanduk')
+        // ukuran tetap valid
+        ->and((float) $metadata['length'])->toBe(2.0)
+        ->and((float) $metadata['width'])->toBe(1.0);
+});
+
+it('invoice: detail ukuran tanpa catatan tidak menghasilkan metadata.note palsu', function () {
+    $this->actingAs(User::factory()->create());
+    \App\Models\StoreProfile::create([
+        'store_name' => 'Toko Test',
+        'address' => 'Alamat',
+        'phone' => '0812',
+    ]);
+    $product = makeAreaProduct('Spanduk Biasa', 25000, 15000);
+
+    $this->from('/pos')->post('/pos', posAreaCartPayload($product, [], [
+        'detail' => 'Ukuran: 2 x 1 m',
+        'note' => '',
+    ]))->assertRedirect();
+
+    $item = \App\Models\TransactionItem::first();
+    $metadata = $item->metadata ?? [];
+
+    // note kosong, tidak boleh ada catatan palsu
+    expect($metadata['note'] ?? '')->toBe('')
+        ->and($metadata['detail'])->toBe('Ukuran: 2 x 1 m')
+        // Invoice component harus tetap bisa di-render
+        ->and((float) $item->selling_price)->toBe(50000.0);
+});
+
+it('invoice: HPP dan subtotal tidak berubah dengan catatan legacy', function () {
+    $this->actingAs(User::factory()->create());
+    \App\Models\StoreProfile::create([
+        'store_name' => 'Toko Test',
+        'address' => 'Alamat',
+        'phone' => '0812',
+    ]);
+    $product = makeAreaProduct('Spanduk Biasa', 25000, 15000);
+
+    $this->from('/pos')->post('/pos', posAreaCartPayload($product, [], [
+        'detail' => 'Ukuran: 1 x 1 m - catatan lama',
+        'note' => '',
+    ]))->assertRedirect();
+
+    $item = \App\Models\TransactionItem::first();
+
+    expect((float) $item->selling_price)->toBe(50000.0)
+        ->and((float) $item->base_price)->toBe(30000.0)
+        ->and((float) $item->profit)->toBe(20000.0)
+        ->and((float) $item->quantity)->toBe(1.0);
+});

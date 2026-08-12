@@ -39,6 +39,31 @@ const getItemAreaInfo = (item) => {
     return null;
 };
 
+// Ambil catatan item: prioritas metadata.note (baru), fallback metadata.detail (legacy).
+// Untuk legacy, hilangkan prefix ukuran agar tidak tampil ganda.
+const getItemNote = (item) => {
+    const md = item.metadata || {};
+
+    // 1. metadata.note (transaksi baru)
+    if (md.note && String(md.note).trim()) {
+        return String(md.note).trim();
+    }
+
+    // 2. Fallback: metadata.detail (transaksi lama area)
+    const detail = String(md.detail || '').trim();
+    if (!detail) {
+        return null;
+    }
+
+    // Format legacy: "Ukuran: 1 x 1 m - catatan" / "Ukuran: 1.5x2 m - catatan" / "Ukuran: 1 × 1 m - catatan"
+    const noteMatch = detail.match(/^Ukuran:\s*\d+(?:\.\d+)?\s*[×x]\s*\d+(?:\.\d+)?\s*m\s*[-–—]\s*(.+)$/i);
+    if (noteMatch && noteMatch[1] && noteMatch[1].trim()) {
+        return noteMatch[1].trim();
+    }
+
+    return null;
+};
+
 const printInvoice = () => {
     window.print();
 };
@@ -192,7 +217,7 @@ const closeWindow = () => {
                         <div class="font-bold inv-text-darkest leading-tight">{{ item.item_name }}</div>
                         <div v-if="getItemAreaInfo(item)" class="text-[8px] inv-text-light italic mt-0.5 leading-snug">
                             {{ getItemAreaInfo(item).size }}<br/>
-                            <span v-if="item.metadata && item.metadata.note">Catatan: {{ item.metadata.note }}</span>
+                            <span v-if="getItemNote(item)">Catatan: {{ getItemNote(item) }}</span>
                         </div>
                         <div v-else-if="item.metadata && item.metadata.detail" class="text-[8px] inv-text-light italic mt-0.5">
                             {{ item.metadata.detail }}
