@@ -26,6 +26,7 @@ test('index mengambil daftar undangan-cetak dan jenis-undangan dari API', functi
                         'jenis_undangan' => ['id' => 1, 'jenis' => 'Premium'],
                         'stok' => 100,
                         'harga' => 5000,
+                        'ukuran_opp' => '14,5 x 22',
                     ],
                 ],
                 'last_page' => 1,

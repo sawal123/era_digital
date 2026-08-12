@@ -1,11 +1,9 @@
-<script setup>
-import { computed, ref, watch } from 'vue';
+<script setup lang="ts">
 import { Head, router, useForm } from '@inertiajs/vue3';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
+import { computed, ref, watch } from 'vue';
 import RichTextEditor from '@/components/RichTextEditor.vue';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogClose,
@@ -15,6 +13,8 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 defineOptions({
     layout: {
@@ -36,24 +36,37 @@ const props = defineProps({
 // ------------------------------------------------------------------
 const formatRupiah = (angka) => {
     const n = Number(angka) || 0;
+
     return new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(n);
 };
 
 const isFavorite = (item) => Number(item.favorite) === 1;
 
 const storageBase = (item) => {
-    if (!item.thumbnail_url) return null;
+    if (!item.thumbnail_url) {
+        return null;
+    }
+
     const match = item.thumbnail_url.match(/^(https?:\/\/[^/]+)\/storage\//);
+
     return match ? `${match[1]}/storage/` : null;
 };
 
 const itemImages = (item) => {
-    if (Array.isArray(item.image_urls) && item.image_urls.length) return item.image_urls;
+    if (Array.isArray(item.image_urls) && item.image_urls.length) {
+        return item.image_urls;
+    }
+
     const base = storageBase(item);
+
     if (base && Array.isArray(item.gambar) && item.gambar.length) {
         return item.gambar.map((path) => (path.startsWith('http') ? path : base + path.replace(/^\//, '')));
     }
-    if (item.thumbnail_url) return [item.thumbnail_url];
+
+    if (item.thumbnail_url) {
+        return [item.thumbnail_url];
+    }
+
     return [];
 };
 
@@ -76,6 +89,7 @@ const jenisOptions = computed(() => {
     if (Array.isArray(props.jenisUndangan) && props.jenisUndangan.length) {
         return [...props.jenisUndangan].sort((a, b) => String(a.jenis).localeCompare(String(b.jenis)));
     }
+
     return [];
 });
 
@@ -95,16 +109,33 @@ const filteredItems = computed(() => {
     const [sort_by, sort_dir] = sortValue.value.split(':');
 
     let result = allItems.value.filter((item) => {
-        if (query && !(item.nama || '').toLowerCase().includes(query)) return false;
-        if (filterJenis.value !== 'all' && String(item.jenis_id) !== String(filterJenis.value)) return false;
+        if (query && !(item.nama || '').toLowerCase().includes(query)) {
+            return false;
+        }
+
+        if (filterJenis.value !== 'all' && String(item.jenis_id) !== String(filterJenis.value)) {
+            return false;
+        }
 
         const fav = isFavorite(item);
-        if (filterFavorite.value === '1' && !fav) return false;
-        if (filterFavorite.value === '0' && fav) return false;
+
+        if (filterFavorite.value === '1' && !fav) {
+            return false;
+        }
+
+        if (filterFavorite.value === '0' && fav) {
+            return false;
+        }
 
         const promo = hasPromo(item);
-        if (filterPromo.value === '1' && !promo) return false;
-        if (filterPromo.value === '0' && promo) return false;
+
+        if (filterPromo.value === '1' && !promo) {
+            return false;
+        }
+
+        if (filterPromo.value === '0' && promo) {
+            return false;
+        }
 
         return true;
     });
@@ -137,6 +168,7 @@ const totalPages = computed(() => Math.ceil(totalItems.value / pageSize.value) |
 
 const paginatedItems = computed(() => {
     const start = (currentPage.value - 1) * pageSize.value;
+
     return filteredItems.value.slice(start, start + pageSize.value);
 });
 
@@ -147,16 +179,24 @@ const displayedPages = computed(() => {
     const pages = [];
     const maxVisible = 5;
     let start = Math.max(1, currentPage.value - 2);
-    let end = Math.min(totalPages.value, start + maxVisible - 1);
+    const end = Math.min(totalPages.value, start + maxVisible - 1);
+
     if (end - start < maxVisible - 1) {
         start = Math.max(1, end - maxVisible + 1);
     }
-    for (let i = start; i <= end; i++) pages.push(i);
+
+    for (let i = start; i <= end; i++) {
+        pages.push(i);
+    }
+
     return pages;
 });
 
 const goToPage = (page) => {
-    if (page < 1 || page > totalPages.value) return;
+    if (page < 1 || page > totalPages.value) {
+return;
+}
+
     currentPage.value = page;
 };
 
@@ -248,7 +288,10 @@ const openEditModal = (item) => {
 };
 
 const closeForm = () => {
-    if (form.processing) return;
+    if (form.processing) {
+return;
+}
+
     formOpen.value = false;
     form.reset();
 };
@@ -292,7 +335,11 @@ const handleSubmit = () => {
             promo: data.promo === '' ? 0 : data.promo,
             hapus_gambar: hapusGambar,
         };
-        if (isEditing.value) payload._method = 'PUT';
+
+        if (isEditing.value) {
+payload._method = 'PUT';
+}
+
         return payload;
     });
 
@@ -329,14 +376,19 @@ const openDeleteConfirm = (item) => {
 };
 
 const closeDeleteConfirm = () => {
-    if (deleteProcessing.value) return;
+    if (deleteProcessing.value) {
+return;
+}
+
     deleteConfirmOpen.value = false;
     deleteTarget.value = null;
     deleteError.value = '';
 };
 
 const confirmDelete = () => {
-    if (!deleteTarget.value) return;
+    if (!deleteTarget.value) {
+return;
+}
 
     deleteProcessing.value = true;
     router.delete(`/undangan/${deleteTarget.value.id}`, {
@@ -440,19 +492,20 @@ const confirmDelete = () => {
                             <th class="p-4">Terjual</th>
                             <th class="p-4">Harga</th>
                             <th class="p-4">Modal</th>
+                            <th class="p-4">UK. OPP</th>
                             <th class="p-4 text-center">Favorit</th>
                             <th class="p-4 text-right pr-6">Aksi</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-border text-sm">
                         <tr v-if="allItems.length === 0">
-                            <td colspan="7" class="p-8 text-center text-muted-foreground">
+                            <td colspan="8" class="p-8 text-center text-muted-foreground">
                                 <i class="fas fa-envelope-open-text text-3xl mb-2 opacity-30"></i>
                                 <p>Tidak ada data undangan ditemukan.</p>
                             </td>
                         </tr>
                         <tr v-else-if="paginatedItems.length === 0">
-                            <td colspan="7" class="p-8 text-center text-muted-foreground">
+                            <td colspan="8" class="p-8 text-center text-muted-foreground">
                                 <i class="fas fa-filter-circle-xmark text-3xl mb-2 opacity-30"></i>
                                 <p>Tidak ada data yang cocok dengan pencarian/filter.</p>
                             </td>
@@ -468,7 +521,6 @@ const confirmDelete = () => {
                                         <p class="font-semibold text-foreground">{{ item.nama }}</p>
                                         <p class="text-xs text-muted-foreground">
                                             {{ item.jenis_undangan?.jenis || 'Tanpa jenis' }}
-                                            <span v-if="item.ukuran_opp" class="ml-1">· {{ item.ukuran_opp }}</span>
                                         </p>
                                     </div>
                                 </div>
@@ -491,6 +543,7 @@ const confirmDelete = () => {
                                 </div>
                             </td>
                             <td class="p-4 text-muted-foreground">Rp {{ formatRupiah(item.harga_modal) }}</td>
+                            <td class="p-4 text-muted-foreground">{{ item.ukuran_opp || '-' }}</td>
                             <td class="p-4 text-center">
                                 <span v-if="isFavorite(item)" class="text-amber-500" title="Favorit"><i class="fas fa-star"></i></span>
                                 <span v-else class="text-muted-foreground/40"><i class="far fa-star"></i></span>
