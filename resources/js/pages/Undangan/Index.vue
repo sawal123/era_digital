@@ -27,6 +27,7 @@ defineOptions({
 
 const props = defineProps({
     undangan: Array, // semua data undangan (flat array dari API)
+    jenisUndangan: Array, // daftar jenis dari API /jenis-undangan
     apiError: String,
 });
 
@@ -72,11 +73,10 @@ const perPage = ref(50);
 const currentPage = ref(1);
 
 const jenisOptions = computed(() => {
-    const set = new Set();
-    allItems.value.forEach((item) => {
-        if (item.jenis) set.add(item.jenis);
-    });
-    return Array.from(set).sort();
+    if (Array.isArray(props.jenisUndangan) && props.jenisUndangan.length) {
+        return [...props.jenisUndangan].sort((a, b) => String(a.jenis).localeCompare(String(b.jenis)));
+    }
+    return [];
 });
 
 const sortOptions = [
@@ -96,7 +96,7 @@ const filteredItems = computed(() => {
 
     let result = allItems.value.filter((item) => {
         if (query && !(item.nama || '').toLowerCase().includes(query)) return false;
-        if (filterJenis.value !== 'all' && item.jenis !== filterJenis.value) return false;
+        if (filterJenis.value !== 'all' && String(item.jenis_id) !== String(filterJenis.value)) return false;
 
         const fav = isFavorite(item);
         if (filterFavorite.value === '1' && !fav) return false;
@@ -194,7 +194,7 @@ const selectedId = ref(null);
 
 const form = useForm({
     nama: '',
-    jenis: '',
+    jenis_id: '',
     stok: '',
     harga: '',
     terjual: '',
@@ -229,7 +229,7 @@ const openEditModal = (item) => {
     isEditing.value = true;
     selectedId.value = item.id;
     form.nama = item.nama;
-    form.jenis = item.jenis;
+    form.jenis_id = item.jenis_id ?? '';
     form.stok = item.stok ?? '';
     form.harga = item.harga ?? '';
     form.terjual = item.terjual ?? '';
@@ -394,7 +394,7 @@ const confirmDelete = () => {
             <div class="col-span-1">
                 <select v-model="filterJenis" class="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
                     <option value="all">Semua Jenis</option>
-                    <option v-for="jenis in jenisOptions" :key="jenis" :value="jenis">{{ jenis }}</option>
+                    <option v-for="jenis in jenisOptions" :key="jenis.id" :value="jenis.id">{{ jenis.jenis }}</option>
                 </select>
             </div>
 
@@ -467,7 +467,7 @@ const confirmDelete = () => {
                                     <div>
                                         <p class="font-semibold text-foreground">{{ item.nama }}</p>
                                         <p class="text-xs text-muted-foreground">
-                                            {{ item.jenis || 'Tanpa jenis' }}
+                                            {{ item.jenis_undangan?.jenis || 'Tanpa jenis' }}
                                             <span v-if="item.ukuran_opp" class="ml-1">· {{ item.ukuran_opp }}</span>
                                         </p>
                                     </div>
@@ -551,7 +551,7 @@ const confirmDelete = () => {
                         {{ detailItem.nama }}
                         <span v-if="isFavorite(detailItem)" class="text-amber-500"><i class="fas fa-star text-sm"></i></span>
                     </DialogTitle>
-                    <DialogDescription>{{ detailItem.jenis || 'Tanpa jenis' }}</DialogDescription>
+                    <DialogDescription>{{ detailItem.jenis_undangan?.jenis || 'Tanpa jenis' }}</DialogDescription>
                 </DialogHeader>
 
                 <div v-if="detailItem" class="space-y-4">
@@ -607,7 +607,7 @@ const confirmDelete = () => {
                         </div>
                         <div class="rounded-xl bg-muted/40 border border-border p-3">
                             <p class="text-xs text-muted-foreground">Jenis</p>
-                            <p class="font-bold text-foreground">{{ detailItem.jenis || '-' }}</p>
+                            <p class="font-bold text-foreground">{{ detailItem.jenis_undangan?.jenis || '-' }}</p>
                         </div>
                     </div>
 
@@ -644,11 +644,11 @@ const confirmDelete = () => {
                         </div>
                         <div class="space-y-2">
                             <Label for="undangan-jenis">Jenis <span class="text-red-500">*</span></Label>
-                            <Input id="undangan-jenis" v-model="form.jenis" class="rounded-xl" list="undangan-jenis-list" placeholder="cth: Maliq" required />
-                            <datalist id="undangan-jenis-list">
-                                <option v-for="jenis in jenisOptions" :key="jenis" :value="jenis" />
-                            </datalist>
-                            <p v-if="form.errors.jenis" class="text-xs text-red-500">{{ form.errors.jenis }}</p>
+                            <select id="undangan-jenis" v-model="form.jenis_id" class="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" required>
+                                <option value="" disabled>Pilih jenis</option>
+                                <option v-for="jenis in jenisOptions" :key="jenis.id" :value="jenis.id">{{ jenis.jenis }}</option>
+                            </select>
+                            <p v-if="form.errors.jenis_id" class="text-xs text-red-500">{{ form.errors.jenis_id }}</p>
                         </div>
                         <div class="space-y-2">
                             <Label for="undangan-stok">Stok <span class="text-red-500">*</span></Label>

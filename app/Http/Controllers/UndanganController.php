@@ -68,8 +68,17 @@ class UndanganController extends Controller
             $page++;
         } while ($page <= $lastPage && count($allData) < $total);
 
+        // Ambil daftar jenis undangan dari API sumber
+        $jenisUndangan = [];
+        $jenisResponse = $this->client()->get('/jenis-undangan');
+
+        if ($jenisResponse->successful()) {
+            $jenisUndangan = $jenisResponse->json()['data'] ?? [];
+        }
+
         return Inertia::render('Undangan/Index', [
             'undangan' => $allData,
+            'jenisUndangan' => $jenisUndangan,
             'apiError' => $apiError,
         ]);
     }

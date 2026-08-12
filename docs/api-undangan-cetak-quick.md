@@ -23,7 +23,7 @@ Tanpa key → `401 Unauthorized`
 GET /undangan-cetak
 ```
 
-**Query opsional:** `search`, `jenis`, `favorite` (1/0), `promo` (1/0), `sort_by`, `sort_dir`, `per_page`
+**Query opsional:** `search`, `jenis_id`, `favorite` (1/0), `promo` (1/0), `sort_by`, `sort_dir`, `per_page`
 
 ```bash
 curl -H "X-API-Key: KEY" \
@@ -42,7 +42,7 @@ Content-Type: multipart/form-data
 | Field         | Wajib | Tipe                             |
 | ------------- | :---: | -------------------------------- |
 | `nama`        |  ✅   | string                           |
-| `jenis`       |  ✅   | string                           |
+| `jenis_id`    |  ✅   | integer (FK `jenis_udangans.id`) |
 | `stok`        |  ✅   | integer                          |
 | `harga`       |  ✅   | integer                          |
 | `terjual`     |  ❌   | integer                          |
@@ -56,7 +56,7 @@ Content-Type: multipart/form-data
 ```bash
 curl -X POST -H "X-API-Key: KEY" \
   -F "nama=Undangan Premium" \
-  -F "jenis=Premium" \
+  -F "jenis_id=2" \
   -F "stok=500" \
   -F "harga=2500" \
   -F "gambar[]=@foto1.jpg" \
@@ -147,6 +147,32 @@ curl -X DELETE -H "X-API-Key: KEY" \
 
 ---
 
+### 7. List Jenis Undangan
+
+```bash
+GET /jenis-undangan
+```
+
+Mengembalikan daftar seluruh `jenis_udangans` (read-only), diurutkan berdasarkan nama `jenis`.
+
+```bash
+curl -H "X-API-Key: KEY" "https://domain.test/api/v1/jenis-undangan"
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": [
+    { "id": 1, "jenis": "Maliq" },
+    { "id": 2, "jenis": "Premium" }
+  ]
+}
+```
+
+---
+
 ## 📦 Struktur Response
 
 ### ✅ Sukses
@@ -185,7 +211,7 @@ curl -X DELETE -H "X-API-Key: KEY" \
 | --------------- | ------- | ------------------------------- |
 | `id`            | integer | ID unik                         |
 | `nama`          | string  | Nama undangan                   |
-| `jenis`         | string  | Kategori                        |
+| `jenis_id`      | integer | ID jenis (FK `jenis_udangans`)  |
 | `stok`          | integer | Stok tersedia                   |
 | `terjual`       | integer | Sudah terjual                   |
 | `harga`         | integer | Harga (IDR)                     |
