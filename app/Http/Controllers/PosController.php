@@ -327,6 +327,7 @@ class PosController extends Controller
 
         $metadata = [
             'detail'    => $item['detail'] ?? '',
+            'note'      => $item['note'] ?? '',
             'admin_fee' => $item['admin_fee'] ?? 0,
             'nominal'   => $item['nominal'] ?? null,
         ];

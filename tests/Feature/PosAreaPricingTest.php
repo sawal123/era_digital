@@ -561,3 +561,73 @@ it('mengabaikan manipulasi type dari frontend (tipe berasal dari kategori produk
     // Jalur PPOB tidak boleh berjalan untuk spanduk.
     expect((float) \App\Models\StoreProfile::first()->saldo_digital)->toBe(100000.0);
 });
+
+// ---------------------------------------------------------------------------
+// NOTE: catatan item (metadata.note) terpisah dari ukuran (length/width)
+// ---------------------------------------------------------------------------
+it('menyimpan catatan item ke metadata.note', function () {
+    $this->actingAs(User::factory()->create());
+    $product = makeAreaProduct('Spanduk Biasa', 25000, 15000);
+
+    $this->from('/pos')->post('/pos', posAreaCartPayload($product, [], [
+        'detail' => 'Ukuran: 2 x 1 m',
+        'note' => 'agen 1 spanduk',
+    ]))->assertRedirect();
+
+    $item = TransactionItem::first();
+    $metadata = $item->metadata ?? [];
+
+    expect($metadata['note'])->toBe('agen 1 spanduk')
+        ->and((float) $metadata['length'])->toBe(2.0)
+        ->and((float) $metadata['width'])->toBe(1.0)
+        ->and((float) $metadata['area_per_piece'])->toBe(2.0);
+});
+
+it('transaksi tanpa note tetap berhasil', function () {
+    $this->actingAs(User::factory()->create());
+    $product = makeAreaProduct('Spanduk Biasa', 25000, 15000);
+
+    $this->from('/pos')->post('/pos', posAreaCartPayload($product, [], [
+        'detail' => 'Ukuran: 2 x 1 m',
+        'note' => '',
+    ]))->assertRedirect();
+
+    $item = TransactionItem::first();
+    $metadata = $item->metadata ?? [];
+
+    expect(isset($metadata['note']) ? $metadata['note'] : '')->toBe('')
+        ->and((float) $item->selling_price)->toBe(50000.0)
+        ->and((float) $item->base_price)->toBe(30000.0)
+        ->and((float) $item->profit)->toBe(20000.0);
+});
+
+it('ukuran dari length/width tetap tersimpan terpisah dari note', function () {
+    $this->actingAs(User::factory()->create());
+    $product = makeAreaProduct('Spanduk Custom', 30000, 20000);
+
+    $this->from('/pos')->post('/pos', posAreaCartPayload($product, [
+        'total' => 90000,
+        'uang_diterima' => 90000,
+    ], [
+        'price' => 90000,
+        'quantity' => 1,
+        'length' => 1.5,
+        'width' => 2,
+        'area_per_piece' => 3,
+        'detail' => 'Ukuran: 1.5 x 2 m',
+        'note' => 'bahan premium',
+    ]))->assertRedirect();
+
+    $item = TransactionItem::first();
+    $metadata = $item->metadata ?? [];
+
+    // Ukuran dari length/width, bukan dari note
+    expect((float) $metadata['length'])->toBe(1.5)
+        ->and((float) $metadata['width'])->toBe(2.0)
+        ->and((float) $metadata['area_per_piece'])->toBe(3.0)
+        ->and($metadata['note'])->toBe('bahan premium')
+        // HPP tidak berubah
+        ->and((float) $item->selling_price)->toBe(90000.0)
+        ->and((float) $item->base_price)->toBe(60000.0)
+        ->and((float) $item->profit)->toBe(30000.0);
+});

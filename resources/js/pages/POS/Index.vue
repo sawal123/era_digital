@@ -417,6 +417,7 @@ const addCetakToCart = () => {
             quantity: quantity,
             type: 'cetak',
             detail: detail,
+            note: '',
             print_vendor_id: cetakVendorId.value || null,
             is_area_based: true,
             length: p,
@@ -611,6 +612,7 @@ const addToCart = (item) => {
         price: item.price,
         quantity: normalizeQuantity(item.quantity || item.qty || 1),
         detail: item.detail || '',
+        note: item.note || '',
         type: item.type,
         ...item
     };
@@ -1454,7 +1456,7 @@ const formatRupiah = (angka) => {
                                 <div class="mt-1">
                                     <input 
                                         type="text" 
-                                        v-model="item.detail" 
+                                        v-model="item.note" 
                                         placeholder="Catatan item..." 
                                         class="w-full bg-muted/40 dark:bg-muted/20 border-none rounded-md px-1.5 py-0.5 text-[10px] font-medium text-foreground focus:ring-1 focus:ring-indigo-500/50 outline-none placeholder:text-muted-foreground/60"
                                     />
@@ -1634,7 +1636,7 @@ const formatRupiah = (angka) => {
                         <div class="mt-1">
                             <input 
                                 type="text" 
-                                v-model="item.detail" 
+                                v-model="item.note" 
                                 placeholder="Catatan item..." 
                                 class="w-full bg-background border-none rounded-md px-1.5 py-0.5 text-[10px] font-medium text-foreground focus:ring-1 focus:ring-indigo-500/50 outline-none placeholder:text-muted-foreground/60"
                             />

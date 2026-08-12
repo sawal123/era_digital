@@ -27,15 +27,13 @@ const formatNumber = (value) => {
     return new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 }).format(n);
 };
 
-// Area-based item (spanduk dll.): metadata berisi length/width/area_per_piece.
+// Area-based item (spanduk dll.): metadata berisi length/width.
 // Jika metadata belum tersedia (transaksi lama) kembalikan null -> fallback tampilan lama.
 const getItemAreaInfo = (item) => {
     const md = item.metadata || {};
     if (md.length && md.width) {
-        const areaPerPiece = md.area_per_piece ?? (Number(md.length) * Number(md.width));
         return {
             size: `Ukuran: ${formatNumber(md.length)} × ${formatNumber(md.width)} m`,
-            areaPerPiece: `Luas / pcs: ${formatNumber(areaPerPiece)} m²`,
         };
     }
     return null;
@@ -194,7 +192,7 @@ const closeWindow = () => {
                         <div class="font-bold inv-text-darkest leading-tight">{{ item.item_name }}</div>
                         <div v-if="getItemAreaInfo(item)" class="text-[8px] inv-text-light italic mt-0.5 leading-snug">
                             {{ getItemAreaInfo(item).size }}<br/>
-                            {{ getItemAreaInfo(item).areaPerPiece }}
+                            <span v-if="item.metadata && item.metadata.note">Catatan: {{ item.metadata.note }}</span>
                         </div>
                         <div v-else-if="item.metadata && item.metadata.detail" class="text-[8px] inv-text-light italic mt-0.5">
                             {{ item.metadata.detail }}
