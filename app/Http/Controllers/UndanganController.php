@@ -97,7 +97,7 @@ class UndanganController extends Controller
             $http = $http->attach('gambar[]', fopen($file->getRealPath(), 'r'), $file->getClientOriginalName());
         }
 
-        $response = $http->post('/undangan-cetak', $request->except(['gambar', '_token']));
+        $response = $http->post('/undangan-cetak', $request->except(['gambar', '_token', '_method', 'hapus_gambar', 'hapus_gambar_lama']));
         $body = $response->json() ?? [];
 
         if ($response->failed()) {
@@ -217,6 +217,10 @@ class UndanganController extends Controller
 
         if ($status === 422 && is_array($errors)) {
             return back()->withErrors($errors)->with('error', $message);
+        }
+
+        if ($status >= 500) {
+            $message = 'Server API Undangan sedang bermasalah (HTTP ' . $status . '). Silakan coba lagi beberapa saat.';
         }
 
         Inertia::flash('toast', ['type' => 'error', 'message' => $message]);

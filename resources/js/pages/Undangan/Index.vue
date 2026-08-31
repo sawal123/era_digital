@@ -325,14 +325,22 @@ const handleSubmit = () => {
         .map((img, i) => (img.removed ? i : null))
         .filter((v) => v !== null);
 
+    // API hanya menerima integer; nilai desimal dari response API (cth "750.00")
+    // harus dinormalisasi ke integer bulat agar lolos validasi saat dikirim balik.
+    const toInteger = (value) => {
+        if (value === '' || value === null || value === undefined) return 0;
+        const num = Number.parseFloat(value);
+        return Number.isFinite(num) ? Math.trunc(num) : 0;
+    };
+
     form.transform((data) => {
         const payload = {
             ...data,
             favorite: data.favorite ? 1 : 0,
-            // field numerik opsional: kirim 0 jika kosong (hindari error integer)
-            terjual: data.terjual === '' ? 0 : data.terjual,
-            harga_modal: data.harga_modal === '' ? 0 : data.harga_modal,
-            promo: data.promo === '' ? 0 : data.promo,
+            // field numerik opsional: kirim 0 jika kosong + normalisasi desimal
+            terjual: toInteger(data.terjual),
+            harga_modal: toInteger(data.harga_modal),
+            promo: toInteger(data.promo),
             hapus_gambar: hapusGambar,
         };
 
