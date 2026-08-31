@@ -58,15 +58,11 @@ const getCurrentMonthString = () => {
 const getCurrentYearString = () => String(new Date().getFullYear());
 const todayString = getTodayString();
 
-// Konversi string ISO (UTC) ke tanggal lokal YYYY-MM-DD agar filter
-// harian/bulanan/tahunan konsisten dengan tampilan (timezone browser).
-const getLocalDateString = (dateString) => {
-    const date = new Date(dateString);
-    if (Number.isNaN(date.getTime())) {
-        return String(dateString ?? '').slice(0, 10);
-    }
-    return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}`;
-};
+// Timestamp dari backend sudah dalam WIB (APP_TIMEZONE=Asia/Jakarta) dan
+// diserialisasi dengan offset +07:00. Tanggal diambil LANGSUNG dari string
+// tanpa konversi timezone browser, agar filter harian/bulanan/tahunan
+// konsisten dengan source of truth di database (tidak double conversion).
+const getLocalDateString = (dateString) => String(dateString ?? '').slice(0, 10);
 
 // ─── FILTER STATE ───────────────────────────────────────────────
 const filterMode  = ref('harian');   // 'harian' | 'bulanan' | 'tahunan'
@@ -594,7 +590,16 @@ return;
 
 // ─── HELPERS ─────────────────────────────────────────────────────
 const formatRupiah = (n) => new Intl.NumberFormat('id-ID').format(n);
-const formatDate   = (s) => new Date(s).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+// Timestamp backend sudah WIB dengan offset +07:00. Tampilkan tanggal
+// dari string secara langsung (tanpa konversi timezone browser) agar
+// tanggal/jam yang terlihat = tanggal/jam WIB yang tersimpan di database.
+const formatDate = (s) => {
+    const date = new Date(String(s ?? '').replace(' ', 'T'));
+    if (Number.isNaN(date.getTime())) {
+        return String(s ?? '');
+    }
+    return date.toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
 const copyToClipboard = async (text) => {
     try {
         await navigator.clipboard.writeText(text);
