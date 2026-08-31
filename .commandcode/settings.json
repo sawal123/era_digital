@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Shell(php artisan tinker --execute=\"dump(['now' => now()->format('Y-m-d H:i:s T'), 'utc_now' => now()->utc()->format('Y-m-d H:i:s T'), 'php_tz' => date_default_timezone_get()]);\")",
+      "Shell(php artisan tinker --execute=\"dump(\\App\\Models\\Transaction::orderByDesc('created_at')->limit(10)->get(['invoice_number','created_at'])->toArray());\")",
+      "Shell(php artisan tinker --execute=\"dump(['mysql_tz' => DB::select('SELECT @@global.time_zone AS gtz, @@session.time_zone AS stz, NOW() AS now_db, UTC_TIMESTAMP() AS utc_now')[0], 'cols' => DB::select('SHOW COLUMNS FROM transactions')]);\")",
+      "Shell(php artisan tinker --execute=\"dump(\\App\\Models\\Transaction::whereBetween('created_at', ['2026-08-11 00:00:00','2026-08-12 23:59:59'])->get(['id','invoice_number','created_at'])->toArray());\")",
+      "Shell(php artisan tinker --execute=\"$t = \\App\\Models\\Transaction::create(['invoice_number' => 'TZTEST-' . now()->format('YmdHis'), 'cashier_id' => 1, 'payment_method' => 'cash', 'payment_status' => 'paid', 'status_bayar' => 'lunas']); dump(['now_wib' => now()->format('Y-m-d H:i:s T'), 'stored_created_at' => $t->created_at->format('Y-m-d H:i:s T'), 'raw_db' => DB::select('SELECT created_at, CONVERT_TZ(created_at, @@session.time_zone, \\\"+00:00\\\") AS utc FROM transactions WHERE id = ?', [$t->id])[0]]); $t->delete();\")",
+      "Shell(php artisan config:clear)",
+      "Shell(php artisan migrate --force)",
+      "Shell(php artisan tinker --execute=\"$t = \\App\\Models\\Transaction::create(['invoice_number' => 'TZVERIFY-' . now()->format('YmdHis'), 'cashier_id' => 1, 'payment_method' => 'cash', 'payment_status' => 'paid', 'status_bayar' => 'lunas']); dump(['saved_now' => now()->format('Y-m-d H:i:s T'), 'read_back' => $t->fresh()->created_at->format('Y-m-d H:i:s T'), 'raw_db' => DB::select('SELECT created_at FROM transactions WHERE id = ?', [$t->id])[0]->created_at, 'whereDate_today' => \\App\\Models\\Transaction::whereDate('created_at', now()->toDateString())->where('id', $t->id)->exists()]); $t->delete();\")",
+      "Shell(php artisan test)",
+      "Shell(git:*)",
+      "Shell(php artisan test --filter=PosAreaPricingTest 2 >& 1)",
+      "Shell(npm:*)",
+      "Shell(npx vue-tsc --noEmit 2 >& 1)",
+      "Shell(findstr:*)",
+      "Shell(php artisan tinker --execute=dump(['app_tz' => config('app.timezone'), 'db_tz' => config('database.connections.mysql.timezone'), 'now' => now()->format('Y-m-d H:i:s T')]); dump(['total' => \\App\\Models\\Transaction::count(), 'hari_ini' => \\App\\Models\\Transaction::whereDate('created_at', now()->toDateString())->count()]);)",
+      "Shell(php artisan tinker --execute=\"dump(['app_tz' => config('app.timezone'), 'db_tz' => config('database.connections.mysql.timezone'), 'now' => now()->format('Y-m-d H:i:s T')]); dump(['total' => \\App\\Models\\Transaction::count(), 'hari_ini' => \\App\\Models\\Transaction::whereDate('created_at', now()->toDateString())->count()]);\")",
+      "Shell(php artisan tinker --execute=\"dump(['conn' => DB::connection()->getDriverName(), 'db' => DB::connection()->getDatabaseName()]); dump(\\App\\Models\\Transaction::withTrashed()->count());\")",
+      "Shell(php artisan tinker --execute=\"dump(DB::table('transactions')->count()); dump(DB::table('transactions')->orderByDesc('id')->limit(5)->get()->toArray());\")",
+      "Shell(php artisan tinker --execute=\"$t = \\App\\Models\\Transaction::create(['invoice_number' => 'TZFINAL-' . now()->format('YmdHis'), 'cashier_id' => 1, 'payment_method' => 'cash', 'payment_status' => 'paid', 'status_bayar' => 'lunas']); dump(['now_wib' => now()->format('Y-m-d H:i:s T'), 'created_at_wib' => $t->fresh()->created_at->format('Y-m-d H:i:s T'), 'raw_db' => DB::table('transactions')->where('id', $t->id)->value('created_at'), 'whereDate_matches' => \\App\\Models\\Transaction::whereDate('created_at', now()->toDateString())->where('id', $t->id)->exists()]); $t->delete();\")",
+      "Shell(php artisan tinker --execute=\"dump(['users' => DB::table('users')->count(), 'payment_methods' => DB::table('payment_methods')->count()]);\")",
+      "Shell(php artisan tinker --execute=\"$u = \\App\\Models\\User::create(['name' => 'TZ Test', 'email' => 'tz@test.local', 'password' => bcrypt('password')]); $t = \\App\\Models\\Transaction::create(['invoice_number' => 'TZFINAL-' . now()->format('YmdHis'), 'cashier_id' => $u->id, 'payment_method' => 'cash', 'payment_status' => 'paid', 'status_bayar' => 'lunas']); dump(['now_wib' => now()->format('Y-m-d H:i:s T'), 'created_at_wib' => $t->fresh()->created_at->format('Y-m-d H:i:s T'), 'raw_db' => DB::table('transactions')->where('id', $t->id)->value('created_at'), 'whereDate_matches' => \\App\\Models\\Transaction::whereDate('created_at', now()->toDateString())->where('id', $t->id)->exists()]); $t->delete(); $u->delete();\")"
+    ],
+    "deny": [],
+    "defaultMode": "default"
+  }
+}

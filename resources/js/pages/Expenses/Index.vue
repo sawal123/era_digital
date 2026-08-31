@@ -384,7 +384,7 @@ const clearAllocationItem = (allocation) => {
 
 const getTransactionLabel = (transaction) => {
     const customerName = transaction.customer_name || transaction.customer?.name || 'Cash / Umum';
-    const date = String(transaction.created_at ?? '').slice(0, 10);
+    const date = getLocalDateString(transaction.created_at);
 
     return `${transaction.invoice_number} - ${customerName}${date ? ` (${date})` : ''}`;
 };
@@ -452,6 +452,14 @@ const formatRupiah = (angka) => {
 const formatDate = (dateString) => {
     const options = { year: 'numeric', month: 'long', day: 'numeric' };
     return new Date(dateString).toLocaleDateString('id-ID', options);
+};
+
+const getLocalDateString = (dateString) => {
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) {
+        return String(dateString ?? '').slice(0, 10);
+    }
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 };
 
 const yearOptions = Array.from({ length: 5 }, (_, i) => String(new Date().getFullYear() - i));

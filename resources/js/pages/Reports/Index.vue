@@ -58,6 +58,16 @@ const getCurrentMonthString = () => {
 const getCurrentYearString = () => String(new Date().getFullYear());
 const todayString = getTodayString();
 
+// Konversi string ISO (UTC) ke tanggal lokal YYYY-MM-DD agar filter
+// harian/bulanan/tahunan konsisten dengan tampilan (timezone browser).
+const getLocalDateString = (dateString) => {
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) {
+        return String(dateString ?? '').slice(0, 10);
+    }
+    return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}`;
+};
+
 // ─── FILTER STATE ───────────────────────────────────────────────
 const filterMode  = ref('harian');   // 'harian' | 'bulanan' | 'tahunan'
 const filterDateRange = ref(`${todayString} to ${todayString}`);
@@ -123,11 +133,12 @@ const filteredTransactions = computed(() => {
     const { start, end } = selectedDateRange.value;
 
     return props.transactions.filter(t => {
+        const localDate = getLocalDateString(t.created_at);
         const matchesPeriod = filterMode.value === 'harian'
-            ? t.created_at.slice(0, 10) >= start && t.created_at.slice(0, 10) <= end
+            ? localDate >= start && localDate <= end
             : filterMode.value === 'bulanan'
-                ? t.created_at.slice(0, 7) === filterMonth.value
-                : t.created_at.slice(0, 4) === filterYear.value;
+                ? localDate.slice(0, 7) === filterMonth.value
+                : localDate.slice(0, 4) === filterYear.value;
 
         if (!matchesPeriod) {
             return false;
