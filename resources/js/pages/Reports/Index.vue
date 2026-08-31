@@ -44,29 +44,36 @@ const props = defineProps({
     },
 });
 
-const padDatePart = (value) => String(value).padStart(2, '0');
-const getTodayString = () => {
-    const now = new Date();
+// Timezone bisnis aplikasi. Seluruh konversi tanggal laporan memakai zona ini
+// secara eksplisit — tidak pernah timezone browser/perangkat user.
+const BUSINESS_TIMEZONE = 'Asia/Jakarta';
 
-    return `${now.getFullYear()}-${padDatePart(now.getMonth() + 1)}-${padDatePart(now.getDate())}`;
-};
-const getCurrentMonthString = () => {
-    const now = new Date();
+// Format instant (ISO UTC dari Laravel, contoh "2026-08-30T17:30:00.000000Z")
+// menjadi YYYY-MM-DD dalam timezone bisnis WIB.
+const formatToBusinessDate = (dateString) => {
+    const date = new Date(String(dateString ?? ''));
 
-    return `${now.getFullYear()}-${padDatePart(now.getMonth() + 1)}`;
-};
-const getCurrentYearString = () => String(new Date().getFullYear());
-const todayString = getTodayString();
-
-// Konversi string ISO (UTC) ke tanggal lokal YYYY-MM-DD agar filter
-// harian/bulanan/tahunan konsisten dengan tampilan (timezone browser).
-const getLocalDateString = (dateString) => {
-    const date = new Date(dateString);
     if (Number.isNaN(date.getTime())) {
         return String(dateString ?? '').slice(0, 10);
     }
-    return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}`;
+
+    return new Intl.DateTimeFormat('en-CA', {
+        timeZone: BUSINESS_TIMEZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).format(date);
 };
+
+const getTodayString = () => formatToBusinessDate(new Date().toISOString());
+const getCurrentMonthString = () => getTodayString().slice(0, 7);
+const getCurrentYearString = () => getTodayString().slice(0, 4);
+const todayString = getTodayString();
+
+// Timestamp dari backend adalah instant UTC (serialisasi Eloquent mengeluarkan
+// ISO UTC "Z"). Konversi ke tanggal bisnis WIB eksplisit agar filter
+// harian/bulanan/tahunan konsisten dengan source of truth database.
+const getLocalDateString = (dateString) => formatToBusinessDate(dateString);
 
 // ─── FILTER STATE ───────────────────────────────────────────────
 const filterMode  = ref('harian');   // 'harian' | 'bulanan' | 'tahunan'
@@ -594,7 +601,25 @@ return;
 
 // ─── HELPERS ─────────────────────────────────────────────────────
 const formatRupiah = (n) => new Intl.NumberFormat('id-ID').format(n);
-const formatDate   = (s) => new Date(s).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+// Timestamp backend adalah instant UTC (ISO "Z"). Tampilkan tanggal/jam
+// secara eksplisit dalam timezone bisnis WIB agar konsisten di semua
+// browser/perangkat, tidak mengikuti timezone user.
+const formatDate = (s) => {
+    const date = new Date(String(s ?? '').replace(' ', 'T'));
+
+    if (Number.isNaN(date.getTime())) {
+        return String(s ?? '');
+    }
+
+    return new Intl.DateTimeFormat('id-ID', {
+        timeZone: BUSINESS_TIMEZONE,
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    }).format(date);
+};
 const copyToClipboard = async (text) => {
     try {
         await navigator.clipboard.writeText(text);
