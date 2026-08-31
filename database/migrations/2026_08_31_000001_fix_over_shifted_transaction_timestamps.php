@@ -19,11 +19,20 @@ use Illuminate\Support\Facades\Schema;
  *
  *   transactions.created_at = payment_histories.created_at            (BENAR)
  *
- * Migration ini menggeser KEMBALI -7 jam HANYA transaksi yang memenuhi pola
- * delta persis +7 jam tersebut. Deteksi berbasis DATA (relasi dengan payment
- * history pertama), bukan ID. Transaksi tanpa payment history dan transaksi
- * yang delta-nya bukan 7 jam TIDAK disentuh. payment_histories.tanggal_bayar
- * tidak diubah (sudah merepresentasikan WIB yang benar).
+ * Migration ini menggeser KEMBALI -7 jam HANYA pada transactions.created_at
+ * untuk transaksi yang memenuhi pola delta persis +7 jam tersebut. Deteksi
+ * berbasis DATA (relasi dengan payment history pertama), bukan ID.
+ *
+ * transactions.updated_at TIDAK disentuh: delta created_at membuktikan
+ * created_at tergeser, tetapi TIDAK membuktikan updated_at juga tergeser.
+ * Transaksi lama bisa saja diperbarui setelah konfigurasi timezone dibenahi
+ * (pembayaran piutang/cicilan, update status, dll), sehingga updated_at-nya
+ * sudah benar. Tidak ada reference timestamp yang aman untuk mengoreksi
+ * updated_at, jadi nilainya dibiarkan apa adanya.
+ *
+ * Transaksi tanpa payment history dan transaksi yang delta-nya bukan 7 jam
+ * TIDAK disentuh. payment_histories.tanggal_bayar tidak diubah (sudah
+ * merepresentasikan WIB yang benar).
  */
 return new class extends Migration
 {
@@ -49,8 +58,7 @@ return new class extends Migration
                     FROM payment_histories
                     GROUP BY transaction_id
                 ) AS p ON p.transaction_id = t.id
-                SET t.created_at = DATE_SUB(t.created_at, INTERVAL 7 HOUR),
-                    t.updated_at = DATE_SUB(t.updated_at, INTERVAL 7 HOUR)
+                SET t.created_at = DATE_SUB(t.created_at, INTERVAL 7 HOUR)
                 WHERE {$diffSeconds} = 25200";
 
         DB::statement($sql);

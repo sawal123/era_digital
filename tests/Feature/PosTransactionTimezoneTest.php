@@ -188,7 +188,7 @@ it('corrective migration hanya menggeser transaksi dengan delta +7 jam', functio
         ->and($correctedIds->toArray())->not->toContain($correct->id)
         ->and($correctedIds->toArray())->not->toContain($noHistoryId);
 
-    // Eksekusi koreksi identik dengan migration.
+    // Eksekusi koreksi identik dengan migration: HANYA created_at yang dikoreksi.
     DB::table('transactions as t')
         ->join(
             DB::raw('(SELECT transaction_id, MIN(created_at) AS first_payment_created_at FROM payment_histories GROUP BY transaction_id) as p'),
@@ -199,7 +199,6 @@ it('corrective migration hanya menggeser transaksi dengan delta +7 jam', functio
         ->whereRaw("{$diffExpression} = 25200")
         ->update([
             't.created_at' => DB::raw("datetime(t.created_at, '-7 hours')"),
-            't.updated_at' => DB::raw("datetime(t.updated_at, '-7 hours')"),
         ]);
 
     $oldWrong->refresh();
@@ -225,6 +224,73 @@ it('corrective migration hanya menggeser transaksi dengan delta +7 jam', functio
     Carbon::setTestNow();
 });
 
+it('corrective migration hanya mengoreksi created_at, updated_at yang sudah benar tidak berubah', function () {
+    Carbon::setTestNow(Carbon::parse('2026-08-30 12:00:00', 'Asia/Jakarta'));
+
+    // Skenario edge case:
+    //   first_payment_created_at = 2026-08-30 12:00
+    //   transactions.created_at  = 2026-08-30 19:00  (salah, +7 jam)
+    //   transactions.updated_at  = 2026-08-31 14:00  (sudah benar, transaksi diperbarui setelah timezone dibenahi)
+    $cashierId = User::factory()->create()->id;
+
+    $transactionId = DB::table('transactions')->insertGetId([
+        'invoice_number' => 'TRX-TZ-EDGE-'.fake()->unique()->numerify('####'),
+        'cashier_id' => $cashierId,
+        'customer_name' => 'Edge Case',
+        'total_base_price' => 1000,
+        'total_price' => 2000,
+        'total_profit' => 1000,
+        'payment_method' => 'cash',
+        'payment_method_id' => wibTimezoneCashMethod()->id,
+        'payment_status' => 'paid',
+        'status_bayar' => 'lunas',
+        'jumlah_dibayar' => 2000,
+        'uang_diterima' => 2000,
+        'kembalian' => 0,
+        'sisa_tagihan' => 0,
+        'created_at' => '2026-08-30 19:00:00',
+        'updated_at' => '2026-08-31 14:00:00',
+    ]);
+
+    DB::table('payment_histories')->insert([
+        'transaction_id' => $transactionId,
+        'jumlah_bayar' => 2000,
+        'tanggal_bayar' => '2026-08-30 12:00:00',
+        'metode_bayar' => 'cash',
+        'keterangan' => 'Lunas',
+        'created_at' => '2026-08-30 12:00:00',
+        'updated_at' => '2026-08-30 12:00:00',
+    ]);
+
+    $diffExpression = 'CAST(ROUND((julianday(t.created_at) - julianday(p.first_payment_created_at)) * 86400) AS INTEGER)';
+
+    // Eksekusi koreksi identik dengan SQL migration (hanya created_at).
+    DB::table('transactions as t')
+        ->join(
+            DB::raw('(SELECT transaction_id, MIN(created_at) AS first_payment_created_at FROM payment_histories GROUP BY transaction_id) as p'),
+            'p.transaction_id',
+            '=',
+            't.id'
+        )
+        ->whereRaw("{$diffExpression} = 25200")
+        ->update([
+            't.created_at' => DB::raw("datetime(t.created_at, '-7 hours')"),
+        ]);
+
+    $updatedAtAfter = DB::table('transactions')->where('id', $transactionId)->value('updated_at');
+
+    // created_at dikoreksi ke waktu WIB yang benar...
+    expect(DB::table('transactions')->where('id', $transactionId)->value('created_at'))->toBe('2026-08-30 12:00:00')
+        // ...dan updated_at TIDAK disentuh (tetap 2026-08-31 14:00, bukan digeser -7 jam).
+        ->and($updatedAtAfter)->toBe('2026-08-31 14:00:00');
+
+    // payment_histories.tanggal_bayar juga tidak disentuh.
+    expect(DB::table('payment_histories')->where('transaction_id', $transactionId)->value('tanggal_bayar'))
+        ->toBe('2026-08-30 12:00:00');
+
+    Carbon::setTestNow();
+});
+
 it('corrective migration aman dijalankan dua kali (idempotent)', function () {
     Carbon::setTestNow(Carbon::parse('2026-08-30 20:00:00', 'Asia/Jakarta'));
 
@@ -243,7 +309,6 @@ it('corrective migration aman dijalankan dua kali (idempotent)', function () {
             ->whereRaw("{$diffExpression} = 25200")
             ->update([
                 't.created_at' => DB::raw("datetime(t.created_at, '-7 hours')"),
-                't.updated_at' => DB::raw("datetime(t.updated_at, '-7 hours')"),
             ]);
     };
 
@@ -286,7 +351,6 @@ it('corrective migration tidak melakukan apa pun jika tidak ada delta +7 jam', f
         ->whereRaw("{$diffExpression} = 25200")
         ->update([
             't.created_at' => DB::raw("datetime(t.created_at, '-7 hours')"),
-            't.updated_at' => DB::raw("datetime(t.updated_at, '-7 hours')"),
         ]);
 
     expect($affected)->toBe(0);
