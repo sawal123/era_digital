@@ -56,27 +56,21 @@ return new class extends Migration
         DB::statement($sql);
     }
 
+    /**
+     * Rollback data-fix ini sengaja NO-OP.
+     *
+     * Setelah up() dijalankan, delta transaksi yang dikoreksi berubah dari
+     * 25200 detik menjadi 0 detik, sehingga tidak ada cara aman untuk
+     * mengidentifikasi ulang transaksi mana yang sebelumnya dikoreksi
+     * (delta 0 juga dimiliki transaksi baru yang memang benar). Mencoba
+     * rollback heuristik berisiko menggeser transaksi yang benar.
+     *
+     * Koreksi data timestamp ini bersifat irreversible secara aman: schema
+     * tidak berubah dan tidak ada data selain timestamp yang disentuh.
+     */
     public function down(): void
     {
-        $connection = Schema::getConnection();
-
-        if ($connection->getDriverName() !== 'mysql') {
-            return;
-        }
-
-        $diffSeconds = $this->diffSecondsExpression();
-
-        $sql = "UPDATE transactions AS t
-                INNER JOIN (
-                    SELECT transaction_id, MIN(created_at) AS first_payment_created_at
-                    FROM payment_histories
-                    GROUP BY transaction_id
-                ) AS p ON p.transaction_id = t.id
-                SET t.created_at = DATE_ADD(t.created_at, INTERVAL 7 HOUR),
-                    t.updated_at = DATE_ADD(t.updated_at, INTERVAL 7 HOUR)
-                WHERE {$diffSeconds} = 25200";
-
-        DB::statement($sql);
+        // Explicit no-op — jangan menebak transaksi mana yang harus dibalik.
     }
 
     private function diffSecondsExpression(): string

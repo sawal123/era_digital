@@ -643,3 +643,38 @@ it('config timezone tetap Asia/Jakarta dan DB timezone +07:00', function () {
     expect(config('app.timezone'))->toBe('Asia/Jakarta')
         ->and(config('database.connections.mysql.timezone'))->toBe('+07:00');
 });
+
+// ---------------------------------------------------------------------------
+// Serialisasi timestamp untuk frontend: Eloquent mengirim ISO UTC (Z).
+// Frontend Reports/Index.vue wajib mengkonversi instant ke Asia/Jakarta
+// (Intl.DateTimeFormat timeZone: 'Asia/Jakarta') — bukan slice(0,10) terhadap
+// string ISO UTC, karena transaksi malam WIB bisa jatuh ke tanggal UTC berbeda.
+// ---------------------------------------------------------------------------
+
+it('serialisasi Eloquent mengirim timestamp sebagai ISO UTC (Z), bukan WIB +07:00', function () {
+    Carbon::setTestNow(Carbon::parse('2026-08-31 00:30:00', 'Asia/Jakarta'));
+
+    $transaction = makeCorrectTransaction(Carbon::parse('2026-08-31 00:30:00', 'Asia/Jakarta'));
+
+    $serialized = $transaction->toArray()['created_at'];
+
+    // 00:30 WIB = 17:30 UTC hari sebelumnya (30 Agustus).
+    expect($serialized)->toBe('2026-08-30T17:30:00.000000Z')
+        ->and(str_ends_with($serialized, 'Z'))->toBeTrue()
+        ->and(str_contains($serialized, '+07:00'))->toBeFalse();
+
+    Carbon::setTestNow();
+});
+
+it('mapping instant UTC ke tanggal bisnis WIB: 16:30Z -> 30, 17:30Z -> 31 Agustus', function () {
+    // Logika yang sama dengan formatToBusinessDate() di Reports/Index.vue:
+    // parse instant lalu format di timezone Asia/Jakarta menjadi YYYY-MM-DD.
+    $formatToBusinessDate = function (string $isoUtc): string {
+        return Carbon::parse($isoUtc)
+            ->setTimezone('Asia/Jakarta')
+            ->format('Y-m-d');
+    };
+
+    expect($formatToBusinessDate('2026-08-30T16:30:00.000000Z'))->toBe('2026-08-30')
+        ->and($formatToBusinessDate('2026-08-30T17:30:00.000000Z'))->toBe('2026-08-31');
+});
