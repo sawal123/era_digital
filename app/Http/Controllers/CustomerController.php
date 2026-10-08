@@ -22,6 +22,7 @@ class CustomerController extends Controller
         ])
             ->withCount('transactions')
             ->withSum('transactions as total_spent', 'total_price')
+            ->withSum('transactions as total_profit', 'total_profit')
             ->orderBy('name')
             ->get();
 

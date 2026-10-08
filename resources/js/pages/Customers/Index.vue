@@ -74,6 +74,20 @@ const filteredCustomers = computed(() => {
             return (a.name || '').localeCompare(b.name || '', 'id');
         }
 
+        if (sortBy.value === 'profit_desc') {
+            const profitA = Number(a.total_profit) || 0;
+            const profitB = Number(b.total_profit) || 0;
+            if (profitB !== profitA) {
+                return profitB - profitA;
+            }
+            const spentA = Number(a.total_spent) || 0;
+            const spentB = Number(b.total_spent) || 0;
+            if (spentB !== spentA) {
+                return spentB - spentA;
+            }
+            return (a.name || '').localeCompare(b.name || '', 'id');
+        }
+
         // Default: name_asc
         return (a.name || '').localeCompare(b.name || '', 'id');
     });
@@ -175,6 +189,7 @@ const openHistoryModal = (customer) => {
 
 const selectedTransactions = computed(() => selectedHistoryCustomer.value?.transactions || []);
 const selectedTotalSpent = computed(() => selectedTransactions.value.reduce((sum, transaction) => sum + toNumber(transaction.total_price), 0));
+const selectedTotalProfit = computed(() => selectedTransactions.value.reduce((sum, transaction) => sum + toNumber(transaction.total_profit), 0));
 
 const toNumber = (value) => Number.parseFloat(value ?? 0) || 0;
 const formatRupiah = (value) => new Intl.NumberFormat('id-ID').format(toNumber(value));
@@ -237,6 +252,7 @@ const customerTypeLabel = (type) => ({
                     <option value="name_asc">Nama A–Z (Default)</option>
                     <option value="transactions_desc">Transaksi Terbanyak</option>
                     <option value="spent_desc">Total Belanja Tertinggi</option>
+                    <option value="profit_desc">Total Keuntungan Tertinggi</option>
                 </select>
             </div>
         </div>
@@ -251,7 +267,7 @@ const customerTypeLabel = (type) => ({
                             <th class="p-4">Tipe Customer</th>
                             <th class="p-4">Nomor HP</th>
                             <th class="p-4">Alamat Rumah</th>
-                            <th class="p-4 text-right">Total Belanja</th>
+                            <th class="p-4 text-right">Total Belanja & Profit</th>
                             <th class="p-4">Tanggal Input</th>
                             <th class="p-4 text-right pr-6">Aksi</th>
                         </tr>
@@ -280,7 +296,10 @@ const customerTypeLabel = (type) => ({
                             </td>
                             <td class="p-4 text-right">
                                 <div class="font-bold text-foreground font-mono">Rp {{ formatRupiah(c.total_spent) }}</div>
-                                <div class="text-[11px] text-muted-foreground">{{ c.transactions_count || 0 }} transaksi</div>
+                                <div class="text-xs font-bold text-emerald-600 dark:text-emerald-400 font-mono mt-0.5">
+                                    Profit: Rp {{ formatRupiah(c.total_profit) }}
+                                </div>
+                                <div class="text-[11px] text-muted-foreground mt-0.5">{{ c.transactions_count || 0 }} transaksi</div>
                             </td>
                             <td class="p-4 text-muted-foreground font-mono text-xs">
                                 {{ formatDate(c.created_at) }}
@@ -382,15 +401,19 @@ const customerTypeLabel = (type) => ({
                         Riwayat Pesanan {{ selectedHistoryCustomer.name }}
                     </DialogTitle>
                     <DialogDescription>
-                        Total belanja Rp {{ formatRupiah(selectedTotalSpent) }} dari {{ selectedTransactions.length }} transaksi.
+                        Total belanja Rp {{ formatRupiah(selectedTotalSpent) }} &bull; Total Keuntungan Rp {{ formatRupiah(selectedTotalProfit) }} dari {{ selectedTransactions.length }} transaksi.
                     </DialogDescription>
                 </DialogHeader>
 
                 <div v-if="selectedHistoryCustomer" class="space-y-4 py-2">
-                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-4">
                         <div class="rounded-2xl border border-border bg-muted/20 p-4">
                             <p class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Total Belanja</p>
                             <p class="mt-1 text-lg font-black text-foreground">Rp {{ formatRupiah(selectedTotalSpent) }}</p>
+                        </div>
+                        <div class="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+                            <p class="text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Total Keuntungan</p>
+                            <p class="mt-1 text-lg font-black text-emerald-600 dark:text-emerald-400">Rp {{ formatRupiah(selectedTotalProfit) }}</p>
                         </div>
                         <div class="rounded-2xl border border-border bg-muted/20 p-4">
                             <p class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Jumlah Transaksi</p>

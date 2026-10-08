@@ -88,13 +88,16 @@ it('mengembalikan data customer beserta transactions_count dan total_spent aggre
         $charlie = $customers->firstWhere('id', $customerC->id);
 
         expect($alfa['transactions_count'])->toBe(2)
-            ->and((float) $alfa['total_spent'])->toBe(150000.0);
+            ->and((float) $alfa['total_spent'])->toBe(150000.0)
+            ->and((float) $alfa['total_profit'])->toBe(80000.0);
 
         expect($beta['transactions_count'])->toBe(3)
-            ->and((float) $beta['total_spent'])->toBe(90000.0);
+            ->and((float) $beta['total_spent'])->toBe(90000.0)
+            ->and((float) $beta['total_profit'])->toBe(45000.0);
 
         expect($charlie['transactions_count'])->toBe(0)
-            ->and($charlie['total_spent'])->toBeNull();
+            ->and($charlie['total_spent'])->toBeNull()
+            ->and($charlie['total_profit'])->toBeNull();
 
         return true;
     });
