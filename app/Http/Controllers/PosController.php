@@ -2,18 +2,19 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\Product;
-use App\Models\Transaction;
-use App\Models\TransactionItem;
 use App\Models\Customer;
-use App\Models\StoreProfile;
+use App\Models\CustomerDigitalAccount;
 use App\Models\PaymentMethod;
 use App\Models\PrintVendor;
-use Inertia\Inertia;
+use App\Models\Product;
+use App\Models\StoreProfile;
+use App\Models\Transaction;
+use App\Models\TransactionItem;
+use App\Services\AreaPricingService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
-use App\Services\AreaPricingService;
+use Inertia\Inertia;
 
 class PosController extends Controller
 {
@@ -33,6 +34,7 @@ class PosController extends Controller
             'signature_path' => null,
             'saldo_digital' => 350000.00,
         ]);
+
         return Inertia::render('POS/Index', [
             'products' => $products,
             'customers' => $customers,
@@ -234,7 +236,7 @@ class PosController extends Controller
                     $nominalVal = $computedItem['nominal'];
 
                     if ($accountNumber && $accountName) {
-                        \App\Models\CustomerDigitalAccount::firstOrCreate([
+                        CustomerDigitalAccount::firstOrCreate([
                             'type' => $digitalType,
                             'account_number' => $accountNumber,
                         ], [
@@ -271,11 +273,12 @@ class PosController extends Controller
             return redirect()->back()->with([
                 'success' => 'Transaksi berhasil disimpan!',
                 'print_invoice' => $invoiceNumber,
-                'recent_transaction' => $freshTransaction
+                'recent_transaction' => $freshTransaction,
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->back()->with('error', 'Gagal memproses transaksi: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', 'Gagal memproses transaksi: '.$e->getMessage());
         }
     }
 
@@ -307,10 +310,9 @@ class PosController extends Controller
      * Hitung satu item cart secara server-side (authoritative).
      *
      * @param  int  $index  indeks cart untuk pesan validasi
+     * @return array<string, mixed>
      *
      * @throws ValidationException
-     *
-     * @return array<string, mixed>
      */
     private function computeCartItem(array $item, Product $product, int $index): array
     {
@@ -325,11 +327,31 @@ class PosController extends Controller
         $unit = $isAreaBased ? 'pcs' : ($product->unit ?: 'pcs');
         $quantity = (float) ($item['quantity'] ?? 0);
 
+        if (! is_numeric($item['quantity'] ?? null) || $quantity <= 0) {
+            throw ValidationException::withMessages([
+                "cart.{$index}.quantity" => 'Quantity harus berupa angka positif yang valid.',
+            ]);
+        }
+
+        if ($quantity > 999999) {
+            throw ValidationException::withMessages([
+                "cart.{$index}.quantity" => 'Quantity tidak boleh melebihi batas maksimal (999.999).',
+            ]);
+        }
+
+        if ($itemType === 'ppob' || ($item['type'] ?? '') === 'digital' || ($item['type'] ?? '') === 'ppob') {
+            if ($quantity !== 1.0) {
+                throw ValidationException::withMessages([
+                    "cart.{$index}.quantity" => 'Quantity untuk produk digital / PPOB dikunci 1 per transaksi.',
+                ]);
+            }
+        }
+
         $metadata = [
-            'detail'    => $item['detail'] ?? '',
-            'note'      => $item['note'] ?? '',
+            'detail' => $item['detail'] ?? '',
+            'note' => $item['note'] ?? '',
             'admin_fee' => $item['admin_fee'] ?? 0,
-            'nominal'   => $item['nominal'] ?? null,
+            'nominal' => $item['nominal'] ?? null,
         ];
 
         if ($isAreaBased) {
@@ -419,13 +441,13 @@ class PosController extends Controller
         $profit = round($subtotalPrice - $subtotalBase, 2);
 
         $metadata = array_merge($metadata, [
-            'length'         => $length,
-            'width'          => $width,
+            'length' => $length,
+            'width' => $width,
             'area_per_piece' => $areaPerPiece,
-            'total_area'     => AreaPricingService::totalArea($areaPerPiece, $quantity),
-            'pricing_unit'   => 'm2',
-            'selling_rate'   => $sellingRate,
-            'base_rate'      => $baseRate,
+            'total_area' => AreaPricingService::totalArea($areaPerPiece, $quantity),
+            'pricing_unit' => 'm2',
+            'selling_rate' => $sellingRate,
+            'base_rate' => $baseRate,
         ]);
 
         return $this->buildComputedItem(
@@ -452,23 +474,23 @@ class PosController extends Controller
     private function buildComputedItem(array $item, ?Product $product, string $itemType, string $unit, float $quantity, float $basePrice, float $sellingPrice, float $subtotalBase, float $subtotalPrice, float $profit, array $metadata, bool $isAreaBased): array
     {
         return [
-            'product'         => $product,
-            'item_name'       => $item['name'] ?? '',
-            'item_type'       => $itemType,
-            'unit'            => $unit,
-            'quantity'        => $quantity,
-            'base_price'      => $basePrice,
-            'selling_price'   => $sellingPrice,
-            'subtotal_base'   => $subtotalBase,
-            'subtotal_price'  => $subtotalPrice,
-            'profit'          => $profit,
-            'metadata'        => $metadata,
-            'is_area_based'   => $isAreaBased,
+            'product' => $product,
+            'item_name' => $item['name'] ?? '',
+            'item_type' => $itemType,
+            'unit' => $unit,
+            'quantity' => $quantity,
+            'base_price' => $basePrice,
+            'selling_price' => $sellingPrice,
+            'subtotal_base' => $subtotalBase,
+            'subtotal_price' => $subtotalPrice,
+            'profit' => $profit,
+            'metadata' => $metadata,
+            'is_area_based' => $isAreaBased,
             'print_vendor_id' => $item['print_vendor_id'] ?? null,
-            'digital_type'    => $item['digital_type'] ?? 'phone',
-            'account_number'  => $item['account_number'] ?? null,
-            'account_name'    => $item['account_name'] ?? null,
-            'nominal'         => $item['nominal'] ?? $item['price'] ?? 0,
+            'digital_type' => $item['digital_type'] ?? 'phone',
+            'account_number' => $item['account_number'] ?? null,
+            'account_name' => $item['account_name'] ?? null,
+            'nominal' => $item['nominal'] ?? $item['price'] ?? 0,
         ];
     }
 
@@ -498,7 +520,7 @@ class PosController extends Controller
         $query = $request->query('query');
         $type = $request->query('type'); // 'token' or 'phone'
 
-        $accounts = \App\Models\CustomerDigitalAccount::where('type', $type)
+        $accounts = CustomerDigitalAccount::where('type', $type)
             ->where(function ($builder) use ($query) {
                 $builder->where('account_number', 'like', "%{$query}%")
                     ->orWhere('account_name', 'like', "%{$query}%");

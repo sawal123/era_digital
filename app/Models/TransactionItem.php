@@ -9,7 +9,7 @@ class TransactionItem extends Model
     protected $fillable = [
         'transaction_id', 'product_id', 'print_vendor_id', 'item_name', 'type', 'unit',
         'quantity', 'base_price', 'selling_price', 'subtotal_base',
-        'subtotal_price', 'profit', 'service_status', 'metadata'
+        'subtotal_price', 'profit', 'service_status', 'metadata',
     ];
 
     protected $casts = [

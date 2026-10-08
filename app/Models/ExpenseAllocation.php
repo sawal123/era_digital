@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class ExpenseAllocation extends Model
 {
     public const STATUS_BELUM_MASUK_HPP = 'belum_masuk_hpp';
+
     public const STATUS_SUDAH_MASUK_HPP = 'sudah_masuk_hpp';
 
     protected $fillable = [

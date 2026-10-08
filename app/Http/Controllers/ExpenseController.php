@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Expense;
 use App\Models\ExpenseAllocation;
 use App\Models\Transaction;
 use App\Models\TransactionItem;
 use App\Services\ProfitCalculationService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
@@ -17,10 +17,10 @@ class ExpenseController extends Controller
     public function index(ProfitCalculationService $profitCalculator)
     {
         $expenses = Expense::with([
-                'transaction.customer',
-                'allocations.transaction.customer',
-                'allocations.transactionItem.printVendor',
-            ])
+            'transaction.customer',
+            'allocations.transaction.customer',
+            'allocations.transactionItem.printVendor',
+        ])
             ->orderByDesc('date')
             ->latest()
             ->get()
@@ -31,15 +31,15 @@ class ExpenseController extends Controller
             });
 
         $transactions = Transaction::select([
-                'id',
-                'invoice_number',
-                'customer_name',
-                'customer_id',
-                'total_base_price',
-                'total_price',
-                'total_profit',
-                'created_at',
-            ])
+            'id',
+            'invoice_number',
+            'customer_name',
+            'customer_id',
+            'total_base_price',
+            'total_price',
+            'total_profit',
+            'created_at',
+        ])
             ->with([
                 'customer:id,name',
                 'items' => function ($query) {
@@ -151,7 +151,7 @@ class ExpenseController extends Controller
                     }
                 }
 
-                $key = $transactionId . ':' . ($transactionItemId ?: 'nota');
+                $key = $transactionId.':'.($transactionItemId ?: 'nota');
                 if (isset($keys[$key])) {
                     $validator->errors()->add(
                         "allocations.{$index}.transaction_id",

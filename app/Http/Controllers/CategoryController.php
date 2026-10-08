@@ -2,18 +2,19 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Category;
-use Inertia\Inertia;
+use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Inertia\Inertia;
 
 class CategoryController extends Controller
 {
     public function index()
     {
         $categories = Category::withCount('products')->get();
+
         return Inertia::render('Category/Index', [
-            'categories' => $categories
+            'categories' => $categories,
         ]);
     }
 
@@ -40,7 +41,7 @@ class CategoryController extends Controller
     public function update(Request $request, Category $category)
     {
         $request->validate([
-            'name' => 'required|string|max:255|unique:categories,name,' . $category->id,
+            'name' => 'required|string|max:255|unique:categories,name,'.$category->id,
             'type' => 'required|in:fisik,jasa,ppob',
         ], [
             'name.unique' => 'Nama kategori sudah digunakan.',

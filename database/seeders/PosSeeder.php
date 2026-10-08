@@ -2,17 +2,17 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
-use Illuminate\Database\Seeder;
 use App\Models\Category;
-use App\Models\Product;
-use App\Models\Transaction;
-use App\Models\TransactionItem;
-use App\Models\Expense;
 use App\Models\Customer;
-use App\Models\StoreProfile;
+use App\Models\CustomerDigitalAccount;
+use App\Models\Expense;
 use App\Models\PaymentMethod;
 use App\Models\PrintVendor;
+use App\Models\Product;
+use App\Models\StoreProfile;
+use App\Models\Transaction;
+use App\Models\TransactionItem;
+use Illuminate\Database\Seeder;
 
 class PosSeeder extends Seeder
 {
@@ -34,7 +34,7 @@ class PosSeeder extends Seeder
             'store_name' => 'Era Digital',
             'address' => 'Jl. Raya Utama No. 45, Kebayoran Baru, Jakarta Selatan',
             'phone' => '0812-3456-7890',
-            'signature_path' => null
+            'signature_path' => null,
         ]);
 
         // Seed some customer directory data
@@ -68,23 +68,23 @@ class PosSeeder extends Seeder
         $p12 = Product::create(['category_id' => $catPpob->id, 'sku' => 'DGT-EWL-01', 'name' => 'Topup E-Wallet', 'unit' => 'transaksi', 'base_price' => 0, 'selling_price' => 0, 'admin_fee' => 1500, 'stock' => null]);
 
         // Seed customer digital accounts
-        \App\Models\CustomerDigitalAccount::create([
+        CustomerDigitalAccount::create([
             'customer_id' => 1,
             'type' => 'token',
             'account_number' => '14238947239',
-            'account_name' => 'Budi Santoso (PLN)'
+            'account_name' => 'Budi Santoso (PLN)',
         ]);
-        \App\Models\CustomerDigitalAccount::create([
+        CustomerDigitalAccount::create([
             'customer_id' => 1,
             'type' => 'phone',
             'account_number' => '08122334455',
-            'account_name' => 'Budi Santoso (Telkomsel)'
+            'account_name' => 'Budi Santoso (Telkomsel)',
         ]);
-        \App\Models\CustomerDigitalAccount::create([
+        CustomerDigitalAccount::create([
             'customer_id' => 2,
             'type' => 'phone',
             'account_number' => '08139876543',
-            'account_name' => 'Siti Aminah (Indosat)'
+            'account_name' => 'Siti Aminah (Indosat)',
         ]);
 
         // Seed some mock expenses
@@ -101,7 +101,7 @@ class PosSeeder extends Seeder
             'total_profit' => 15000,
             'payment_method' => 'cash',
             'payment_status' => 'paid',
-            'created_at' => '2026-05-15 10:20:00'
+            'created_at' => '2026-05-15 10:20:00',
         ]);
 
         TransactionItem::create([
@@ -140,7 +140,7 @@ class PosSeeder extends Seeder
             'total_profit' => 2000,
             'payment_method' => 'qris',
             'payment_status' => 'paid',
-            'created_at' => '2026-05-16 14:45:00'
+            'created_at' => '2026-05-16 14:45:00',
         ]);
 
         TransactionItem::create([
@@ -155,7 +155,7 @@ class PosSeeder extends Seeder
             'subtotal_base' => 50000,
             'subtotal_price' => 52000,
             'profit' => 2000,
-            'metadata' => ['detail' => 'No/ID: 14238947239']
+            'metadata' => ['detail' => 'No/ID: 14238947239'],
         ]);
     }
 }

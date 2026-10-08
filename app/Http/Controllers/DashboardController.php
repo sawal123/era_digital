@@ -2,11 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Transaction;
-use App\Models\TransactionItem;
 use App\Models\Product;
+use App\Models\TransactionItem;
 use App\Services\ProfitCalculationService;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class DashboardController extends Controller
@@ -45,26 +43,33 @@ class DashboardController extends Controller
 
             $dayName = '';
             switch ($date->dayOfWeek) {
-                case 0: $dayName = 'Minggu'; break;
-                case 1: $dayName = 'Senin'; break;
-                case 2: $dayName = 'Selasa'; break;
-                case 3: $dayName = 'Rabu'; break;
-                case 4: $dayName = 'Kamis'; break;
-                case 5: $dayName = 'Jumat'; break;
-                case 6: $dayName = 'Sabtu'; break;
+                case 0: $dayName = 'Minggu';
+                    break;
+                case 1: $dayName = 'Senin';
+                    break;
+                case 2: $dayName = 'Selasa';
+                    break;
+                case 3: $dayName = 'Rabu';
+                    break;
+                case 4: $dayName = 'Kamis';
+                    break;
+                case 5: $dayName = 'Jumat';
+                    break;
+                case 6: $dayName = 'Sabtu';
+                    break;
             }
 
             $chartData[] = [
-                'day'         => $dayName,
-                'date'        => $date->format('d M'),
-                'profit'      => (float) $netProfit,
+                'day' => $dayName,
+                'date' => $date->format('d M'),
+                'profit' => (float) $netProfit,
                 'ppob_profit' => $ppobProfit,
             ];
         }
 
         // 3. WIDGET PERINGATAN STOK (STOK KRITIS <= min_stock)
         $criticalProducts = Product::with('category')
-            ->whereHas('category', function($q) {
+            ->whereHas('category', function ($q) {
                 $q->where('type', 'fisik');
             })
             ->whereColumn('stock', '<=', 'min_stock')
@@ -73,16 +78,16 @@ class DashboardController extends Controller
 
         return Inertia::render('Dashboard', [
             'stats' => [
-                'total_omset'        => $totalOmset,
-                'total_modal'        => $totalModal,
-                'total_pengeluaran'  => $totalPengeluaran,
-                'hpp_tambahan'       => $todaySummary['additional_hpp'],
-                'operasional_rutin'  => $todaySummary['operational_expenses'],
-                'kas_keluar'         => $todaySummary['cash_out'],
-                'keuntungan_bersih'  => $keuntunganBersih,
-                'keuntungan_ppob'    => $keuntunganPpob,
+                'total_omset' => $totalOmset,
+                'total_modal' => $totalModal,
+                'total_pengeluaran' => $totalPengeluaran,
+                'hpp_tambahan' => $todaySummary['additional_hpp'],
+                'operasional_rutin' => $todaySummary['operational_expenses'],
+                'kas_keluar' => $todaySummary['cash_out'],
+                'keuntungan_bersih' => $keuntunganBersih,
+                'keuntungan_ppob' => $keuntunganPpob,
             ],
-            'chartData'        => $chartData,
+            'chartData' => $chartData,
             'criticalProducts' => $criticalProducts,
         ]);
     }

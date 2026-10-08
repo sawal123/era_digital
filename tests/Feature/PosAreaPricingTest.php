@@ -3,6 +3,7 @@
 use App\Models\Category;
 use App\Models\PaymentMethod;
 use App\Models\Product;
+use App\Models\StoreProfile;
 use App\Models\Transaction;
 use App\Models\TransactionItem;
 use App\Models\User;
@@ -11,7 +12,6 @@ use App\Models\User;
  * Helpers khusus test POS area (percetakan berbasis meter persegi).
  * Nama dibuat unik agar tidak bertabrakan dengan helper test lain.
  */
-
 function posAreaCategory(): Category
 {
     return Category::firstOrCreate(
@@ -24,7 +24,7 @@ function makeAreaProduct(string $name = 'Spanduk Biasa', float $selling = 25000,
 {
     return Product::create([
         'category_id' => posAreaCategory()->id,
-        'sku' => 'TST-SPD-' . fake()->unique()->numerify('###'),
+        'sku' => 'TST-SPD-'.fake()->unique()->numerify('###'),
         'name' => $name,
         'unit' => 'meter', // area-based per m²
         'base_price' => $base,
@@ -38,7 +38,7 @@ function makeNonAreaProduct(string $name = 'Fotokopi', float $selling = 200, flo
 {
     return Product::create([
         'category_id' => posAreaCategory()->id,
-        'sku' => 'TST-NAR-' . fake()->unique()->numerify('###'),
+        'sku' => 'TST-NAR-'.fake()->unique()->numerify('###'),
         'name' => $name,
         'unit' => $unit,
         'base_price' => $base,
@@ -542,7 +542,7 @@ it('mengabaikan manipulasi type dari frontend (tipe berasal dari kategori produk
 
     // StoreProfile dibuat agar kita bisa membuktikan jalur PPOB TIDAK terpanggil
     // (saldo digital tidak boleh berkurang untuk spanduk).
-    \App\Models\StoreProfile::create([
+    StoreProfile::create([
         'store_name' => 'Toko Test',
         'address' => 'Alamat',
         'phone' => '0812',
@@ -559,7 +559,7 @@ it('mengabaikan manipulasi type dari frontend (tipe berasal dari kategori produk
         ->and((float) $item->subtotal_price)->toBe(50000.0);
 
     // Jalur PPOB tidak boleh berjalan untuk spanduk.
-    expect((float) \App\Models\StoreProfile::first()->saldo_digital)->toBe(100000.0);
+    expect((float) StoreProfile::first()->saldo_digital)->toBe(100000.0);
 });
 
 // ---------------------------------------------------------------------------
@@ -707,19 +707,19 @@ it('parser: detail kosong → null', function () {
 // ---------------------------------------------------------------------------
 it('invoice: metadata.note baru tersimpan dan invoice route OK', function () {
     $this->actingAs(User::factory()->create());
-    \App\Models\StoreProfile::create(['store_name' => 'Toko Test', 'address' => 'Alamat', 'phone' => '0812']);
+    StoreProfile::create(['store_name' => 'Toko Test', 'address' => 'Alamat', 'phone' => '0812']);
     $product = makeAreaProduct('Spanduk Biasa', 25000, 15000);
 
     $this->from('/pos')->post('/pos', posAreaCartPayload($product, [], [
         'note' => 'agen 1 spanduk',
     ]))->assertRedirect();
 
-    $transaction = \App\Models\Transaction::first();
+    $transaction = Transaction::first();
     $this->get("/pos/print/{$transaction->invoice_number}")
         ->assertOk()
-        ->assertInertia(fn($page) => $page->component('POS/PrintInvoice')->has('transaction.items', 1));
+        ->assertInertia(fn ($page) => $page->component('POS/PrintInvoice')->has('transaction.items', 1));
 
-    $item = \App\Models\TransactionItem::first();
+    $item = TransactionItem::first();
     $metadata = $item->metadata ?? [];
     expect($metadata['note'])->toBe('agen 1 spanduk')
         ->and((float) $metadata['length'])->toBe(2.0);
@@ -727,7 +727,7 @@ it('invoice: metadata.note baru tersimpan dan invoice route OK', function () {
 
 it('invoice: legacy metadata.detail tetap utuh & invoice route OK', function () {
     $this->actingAs(User::factory()->create());
-    \App\Models\StoreProfile::create(['store_name' => 'Toko Test', 'address' => 'Alamat', 'phone' => '0812']);
+    StoreProfile::create(['store_name' => 'Toko Test', 'address' => 'Alamat', 'phone' => '0812']);
     $product = makeAreaProduct('Spanduk Biasa', 25000, 15000);
 
     $this->from('/pos')->post('/pos', posAreaCartPayload($product, [], [
@@ -735,12 +735,12 @@ it('invoice: legacy metadata.detail tetap utuh & invoice route OK', function () 
         'note' => '',
     ]))->assertRedirect();
 
-    $transaction = \App\Models\Transaction::first();
+    $transaction = Transaction::first();
     $this->get("/pos/print/{$transaction->invoice_number}")
         ->assertOk()
-        ->assertInertia(fn($page) => $page->component('POS/PrintInvoice')->has('transaction.items', 1));
+        ->assertInertia(fn ($page) => $page->component('POS/PrintInvoice')->has('transaction.items', 1));
 
-    $item = \App\Models\TransactionItem::first();
+    $item = TransactionItem::first();
     $metadata = $item->metadata ?? [];
     expect($metadata['note'] ?? '')->toBe('')
         ->and($metadata['detail'])->toBe('Ukuran: 1 x 1 m - agen 1 spanduk');
@@ -748,7 +748,7 @@ it('invoice: legacy metadata.detail tetap utuh & invoice route OK', function () 
 
 it('invoice: HPP dan subtotal tidak berubah dengan catatan legacy', function () {
     $this->actingAs(User::factory()->create());
-    \App\Models\StoreProfile::create(['store_name' => 'Toko Test', 'address' => 'Alamat', 'phone' => '0812']);
+    StoreProfile::create(['store_name' => 'Toko Test', 'address' => 'Alamat', 'phone' => '0812']);
     $product = makeAreaProduct('Spanduk Biasa', 25000, 15000);
 
     $this->from('/pos')->post('/pos', posAreaCartPayload($product, [], [
@@ -756,7 +756,7 @@ it('invoice: HPP dan subtotal tidak berubah dengan catatan legacy', function () 
         'note' => '',
     ]))->assertRedirect();
 
-    $item = \App\Models\TransactionItem::first();
+    $item = TransactionItem::first();
     expect((float) $item->selling_price)->toBe(50000.0)
         ->and((float) $item->base_price)->toBe(30000.0)
         ->and((float) $item->profit)->toBe(20000.0)

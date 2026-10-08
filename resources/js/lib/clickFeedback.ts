@@ -19,9 +19,13 @@ function getVisibleBackground(element: HTMLElement): string {
     let current: HTMLElement | null = element;
 
     while (current) {
-        const backgroundColor = window.getComputedStyle(current).backgroundColor;
+        const backgroundColor =
+            window.getComputedStyle(current).backgroundColor;
 
-        if (backgroundColor !== 'rgba(0, 0, 0, 0)' && backgroundColor !== 'transparent') {
+        if (
+            backgroundColor !== 'rgba(0, 0, 0, 0)' &&
+            backgroundColor !== 'transparent'
+        ) {
             return backgroundColor;
         }
 
@@ -76,7 +80,9 @@ export function initializeClickFeedback(): void {
             return;
         }
 
-        const element = target.closest<HTMLElement>('button, a[href], [role="button"]');
+        const element = target.closest<HTMLElement>(
+            'button, a[href], [role="button"]',
+        );
 
         if (
             !element ||
@@ -108,7 +114,10 @@ export function initializeClickFeedback(): void {
         const styles = window.getComputedStyle(element);
 
         element.dataset.loadingLabel = loadingLabel;
-        element.style.setProperty('--click-loading-bg', getVisibleBackground(element));
+        element.style.setProperty(
+            '--click-loading-bg',
+            getVisibleBackground(element),
+        );
         element.style.setProperty('--click-loading-color', styles.color);
         element.classList.remove('is-click-loading');
         element.classList.toggle('is-icon-loading', loadingLabel === '');

@@ -11,7 +11,7 @@ class PaymentHistory extends Model
         'jumlah_bayar',
         'tanggal_bayar',
         'metode_bayar',
-        'keterangan'
+        'keterangan',
     ];
 
     protected $casts = [

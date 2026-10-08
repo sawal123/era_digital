@@ -1,6 +1,6 @@
 <script setup>
-import { ref } from 'vue';
 import { Head, useForm } from '@inertiajs/vue3';
+import { ref } from 'vue';
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +14,10 @@ const form = useForm({
     store_name: props.profile.store_name || '',
     phone: props.profile.phone || '',
     address: props.profile.address || '',
-    saldo_digital: props.profile.saldo_digital !== undefined ? parseFloat(props.profile.saldo_digital) : 350000,
+    saldo_digital:
+        props.profile.saldo_digital !== undefined
+            ? parseFloat(props.profile.saldo_digital)
+            : 350000,
     logo: null,
     signature: null,
 });
@@ -26,6 +29,7 @@ const signatureInputRef = ref(null);
 
 const handleLogoChange = (e) => {
     const file = e.target.files[0];
+
     if (file) {
         form.logo = file;
         const reader = new FileReader();
@@ -38,6 +42,7 @@ const handleLogoChange = (e) => {
 
 const handleSignatureChange = (e) => {
     const file = e.target.files[0];
+
     if (file) {
         form.signature = file;
         const reader = new FileReader();
@@ -53,7 +58,7 @@ const handleSubmit = () => {
         forceFormData: true,
         onSuccess: () => {
             // Berhasil
-        }
+        },
     });
 };
 </script>
@@ -61,25 +66,27 @@ const handleSubmit = () => {
 <template>
     <Head title="Pengaturan Toko" />
 
-    <div class="flex flex-col space-y-6 font-inter">
+    <div class="font-inter flex flex-col space-y-6">
         <Heading
             variant="small"
             title="Profil Toko & Bukti Sah Struk"
             description="Lengkapi identitas toko Anda untuk dicetak sebagai kop nota transaksi dan cap tanda tangan digital."
         />
 
-        <form @submit.prevent="handleSubmit" class="space-y-6 max-w-xl">
+        <form @submit.prevent="handleSubmit" class="max-w-xl space-y-6">
             <!-- Nama Toko -->
             <div class="grid gap-2">
                 <Label for="store_name">Nama Toko</Label>
                 <Input
                     id="store_name"
-                    class="mt-1 block w-full bg-background border-border text-foreground"
+                    class="mt-1 block w-full border-border bg-background text-foreground"
                     v-model="form.store_name"
                     required
                     placeholder="Contoh: Era Digital Print"
                 />
-                <p v-if="form.errors.store_name" class="text-xs text-red-500">{{ form.errors.store_name }}</p>
+                <p v-if="form.errors.store_name" class="text-xs text-red-500">
+                    {{ form.errors.store_name }}
+                </p>
             </div>
 
             <!-- Nomor HP -->
@@ -87,12 +94,14 @@ const handleSubmit = () => {
                 <Label for="phone">Nomor HP / WhatsApp Toko</Label>
                 <Input
                     id="phone"
-                    class="mt-1 block w-full bg-background border-border text-foreground"
+                    class="mt-1 block w-full border-border bg-background text-foreground"
                     v-model="form.phone"
                     required
                     placeholder="Contoh: 0812-3456-7890"
                 />
-                <p v-if="form.errors.phone" class="text-xs text-red-500">{{ form.errors.phone }}</p>
+                <p v-if="form.errors.phone" class="text-xs text-red-500">
+                    {{ form.errors.phone }}
+                </p>
             </div>
 
             <!-- Alamat Toko -->
@@ -101,39 +110,58 @@ const handleSubmit = () => {
                 <textarea
                     id="address"
                     rows="3"
-                    class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 text-foreground border-border"
+                    class="flex min-h-[80px] w-full rounded-md border border-border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                     v-model="form.address"
                     required
                     placeholder="Tulis alamat ruko atau cabang lengkap..."
                 ></textarea>
-                <p v-if="form.errors.address" class="text-xs text-red-500">{{ form.errors.address }}</p>
+                <p v-if="form.errors.address" class="text-xs text-red-500">
+                    {{ form.errors.address }}
+                </p>
             </div>
 
             <!-- Saldo Digital Toko -->
             <div class="grid gap-2">
                 <Label for="saldo_digital">Saldo Digital Toko (Rupiah)</Label>
                 <div class="relative">
-                    <span class="absolute left-3 top-3 text-muted-foreground text-xs font-bold font-mono">Rp</span>
+                    <span
+                        class="absolute top-3 left-3 font-mono text-xs font-bold text-muted-foreground"
+                        >Rp</span
+                    >
                     <Input
                         id="saldo_digital"
                         type="number"
-                        class="pl-9 block w-full bg-background border-border text-foreground rounded-xl"
+                        class="block w-full rounded-xl border-border bg-background pl-9 text-foreground"
                         v-model.number="form.saldo_digital"
                         required
                         placeholder="Contoh: 350000"
                     />
                 </div>
-                <p class="text-xs text-muted-foreground">Isi dengan sisa float deposit atau saldo server PPOB Anda saat ini. Saldo ini akan terpotong secara otomatis tiap ada transaksi digital sukses.</p>
-                <p v-if="form.errors.saldo_digital" class="text-xs text-red-500">{{ form.errors.saldo_digital }}</p>
+                <p class="text-xs text-muted-foreground">
+                    Isi dengan sisa float deposit atau saldo server PPOB Anda
+                    saat ini. Saldo ini akan terpotong secara otomatis tiap ada
+                    transaksi digital sukses.
+                </p>
+                <p
+                    v-if="form.errors.saldo_digital"
+                    class="text-xs text-red-500"
+                >
+                    {{ form.errors.saldo_digital }}
+                </p>
             </div>
 
             <!-- Upload Logo Toko -->
-            <div class="grid gap-3 p-4 bg-muted/20 border border-border/60 rounded-2xl">
-                <Label for="logo" class="font-bold flex items-center gap-2">
-                    <i class="fas fa-store text-indigo-500 text-sm"></i>
+            <div
+                class="grid gap-3 rounded-2xl border border-border/60 bg-muted/20 p-4"
+            >
+                <Label for="logo" class="flex items-center gap-2 font-bold">
+                    <i class="fas fa-store text-sm text-indigo-500"></i>
                     Logo Toko
                 </Label>
-                <p class="text-xs text-muted-foreground">Logo akan ditampilkan pada bagian atas sidebar aplikasi. Gunakan gambar persegi PNG atau JPG maksimal 2MB.</p>
+                <p class="text-xs text-muted-foreground">
+                    Logo akan ditampilkan pada bagian atas sidebar aplikasi.
+                    Gunakan gambar persegi PNG atau JPG maksimal 2MB.
+                </p>
 
                 <input
                     ref="logoInputRef"
@@ -144,33 +172,55 @@ const handleSubmit = () => {
                     @change="handleLogoChange"
                 />
 
-                <div class="flex items-center gap-4 mt-2">
+                <div class="mt-2 flex items-center gap-4">
                     <Button
                         type="button"
                         variant="outline"
-                        class="rounded-xl border-indigo-200 hover:border-indigo-400 bg-background text-indigo-600 dark:text-indigo-400 dark:border-indigo-900/50"
+                        class="rounded-xl border-indigo-200 bg-background text-indigo-600 hover:border-indigo-400 dark:border-indigo-900/50 dark:text-indigo-400"
                         @click="() => logoInputRef.click()"
                     >
                         <i class="fas fa-upload mr-2 text-xs"></i>
                         Pilih Logo
                     </Button>
 
-                    <div v-if="logoPreview" class="relative border border-border/80 rounded-xl bg-white p-2 h-20 w-20 flex items-center justify-center overflow-hidden">
-                        <img :src="logoPreview" alt="Pratinjau Logo Toko" class="max-h-full max-w-full object-contain" />
+                    <div
+                        v-if="logoPreview"
+                        class="relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-xl border border-border/80 bg-white p-2"
+                    >
+                        <img
+                            :src="logoPreview"
+                            alt="Pratinjau Logo Toko"
+                            class="max-h-full max-w-full object-contain"
+                        />
                     </div>
-                    <div v-else class="text-xs italic text-muted-foreground">Belum ada logo toko diunggah.</div>
+                    <div v-else class="text-xs text-muted-foreground italic">
+                        Belum ada logo toko diunggah.
+                    </div>
                 </div>
-                <p v-if="form.errors.logo" class="text-xs text-red-500 mt-1">{{ form.errors.logo }}</p>
+                <p v-if="form.errors.logo" class="mt-1 text-xs text-red-500">
+                    {{ form.errors.logo }}
+                </p>
             </div>
 
             <!-- Upload Tanda Tangan Digital -->
-            <div class="grid gap-3 p-4 bg-muted/20 border border-border/60 rounded-2xl">
-                <Label for="signature" class="font-bold flex items-center gap-2">
-                    <i class="fas fa-file-signature text-indigo-500 text-sm"></i>
+            <div
+                class="grid gap-3 rounded-2xl border border-border/60 bg-muted/20 p-4"
+            >
+                <Label
+                    for="signature"
+                    class="flex items-center gap-2 font-bold"
+                >
+                    <i
+                        class="fas fa-file-signature text-sm text-indigo-500"
+                    ></i>
                     Gambar Cap / Tanda Tangan Digital
                 </Label>
-                <p class="text-xs text-muted-foreground">Pilih berkas gambar tanda tangan berformat PNG transparan (maksimal 2MB). Ini akan tercetak otomatis di bagian paling bawah invoice.</p>
-                
+                <p class="text-xs text-muted-foreground">
+                    Pilih berkas gambar tanda tangan berformat PNG transparan
+                    (maksimal 2MB). Ini akan tercetak otomatis di bagian paling
+                    bawah invoice.
+                </p>
+
                 <input
                     ref="signatureInputRef"
                     id="signature"
@@ -179,13 +229,13 @@ const handleSubmit = () => {
                     class="hidden"
                     @change="handleSignatureChange"
                 />
-                
-                <div class="flex items-center gap-4 mt-2">
+
+                <div class="mt-2 flex items-center gap-4">
                     <!-- Trigger button -->
                     <Button
                         type="button"
                         variant="outline"
-                        class="rounded-xl border-indigo-200 hover:border-indigo-400 bg-background text-indigo-600 dark:text-indigo-400 dark:border-indigo-900/50"
+                        class="rounded-xl border-indigo-200 bg-background text-indigo-600 hover:border-indigo-400 dark:border-indigo-900/50 dark:text-indigo-400"
                         @click="() => signatureInputRef.click()"
                     >
                         <i class="fas fa-upload mr-2 text-xs"></i>
@@ -193,16 +243,34 @@ const handleSubmit = () => {
                     </Button>
 
                     <!-- Preview box -->
-                    <div v-if="signaturePreview" class="relative border border-border/80 rounded-xl bg-white p-2 h-20 w-32 flex items-center justify-center overflow-hidden">
-                        <img :src="signaturePreview" alt="Pratinjau Tanda Tangan" class="max-h-full max-w-full object-contain" />
+                    <div
+                        v-if="signaturePreview"
+                        class="relative flex h-20 w-32 items-center justify-center overflow-hidden rounded-xl border border-border/80 bg-white p-2"
+                    >
+                        <img
+                            :src="signaturePreview"
+                            alt="Pratinjau Tanda Tangan"
+                            class="max-h-full max-w-full object-contain"
+                        />
                     </div>
-                    <div v-else class="text-xs italic text-muted-foreground">Belum ada tanda tangan diunggah.</div>
+                    <div v-else class="text-xs text-muted-foreground italic">
+                        Belum ada tanda tangan diunggah.
+                    </div>
                 </div>
-                <p v-if="form.errors.signature" class="text-xs text-red-500 mt-1">{{ form.errors.signature }}</p>
+                <p
+                    v-if="form.errors.signature"
+                    class="mt-1 text-xs text-red-500"
+                >
+                    {{ form.errors.signature }}
+                </p>
             </div>
 
             <div class="flex items-center gap-4">
-                <Button type="submit" :disabled="form.processing" class="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl">
+                <Button
+                    type="submit"
+                    :disabled="form.processing"
+                    class="rounded-xl bg-indigo-600 text-white hover:bg-indigo-700"
+                >
                     {{ form.processing ? 'Menyimpan...' : 'Simpan Pengaturan' }}
                 </Button>
             </div>

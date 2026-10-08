@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\AreaPricingService;
 use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
@@ -17,7 +18,7 @@ class Product extends Model
         'admin_fee',
         'stock',
         'min_stock',
-        'is_active'
+        'is_active',
     ];
 
     public function category()
@@ -30,7 +31,7 @@ class Product extends Model
      */
     public function isAreaBased(): bool
     {
-        return \App\Services\AreaPricingService::isAreaBased($this);
+        return AreaPricingService::isAreaBased($this);
     }
 
     public function stockMovements()

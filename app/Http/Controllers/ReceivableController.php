@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Transaction;
-use Inertia\Inertia;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
 
 class ReceivableController extends Controller
 {
@@ -20,7 +20,7 @@ class ReceivableController extends Controller
             ->get();
 
         return Inertia::render('Receivables/Index', [
-            'transactions' => $transactions
+            'transactions' => $transactions,
         ]);
     }
 
@@ -56,7 +56,7 @@ class ReceivableController extends Controller
                 'sisa_tagihan' => $sisaTagihan,
                 'status_bayar' => $statusBayar,
                 'payment_status' => $paymentStatus,
-                'keterangan' => $transaction->keterangan . "\n[Lunas Tambahan Rp " . number_format($bayarNominal, 0, ',', '.') . " pada " . now()->format('d/m/Y H:i') . "]"
+                'keterangan' => $transaction->keterangan."\n[Lunas Tambahan Rp ".number_format($bayarNominal, 0, ',', '.').' pada '.now()->format('d/m/Y H:i').']',
             ]);
 
             // Record chronicled payment history
@@ -72,7 +72,8 @@ class ReceivableController extends Controller
             return redirect()->back()->with('success', 'Pembayaran cicilan / pelunasan piutang berhasil disimpan!');
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->back()->with('error', 'Gagal memproses pelunasan: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', 'Gagal memproses pelunasan: '.$e->getMessage());
         }
     }
 }

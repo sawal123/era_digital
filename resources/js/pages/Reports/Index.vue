@@ -1,14 +1,26 @@
 <script setup lang="ts">
-// @ts-nocheck
 import { Head, router, usePage } from '@inertiajs/vue3';
 import flatpickr from 'flatpickr';
 import html2pdf from 'html2pdf.js';
-import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from 'vue';
+import {
+    ref,
+    computed,
+    nextTick,
+    watch,
+    onMounted,
+    onBeforeUnmount,
+} from 'vue';
 import { toast } from 'vue-sonner';
+import SearchableSelect from '@/components/SearchableSelect.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import SearchableSelect from '@/components/SearchableSelect.vue';
+import {
+    Card,
+    CardHeader,
+    CardTitle,
+    CardDescription,
+    CardContent,
+} from '@/components/ui/card';
 import {
     Dialog,
     DialogClose,
@@ -76,10 +88,10 @@ const todayString = getTodayString();
 const getLocalDateString = (dateString) => formatToBusinessDate(dateString);
 
 // ─── FILTER STATE ───────────────────────────────────────────────
-const filterMode  = ref('harian');   // 'harian' | 'bulanan' | 'tahunan'
+const filterMode = ref('harian'); // 'harian' | 'bulanan' | 'tahunan'
 const filterDateRange = ref(`${todayString} to ${todayString}`);
 const filterMonth = ref(getCurrentMonthString());
-const filterYear  = ref(getCurrentYearString());
+const filterYear = ref(getCurrentYearString());
 const searchQuery = ref('');
 const perPage = ref(10);
 const currentPage = ref(1);
@@ -120,7 +132,10 @@ const initDateRangePicker = () => {
     dateRangePickerInstance = flatpickr(dateRangeInput.value, {
         mode: 'range',
         dateFormat: 'Y-m-d',
-        defaultDate: [selectedDateRange.value.start, selectedDateRange.value.end],
+        defaultDate: [
+            selectedDateRange.value.start,
+            selectedDateRange.value.end,
+        ],
         onChange: (selectedDates, _dateStr, instance) => {
             if (selectedDates.length === 0) {
                 setDateRange(todayString);
@@ -128,8 +143,13 @@ const initDateRangePicker = () => {
                 return;
             }
 
-            const [startDate, endDate = startDate] = selectedDates.map((date) => instance.formatDate(date, 'Y-m-d'));
-            filterDateRange.value = startDate === endDate ? startDate : `${startDate} to ${endDate}`;
+            const [startDate, endDate = startDate] = selectedDates.map((date) =>
+                instance.formatDate(date, 'Y-m-d'),
+            );
+            filterDateRange.value =
+                startDate === endDate
+                    ? startDate
+                    : `${startDate} to ${endDate}`;
         },
     });
 };
@@ -139,13 +159,14 @@ const filteredTransactions = computed(() => {
     const query = searchQuery.value.toLowerCase().trim();
     const { start, end } = selectedDateRange.value;
 
-    return props.transactions.filter(t => {
+    return props.transactions.filter((t) => {
         const localDate = getLocalDateString(t.created_at);
-        const matchesPeriod = filterMode.value === 'harian'
-            ? localDate >= start && localDate <= end
-            : filterMode.value === 'bulanan'
-                ? localDate.slice(0, 7) === filterMonth.value
-                : localDate.slice(0, 4) === filterYear.value;
+        const matchesPeriod =
+            filterMode.value === 'harian'
+                ? localDate >= start && localDate <= end
+                : filterMode.value === 'bulanan'
+                  ? localDate.slice(0, 7) === filterMonth.value
+                  : localDate.slice(0, 4) === filterYear.value;
 
         if (!matchesPeriod) {
             return false;
@@ -155,14 +176,13 @@ const filteredTransactions = computed(() => {
             return true;
         }
 
-        const customerName = t.customer_name || t.customer?.name || 'cash / umum';
+        const customerName =
+            t.customer_name || t.customer?.name || 'cash / umum';
         const paymentMethod = t.payment_method || '';
 
-        return [
-            t.invoice_number,
-            customerName,
-            paymentMethod,
-        ].some(value => String(value).toLowerCase().includes(query));
+        return [t.invoice_number, customerName, paymentMethod].some((value) =>
+            String(value).toLowerCase().includes(query),
+        );
     });
 });
 const filteredExpenses = computed(() => {
@@ -174,19 +194,30 @@ const filteredExpenses = computed(() => {
         return filterMode.value === 'harian'
             ? expenseDate >= start && expenseDate <= end
             : filterMode.value === 'bulanan'
-                ? expenseDate.slice(0, 7) === filterMonth.value
-                : expenseDate.slice(0, 4) === filterYear.value;
+              ? expenseDate.slice(0, 7) === filterMonth.value
+              : expenseDate.slice(0, 4) === filterYear.value;
     });
 });
 
-const totalPages = computed(() => Math.max(1, Math.ceil(filteredTransactions.value.length / perPage.value)));
+const totalPages = computed(() =>
+    Math.max(1, Math.ceil(filteredTransactions.value.length / perPage.value)),
+);
 const paginatedTransactions = computed(() => {
     const start = (currentPage.value - 1) * perPage.value;
 
     return filteredTransactions.value.slice(start, start + perPage.value);
 });
-const paginationStart = computed(() => filteredTransactions.value.length === 0 ? 0 : ((currentPage.value - 1) * perPage.value) + 1);
-const paginationEnd = computed(() => Math.min(currentPage.value * perPage.value, filteredTransactions.value.length));
+const paginationStart = computed(() =>
+    filteredTransactions.value.length === 0
+        ? 0
+        : (currentPage.value - 1) * perPage.value + 1,
+);
+const paginationEnd = computed(() =>
+    Math.min(
+        currentPage.value * perPage.value,
+        filteredTransactions.value.length,
+    ),
+);
 const visiblePages = computed(() => {
     const pages = [];
     const start = Math.max(1, currentPage.value - 2);
@@ -199,9 +230,19 @@ const visiblePages = computed(() => {
     return pages;
 });
 
-watch([filterMode, filterDateRange, filterMonth, filterYear, searchQuery, perPage], () => {
-    currentPage.value = 1;
-});
+watch(
+    [
+        filterMode,
+        filterDateRange,
+        filterMonth,
+        filterYear,
+        searchQuery,
+        perPage,
+    ],
+    () => {
+        currentPage.value = 1;
+    },
+);
 
 watch(totalPages, (pages) => {
     if (currentPage.value > pages) {
@@ -236,7 +277,8 @@ const goToPage = (page) => {
     currentPage.value = Math.min(Math.max(1, page), totalPages.value);
 };
 
-const getCustomerName = (transaction) => transaction.customer_name || transaction.customer?.name || 'Cash / Umum';
+const getCustomerName = (transaction) =>
+    transaction.customer_name || transaction.customer?.name || 'Cash / Umum';
 
 const downloadBlob = (content, type, filename) => {
     const url = URL.createObjectURL(new Blob([content], { type }));
@@ -247,14 +289,17 @@ const downloadBlob = (content, type, filename) => {
     URL.revokeObjectURL(url);
 };
 
-const escapeHtml = (value) => String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;');
+const escapeHtml = (value) =>
+    String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;');
 
 const exportExcel = () => {
-    const rows = filteredTransactions.value.map(transaction => `
+    const rows = filteredTransactions.value
+        .map(
+            (transaction) => `
         <tr>
             <td>${escapeHtml(transaction.invoice_number)}</td>
             <td>${escapeHtml(formatDate(transaction.created_at))}</td>
@@ -264,8 +309,12 @@ const exportExcel = () => {
             <td>${Number(transaction.total_price || 0)}</td>
             <td>${Number(transaction.total_profit || 0)}</td>
         </tr>
-    `).join('');
-    const businessRows = businessCategoryRows.value.map(category => `
+    `,
+        )
+        .join('');
+    const businessRows = businessCategoryRows.value
+        .map(
+            (category) => `
         <tr>
             <td>${escapeHtml(category.label)}</td>
             <td>${Number(category.omzet || 0)}</td>
@@ -274,7 +323,9 @@ const exportExcel = () => {
             <td>${Number(category.margin || 0).toFixed(1)}%</td>
             <td>${Number(category.transactionCount || 0)}</td>
         </tr>
-    `).join('');
+    `,
+        )
+        .join('');
 
     const workbook = `
         <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
@@ -300,40 +351,107 @@ const exportExcel = () => {
         </html>
     `;
 
-    downloadBlob(workbook, 'application/vnd.ms-excel;charset=utf-8;', `laporan-penjualan-${filterFileLabel.value}.xls`);
+    downloadBlob(
+        workbook,
+        'application/vnd.ms-excel;charset=utf-8;',
+        `laporan-penjualan-${filterFileLabel.value}.xls`,
+    );
 };
 
 const exportPdf = async () => {
     if (filteredTransactions.value.length === 0) {
-return;
-}
+        return;
+    }
 
     await nextTick();
-    await html2pdf().set({
-        margin: 8,
-        filename: `laporan-penjualan-${filterFileLabel.value}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, backgroundColor: '#ffffff' },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
-    }).from(exportPdfRef.value).save();
+    await html2pdf()
+        .set({
+            margin: 8,
+            filename: `laporan-penjualan-${filterFileLabel.value}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, backgroundColor: '#ffffff' },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+        })
+        .from(exportPdfRef.value)
+        .save();
 };
 
 // ─── SUMMARY METRICS ─────────────────────────────────────────────
-const totalSales  = computed(() => filteredTransactions.value.reduce((sum, transaction) => sum + toNumber(transaction.total_price), 0));
-const totalBase   = computed(() => filteredTransactions.value.reduce((sum, transaction) => sum + toNumber(transaction.total_base_price), 0));
-const totalTransactionProfit = computed(() => filteredTransactions.value.reduce((sum, transaction) => sum + toNumber(transaction.total_profit), 0));
-const getExpenseFinance = (expense) => expense.finance || {
-    additional_hpp: expense.category === 'hpp_pesanan' && expense.hpp_status !== 'sudah_masuk_hpp' ? toNumber(expense.amount) : 0,
-    unallocated_hpp: expense.category === 'hpp_pesanan' ? Math.max(0, toNumber(expense.amount) - toNumber(expense.allocated_amount)) : 0,
-    operational_expense: expense.category === 'operasional_rutin' ? toNumber(expense.amount) : 0,
-    cash_out: toNumber(expense.amount),
-};
-const hppAdditionalTotal = computed(() => filteredExpenses.value.reduce((sum, expense) => sum + toNumber(getExpenseFinance(expense).additional_hpp), 0));
-const unallocatedHppTotal = computed(() => filteredExpenses.value.reduce((sum, expense) => sum + toNumber(getExpenseFinance(expense).unallocated_hpp), 0));
-const operationalExpenseTotal = computed(() => filteredExpenses.value.reduce((sum, expense) => sum + toNumber(getExpenseFinance(expense).operational_expense), 0));
-const totalCashOut = computed(() => filteredExpenses.value.reduce((sum, expense) => sum + toNumber(expense.amount), 0));
-const totalExpenses = computed(() => hppAdditionalTotal.value + operationalExpenseTotal.value);
-const netProfit = computed(() => totalTransactionProfit.value - hppAdditionalTotal.value - operationalExpenseTotal.value);
+const totalSales = computed(() =>
+    filteredTransactions.value.reduce(
+        (sum, transaction) => sum + toNumber(transaction.total_price),
+        0,
+    ),
+);
+const totalBase = computed(() =>
+    filteredTransactions.value.reduce(
+        (sum, transaction) => sum + toNumber(transaction.total_base_price),
+        0,
+    ),
+);
+const totalTransactionProfit = computed(() =>
+    filteredTransactions.value.reduce(
+        (sum, transaction) => sum + toNumber(transaction.total_profit),
+        0,
+    ),
+);
+const getExpenseFinance = (expense) =>
+    expense.finance || {
+        additional_hpp:
+            expense.category === 'hpp_pesanan' &&
+            expense.hpp_status !== 'sudah_masuk_hpp'
+                ? toNumber(expense.amount)
+                : 0,
+        unallocated_hpp:
+            expense.category === 'hpp_pesanan'
+                ? Math.max(
+                      0,
+                      toNumber(expense.amount) -
+                          toNumber(expense.allocated_amount),
+                  )
+                : 0,
+        operational_expense:
+            expense.category === 'operasional_rutin'
+                ? toNumber(expense.amount)
+                : 0,
+        cash_out: toNumber(expense.amount),
+    };
+const hppAdditionalTotal = computed(() =>
+    filteredExpenses.value.reduce(
+        (sum, expense) =>
+            sum + toNumber(getExpenseFinance(expense).additional_hpp),
+        0,
+    ),
+);
+const unallocatedHppTotal = computed(() =>
+    filteredExpenses.value.reduce(
+        (sum, expense) =>
+            sum + toNumber(getExpenseFinance(expense).unallocated_hpp),
+        0,
+    ),
+);
+const operationalExpenseTotal = computed(() =>
+    filteredExpenses.value.reduce(
+        (sum, expense) =>
+            sum + toNumber(getExpenseFinance(expense).operational_expense),
+        0,
+    ),
+);
+const totalCashOut = computed(() =>
+    filteredExpenses.value.reduce(
+        (sum, expense) => sum + toNumber(expense.amount),
+        0,
+    ),
+);
+const totalExpenses = computed(
+    () => hppAdditionalTotal.value + operationalExpenseTotal.value,
+);
+const netProfit = computed(
+    () =>
+        totalTransactionProfit.value -
+        hppAdditionalTotal.value -
+        operationalExpenseTotal.value,
+);
 
 const businessCategories = [
     {
@@ -370,42 +488,100 @@ const businessCategories = [
     },
 ];
 
-const includesAny = (value, keywords) => keywords.some((keyword) => value.includes(keyword));
+const includesAny = (value, keywords) =>
+    keywords.some((keyword) => value.includes(keyword));
 const normalizeText = (value) => String(value ?? '').toLowerCase();
-const getItemSearchText = (item) => [
-    item.item_name,
-    item.product?.name,
-    item.product?.sku,
-    item.product?.category?.name,
-    item.product?.category?.slug,
-    item.product?.category?.type,
-    item.type,
-].map(normalizeText).join(' ');
+const getItemSearchText = (item) =>
+    [
+        item.item_name,
+        item.product?.name,
+        item.product?.sku,
+        item.product?.category?.name,
+        item.product?.category?.slug,
+        item.product?.category?.type,
+        item.type,
+    ]
+        .map(normalizeText)
+        .join(' ');
 
 const classifyBusinessItem = (item) => {
     const searchText = getItemSearchText(item);
     const categoryType = item.product?.category?.type || item.type;
 
-    if (categoryType === 'ppob' || item.type === 'ppob' || includesAny(searchText, ['pulsa', 'token', 'topup', 'top-up', 'e-wallet', 'saldo digital'])) {
+    if (
+        categoryType === 'ppob' ||
+        item.type === 'ppob' ||
+        includesAny(searchText, [
+            'pulsa',
+            'token',
+            'topup',
+            'top-up',
+            'e-wallet',
+            'saldo digital',
+        ])
+    ) {
         return 'saldo_digital';
     }
 
-    if (includesAny(searchText, ['desain', 'design', 'pengetikan', 'ketik', 'edit dokumen', 'edit file', 'layout'])) {
+    if (
+        includesAny(searchText, [
+            'desain',
+            'design',
+            'pengetikan',
+            'ketik',
+            'edit dokumen',
+            'edit file',
+            'layout',
+        ])
+    ) {
         return 'jasa';
     }
 
-    if (categoryType === 'fisik' || item.type === 'fisik' || includesAny(searchText, ['atk', 'pulpen', 'pena', 'kertas', 'buku', 'alat sekolah', 'kalkulator', 'plastik'])) {
+    if (
+        categoryType === 'fisik' ||
+        item.type === 'fisik' ||
+        includesAny(searchText, [
+            'atk',
+            'pulpen',
+            'pena',
+            'kertas',
+            'buku',
+            'alat sekolah',
+            'kalkulator',
+            'plastik',
+        ])
+    ) {
         return 'atk';
     }
 
-    if (includesAny(searchText, ['spanduk', 'baliho', 'undangan', 'fotokopi', 'photo copy', 'cetak', 'print', 'brosur', 'stiker', 'banner', 'jilid', 'laminating'])) {
+    if (
+        includesAny(searchText, [
+            'spanduk',
+            'baliho',
+            'undangan',
+            'fotokopi',
+            'photo copy',
+            'cetak',
+            'print',
+            'brosur',
+            'stiker',
+            'banner',
+            'jilid',
+            'laminating',
+        ])
+    ) {
         return 'percetakan';
     }
 
-    return categoryType === 'jasa' || item.type === 'jasa' ? 'percetakan' : 'jasa';
+    return categoryType === 'jasa' || item.type === 'jasa'
+        ? 'percetakan'
+        : 'jasa';
 };
 
-const getTransactionById = (transactionId) => filteredTransactions.value.find((transaction) => String(transaction.id) === String(transactionId));
+const getTransactionById = (transactionId) =>
+    filteredTransactions.value.find(
+        (transaction) => String(transaction.id) === String(transactionId),
+    );
 const getDominantTransactionBusinessCategory = (transaction) => {
     const dominantCategory = transaction?.items?.reduce((best, item) => {
         const key = classifyBusinessItem(item);
@@ -429,7 +605,8 @@ const classifyAllocationBusinessCategory = (allocation) => {
         };
     }
 
-    const linkedTransaction = getTransactionById(allocation.transaction_id) || allocation.transaction;
+    const linkedTransaction =
+        getTransactionById(allocation.transaction_id) || allocation.transaction;
     const dominantCategory = linkedTransaction?.items?.reduce((best, item) => {
         const key = classifyBusinessItem(item);
         const omzet = toNumber(item.subtotal_price);
@@ -442,25 +619,29 @@ const classifyAllocationBusinessCategory = (allocation) => {
     }, null);
 
     return {
-        key: dominantCategory?.key || getDominantTransactionBusinessCategory(linkedTransaction),
+        key:
+            dominantCategory?.key ||
+            getDominantTransactionBusinessCategory(linkedTransaction),
         isNoteLevel: true,
     };
 };
 
 const businessCategoryRows = computed(() => {
-    const rows = Object.fromEntries(businessCategories.map((category) => [
-        category.key,
-        {
-            ...category,
-            omzet: 0,
-            modal: 0,
-            laba: 0,
-            margin: 0,
-            transactionIds: new Set(),
-            adjustmentTotal: 0,
-            noteLevelAdjustmentTotal: 0,
-        },
-    ]));
+    const rows = Object.fromEntries(
+        businessCategories.map((category) => [
+            category.key,
+            {
+                ...category,
+                omzet: 0,
+                modal: 0,
+                laba: 0,
+                margin: 0,
+                transactionIds: new Set(),
+                adjustmentTotal: 0,
+                noteLevelAdjustmentTotal: 0,
+            },
+        ]),
+    );
 
     filteredTransactions.value.forEach((transaction) => {
         (transaction.items || []).forEach((item) => {
@@ -481,7 +662,8 @@ const businessCategoryRows = computed(() => {
         (expense.allocations || [])
             .filter((allocation) => allocation.hpp_status === 'belum_masuk_hpp')
             .forEach((allocation) => {
-                const classification = classifyAllocationBusinessCategory(allocation);
+                const classification =
+                    classifyAllocationBusinessCategory(allocation);
                 const row = rows[classification.key] || rows.percetakan;
                 const amount = toNumber(allocation.amount);
 
@@ -525,44 +707,56 @@ const customerEditName = ref('');
 const customerEditPhone = ref('');
 const isSavingCustomerEdit = ref(false);
 const getCustomerOptionLabel = (customer) => customer.name || 'Tanpa nama';
-const getCustomerOptionDescription = (customer) => [
-    customer.phone ? `HP: ${customer.phone}` : '',
-    customer.customer_type ? `Tipe: ${customer.customer_type}` : '',
-].filter(Boolean).join(' | ');
+const getCustomerOptionDescription = (customer) =>
+    [
+        customer.phone ? `HP: ${customer.phone}` : '',
+        customer.customer_type ? `Tipe: ${customer.customer_type}` : '',
+    ]
+        .filter(Boolean)
+        .join(' | ');
 
 const openDetail = (trx) => {
     selectedTransaction.value = trx;
     invoiceRecipientName.value = trx.customer_name || trx.customer?.name || '';
-    invoiceRecipientPhone.value = trx.customer_phone || trx.customer?.phone || '';
+    invoiceRecipientPhone.value =
+        trx.customer_phone || trx.customer?.phone || '';
     detailOpen.value = true;
 };
 
 const saveInvoiceRecipient = () => {
     if (!selectedTransaction.value) {
-return;
-}
+        return;
+    }
 
     isSavingInvoiceRecipient.value = true;
-    router.patch(`/reports/${selectedTransaction.value.id}/invoice-recipient`, {
-        customer_name: invoiceRecipientName.value.trim() || null,
-        customer_phone: invoiceRecipientPhone.value.trim() || null,
-    }, {
-        preserveScroll: true,
-        onSuccess: () => {
-            selectedTransaction.value.customer_name = invoiceRecipientName.value.trim() || null;
-            selectedTransaction.value.customer_phone = invoiceRecipientPhone.value.trim() || null;
-            isSavingInvoiceRecipient.value = false;
+    router.patch(
+        `/reports/${selectedTransaction.value.id}/invoice-recipient`,
+        {
+            customer_name: invoiceRecipientName.value.trim() || null,
+            customer_phone: invoiceRecipientPhone.value.trim() || null,
         },
-        onError: () => {
- isSavingInvoiceRecipient.value = false; 
-},
-    });
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                selectedTransaction.value.customer_name =
+                    invoiceRecipientName.value.trim() || null;
+                selectedTransaction.value.customer_phone =
+                    invoiceRecipientPhone.value.trim() || null;
+                isSavingInvoiceRecipient.value = false;
+            },
+            onError: () => {
+                isSavingInvoiceRecipient.value = false;
+            },
+        },
+    );
 };
 
 const openCustomerEdit = (trx) => {
     customerEditTarget.value = trx;
     customerEditSelectedId.value = trx.customer_id || trx.customer?.id || '';
-    customerEditMode.value = customerEditSelectedId.value ? 'existing' : 'manual';
+    customerEditMode.value = customerEditSelectedId.value
+        ? 'existing'
+        : 'manual';
     customerEditName.value = trx.customer_name || trx.customer?.name || '';
     customerEditPhone.value = trx.customer_phone || trx.customer?.phone || '';
     customerEditOpen.value = true;
@@ -570,20 +764,21 @@ const openCustomerEdit = (trx) => {
 
 const saveCustomerEdit = () => {
     if (!customerEditTarget.value) {
-return;
-}
+        return;
+    }
 
-    const payload = customerEditMode.value === 'existing'
-        ? {
-            customer_id: customerEditSelectedId.value || null,
-            customer_name: null,
-            customer_phone: null,
-        }
-        : {
-            customer_id: null,
-            customer_name: customerEditName.value.trim() || null,
-            customer_phone: customerEditPhone.value.trim() || null,
-        };
+    const payload =
+        customerEditMode.value === 'existing'
+            ? {
+                  customer_id: customerEditSelectedId.value || null,
+                  customer_name: null,
+                  customer_phone: null,
+              }
+            : {
+                  customer_id: null,
+                  customer_name: customerEditName.value.trim() || null,
+                  customer_phone: customerEditPhone.value.trim() || null,
+              };
 
     isSavingCustomerEdit.value = true;
     router.patch(`/reports/${customerEditTarget.value.id}/customer`, payload, {
@@ -636,7 +831,9 @@ const copyToClipboard = async (text) => {
 };
 
 // Generate daftar tahun (5 tahun ke belakang)
-const yearOptions = Array.from({ length: 5 }, (_, i) => String(new Date().getFullYear() - i));
+const yearOptions = Array.from({ length: 5 }, (_, i) =>
+    String(new Date().getFullYear() - i),
+);
 
 // Label badge pada mode aktif
 const filterLabel = computed(() => {
@@ -647,8 +844,8 @@ const filterLabel = computed(() => {
     }
 
     if (filterMode.value === 'bulanan') {
-return filterMonth.value;
-}
+        return filterMonth.value;
+    }
 
     return filterYear.value;
 });
@@ -659,13 +856,15 @@ const filterFileLabel = computed(() => {
         return start === end ? start : `${start}_sd_${end}`;
     }
 
-    return filterMode.value === 'bulanan' ? filterMonth.value : filterYear.value;
+    return filterMode.value === 'bulanan'
+        ? filterMonth.value
+        : filterYear.value;
 });
 
 // ─── DELETE ───────────────────────────────────────────────────────
-const deleteTarget    = ref(null);
+const deleteTarget = ref(null);
 const deleteConfirmOpen = ref(false);
-const isDeleting      = ref(false);
+const isDeleting = ref(false);
 const deleteError = ref('');
 
 const openDeleteConfirm = (trx) => {
@@ -676,8 +875,8 @@ const openDeleteConfirm = (trx) => {
 
 const confirmDelete = () => {
     if (!deleteTarget.value) {
-return;
-}
+        return;
+    }
 
     isDeleting.value = true;
     router.delete(`/reports/${deleteTarget.value.id}`, {
@@ -701,20 +900,42 @@ const flash = computed(() => usePage().props.flash ?? {});
 <template>
     <Head>
         <title>Laporan Penjualan | Smart POS System</title>
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+        />
     </Head>
 
-    <div class="flex flex-col gap-6 p-4 md:p-6 pb-8 font-inter">
-
+    <div class="font-inter flex flex-col gap-6 p-4 pb-8 md:p-6">
         <!-- Flash Notifications -->
-        <transition enter-active-class="transition duration-300 ease-out" enter-from-class="opacity-0 -translate-y-2" enter-to-class="opacity-100 translate-y-0" leave-active-class="transition duration-200" leave-from-class="opacity-100" leave-to-class="opacity-0">
-            <div v-if="flash.success" class="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 rounded-2xl px-4 py-3 text-sm font-semibold">
+        <transition
+            enter-active-class="transition duration-300 ease-out"
+            enter-from-class="opacity-0 -translate-y-2"
+            enter-to-class="opacity-100 translate-y-0"
+            leave-active-class="transition duration-200"
+            leave-from-class="opacity-100"
+            leave-to-class="opacity-0"
+        >
+            <div
+                v-if="flash.success"
+                class="flex items-center gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-700 dark:text-emerald-400"
+            >
                 <i class="fas fa-check-circle text-emerald-500"></i>
                 {{ flash.success }}
             </div>
         </transition>
-        <transition enter-active-class="transition duration-300 ease-out" enter-from-class="opacity-0 -translate-y-2" enter-to-class="opacity-100 translate-y-0" leave-active-class="transition duration-200" leave-from-class="opacity-100" leave-to-class="opacity-0">
-            <div v-if="flash.error" class="flex items-center gap-3 bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-400 rounded-2xl px-4 py-3 text-sm font-semibold">
+        <transition
+            enter-active-class="transition duration-300 ease-out"
+            enter-from-class="opacity-0 -translate-y-2"
+            enter-to-class="opacity-100 translate-y-0"
+            leave-active-class="transition duration-200"
+            leave-from-class="opacity-100"
+            leave-to-class="opacity-0"
+        >
+            <div
+                v-if="flash.error"
+                class="flex items-center gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700 dark:text-red-400"
+            >
                 <i class="fas fa-exclamation-circle text-red-500"></i>
                 {{ flash.error }}
             </div>
@@ -722,34 +943,63 @@ const flash = computed(() => usePage().props.flash ?? {});
 
         <!-- Header + Filter Bar -->
         <div class="flex flex-col gap-4">
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+            <div
+                class="flex flex-col items-start justify-between gap-3 md:flex-row md:items-center"
+            >
                 <div>
-                    <h1 class="text-2xl font-bold tracking-tight text-foreground">Laporan Penjualan & Keuntungan</h1>
-                    <p class="text-sm text-muted-foreground">Analisis performa penjualan dengan filter periode waktu.</p>
+                    <h1
+                        class="text-2xl font-bold tracking-tight text-foreground"
+                    >
+                        Laporan Penjualan & Keuntungan
+                    </h1>
+                    <p class="text-sm text-muted-foreground">
+                        Analisis performa penjualan dengan filter periode waktu.
+                    </p>
                 </div>
                 <!-- Result count badge -->
-                <span class="text-xs bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 px-3 py-1.5 rounded-full font-semibold">
+                <span
+                    class="rounded-full border border-indigo-500/20 bg-indigo-500/10 px-3 py-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400"
+                >
                     <i class="fas fa-receipt mr-1"></i>
-                    {{ filteredTransactions.length }} transaksi • {{ filterLabel }}
+                    {{ filteredTransactions.length }} transaksi •
+                    {{ filterLabel }}
                 </span>
             </div>
 
             <!-- ── FILTER PANEL ── -->
-            <div class="bg-card border border-border rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4 shadow-xs">
+            <div
+                class="flex flex-col items-start gap-4 rounded-2xl border border-border bg-card p-4 shadow-xs sm:flex-row sm:items-center"
+            >
                 <!-- Mode Tabs -->
-                <div class="flex gap-1.5 bg-muted/50 p-1 rounded-xl border border-border/50">
+                <div
+                    class="flex gap-1.5 rounded-xl border border-border/50 bg-muted/50 p-1"
+                >
                     <button
                         v-for="m in [
-                            { key: 'harian',  label: 'Harian',  icon: 'fas fa-calendar-day' },
-                            { key: 'bulanan', label: 'Bulanan', icon: 'fas fa-calendar-alt' },
-                            { key: 'tahunan', label: 'Tahunan', icon: 'fas fa-calendar' },
+                            {
+                                key: 'harian',
+                                label: 'Harian',
+                                icon: 'fas fa-calendar-day',
+                            },
+                            {
+                                key: 'bulanan',
+                                label: 'Bulanan',
+                                icon: 'fas fa-calendar-alt',
+                            },
+                            {
+                                key: 'tahunan',
+                                label: 'Tahunan',
+                                icon: 'fas fa-calendar',
+                            },
                         ]"
                         :key="m.key"
                         @click="setMode(m.key)"
-                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200"
-                        :class="filterMode === m.key
-                            ? 'bg-indigo-600 text-white shadow-sm'
-                            : 'text-muted-foreground hover:text-foreground hover:bg-muted'"
+                        class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all duration-200"
+                        :class="
+                            filterMode === m.key
+                                ? 'bg-indigo-600 text-white shadow-sm'
+                                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                        "
                     >
                         <i :class="m.icon" class="text-[10px]"></i>
                         {{ m.label }}
@@ -757,50 +1007,76 @@ const flash = computed(() => usePage().props.flash ?? {});
                 </div>
 
                 <!-- Input sesuai mode -->
-                <div class="flex-1 flex items-center gap-3">
+                <div class="flex flex-1 items-center gap-3">
                     <!-- Harian: flatpickr range -->
-                    <div v-if="filterMode === 'harian'" class="relative flex-1 max-w-sm">
-                        <i class="fas fa-calendar-day absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
+                    <div
+                        v-if="filterMode === 'harian'"
+                        class="relative max-w-sm flex-1"
+                    >
+                        <i
+                            class="fas fa-calendar-day absolute top-1/2 left-3 -translate-y-1/2 text-xs text-muted-foreground"
+                        ></i>
                         <input
                             ref="dateRangeInput"
                             type="text"
                             :value="filterDateRange"
                             placeholder="Pilih rentang tanggal"
-                            class="h-9 w-full rounded-xl border border-input bg-background px-3 pl-8 text-sm text-foreground transition focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            class="h-9 w-full rounded-xl border border-input bg-background px-3 pl-8 text-sm text-foreground transition focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                         />
                     </div>
 
                     <!-- Bulanan: month picker -->
-                    <div v-else-if="filterMode === 'bulanan'" class="relative flex-1 max-w-xs">
-                        <i class="fas fa-calendar-alt absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
+                    <div
+                        v-else-if="filterMode === 'bulanan'"
+                        class="relative max-w-xs flex-1"
+                    >
+                        <i
+                            class="fas fa-calendar-alt absolute top-1/2 left-3 -translate-y-1/2 text-xs text-muted-foreground"
+                        ></i>
                         <input
                             type="month"
                             v-model="filterMonth"
-                            class="pl-8 h-9 w-full rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 transition px-3"
+                            class="h-9 w-full rounded-xl border border-input bg-background px-3 pl-8 text-sm text-foreground transition focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                         />
                     </div>
 
                     <!-- Tahunan: select tahun -->
-                    <div v-else class="relative flex-1 max-w-xs">
-                        <i class="fas fa-calendar absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
+                    <div v-else class="relative max-w-xs flex-1">
+                        <i
+                            class="fas fa-calendar absolute top-1/2 left-3 -translate-y-1/2 text-xs text-muted-foreground"
+                        ></i>
                         <select
                             v-model="filterYear"
-                            class="pl-8 h-9 w-full rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 transition px-3 appearance-none"
+                            class="h-9 w-full appearance-none rounded-xl border border-input bg-background px-3 pl-8 text-sm text-foreground transition focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                         >
-                            <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
+                            <option
+                                v-for="y in yearOptions"
+                                :key="y"
+                                :value="y"
+                            >
+                                {{ y }}
+                            </option>
                         </select>
                     </div>
 
                     <!-- Quick shortcut: Hari ini / Bulan ini / Tahun ini -->
                     <button
                         @click="
-                            filterMode === 'harian'  ? setDateRange(todayString) :
-                            filterMode === 'bulanan' ? filterMonth = getCurrentMonthString() :
-                                                       filterYear  = getCurrentYearString()
+                            filterMode === 'harian'
+                                ? setDateRange(todayString)
+                                : filterMode === 'bulanan'
+                                  ? (filterMonth = getCurrentMonthString())
+                                  : (filterYear = getCurrentYearString())
                         "
-                        class="text-xs text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-300 font-semibold whitespace-nowrap transition underline underline-offset-2"
+                        class="text-xs font-semibold whitespace-nowrap text-indigo-500 underline underline-offset-2 transition hover:text-indigo-700 dark:hover:text-indigo-300"
                     >
-                        {{ filterMode === 'harian' ? 'Hari ini' : filterMode === 'bulanan' ? 'Bulan ini' : 'Tahun ini' }}
+                        {{
+                            filterMode === 'harian'
+                                ? 'Hari ini'
+                                : filterMode === 'bulanan'
+                                  ? 'Bulan ini'
+                                  : 'Tahun ini'
+                        }}
                     </button>
                 </div>
             </div>
@@ -808,122 +1084,274 @@ const flash = computed(() => usePage().props.flash ?? {});
 
         <!-- Metrics Grid -->
         <div class="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
-            <Card class="border-border/60 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 relative overflow-hidden shadow-sm">
+            <Card
+                class="relative overflow-hidden border-border/60 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 shadow-sm"
+            >
                 <CardHeader class="pb-2">
-                    <CardTitle class="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                    <CardTitle
+                        class="flex items-center justify-between text-xs font-semibold tracking-wider text-muted-foreground uppercase"
+                    >
                         <span>Total Pendapatan (Omset)</span>
-                        <i class="fas fa-wallet text-indigo-500 dark:text-indigo-400 text-sm"></i>
+                        <i
+                            class="fas fa-wallet text-sm text-indigo-500 dark:text-indigo-400"
+                        ></i>
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div class="text-2xl font-black text-foreground">Rp {{ formatRupiah(totalSales) }}</div>
-                    <p class="text-[11px] text-muted-foreground mt-1">{{ filteredTransactions.length }} transaksi pada periode ini</p>
+                    <div class="text-2xl font-black text-foreground">
+                        Rp {{ formatRupiah(totalSales) }}
+                    </div>
+                    <p class="mt-1 text-[11px] text-muted-foreground">
+                        {{ filteredTransactions.length }} transaksi pada periode
+                        ini
+                    </p>
                 </CardContent>
-                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
+                <div
+                    class="absolute right-0 bottom-0 left-0 h-1 bg-gradient-to-r from-indigo-500 to-purple-500"
+                ></div>
             </Card>
 
-            <Card class="border-border/60 bg-gradient-to-br from-amber-500/5 to-orange-500/5 relative overflow-hidden shadow-sm">
+            <Card
+                class="relative overflow-hidden border-border/60 bg-gradient-to-br from-amber-500/5 to-orange-500/5 shadow-sm"
+            >
                 <CardHeader class="pb-2">
-                    <CardTitle class="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                    <CardTitle
+                        class="flex items-center justify-between text-xs font-semibold tracking-wider text-muted-foreground uppercase"
+                    >
                         <span>Total Harga Modal</span>
-                        <i class="fas fa-box-open text-amber-500 dark:text-amber-400 text-sm"></i>
+                        <i
+                            class="fas fa-box-open text-sm text-amber-500 dark:text-amber-400"
+                        ></i>
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div class="text-2xl font-black text-foreground">Rp {{ formatRupiah(totalBase) }}</div>
-                    <p class="text-[11px] text-muted-foreground mt-1">Biaya modal pokok produk fisik/kulakan</p>
+                    <div class="text-2xl font-black text-foreground">
+                        Rp {{ formatRupiah(totalBase) }}
+                    </div>
+                    <p class="mt-1 text-[11px] text-muted-foreground">
+                        Biaya modal pokok produk fisik/kulakan
+                    </p>
                 </CardContent>
-                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-orange-500"></div>
+                <div
+                    class="absolute right-0 bottom-0 left-0 h-1 bg-gradient-to-r from-amber-500 to-orange-500"
+                ></div>
             </Card>
 
-            <Card class="border-border/60 bg-gradient-to-br from-rose-500/5 to-red-500/5 relative overflow-hidden shadow-sm">
+            <Card
+                class="relative overflow-hidden border-border/60 bg-gradient-to-br from-rose-500/5 to-red-500/5 shadow-sm"
+            >
                 <CardHeader class="pb-2">
-                    <CardTitle class="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                    <CardTitle
+                        class="flex items-center justify-between text-xs font-semibold tracking-wider text-muted-foreground uppercase"
+                    >
                         <span>Biaya Pengurang Laba</span>
-                        <i class="fas fa-file-invoice-dollar text-rose-500 dark:text-rose-400 text-sm"></i>
+                        <i
+                            class="fas fa-file-invoice-dollar text-sm text-rose-500 dark:text-rose-400"
+                        ></i>
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div class="text-2xl font-black text-rose-600 dark:text-rose-400">Rp {{ formatRupiah(totalExpenses) }}</div>
-                    <p class="text-[11px] text-muted-foreground mt-1">HPP tambahan Rp {{ formatRupiah(hppAdditionalTotal) }} + operasional Rp {{ formatRupiah(operationalExpenseTotal) }}</p>
-                    <p class="text-[10px] text-muted-foreground mt-0.5">Arus kas keluar: Rp {{ formatRupiah(totalCashOut) }}</p>
+                    <div
+                        class="text-2xl font-black text-rose-600 dark:text-rose-400"
+                    >
+                        Rp {{ formatRupiah(totalExpenses) }}
+                    </div>
+                    <p class="mt-1 text-[11px] text-muted-foreground">
+                        HPP tambahan Rp {{ formatRupiah(hppAdditionalTotal) }} +
+                        operasional Rp
+                        {{ formatRupiah(operationalExpenseTotal) }}
+                    </p>
+                    <p class="mt-0.5 text-[10px] text-muted-foreground">
+                        Arus kas keluar: Rp {{ formatRupiah(totalCashOut) }}
+                    </p>
                 </CardContent>
-                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 to-red-500"></div>
+                <div
+                    class="absolute right-0 bottom-0 left-0 h-1 bg-gradient-to-r from-rose-500 to-red-500"
+                ></div>
             </Card>
 
-            <Card class="border-border/60 bg-gradient-to-br from-emerald-500/5 to-teal-500/5 relative overflow-hidden shadow-sm">
+            <Card
+                class="relative overflow-hidden border-border/60 bg-gradient-to-br from-emerald-500/5 to-teal-500/5 shadow-sm"
+            >
                 <CardHeader class="pb-2">
-                    <CardTitle class="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                    <CardTitle
+                        class="flex items-center justify-between text-xs font-semibold tracking-wider text-muted-foreground uppercase"
+                    >
                         <span>Laba Bersih</span>
-                        <i class="fas fa-chart-line text-emerald-500 dark:text-emerald-400 text-sm"></i>
+                        <i
+                            class="fas fa-chart-line text-sm text-emerald-500 dark:text-emerald-400"
+                        ></i>
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div class="text-2xl font-black" :class="netProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'">
+                    <div
+                        class="text-2xl font-black"
+                        :class="
+                            netProfit >= 0
+                                ? 'text-emerald-600 dark:text-emerald-400'
+                                : 'text-red-600 dark:text-red-400'
+                        "
+                    >
                         Rp {{ formatRupiah(netProfit) }}
                     </div>
-                    <p class="text-[11px] text-muted-foreground mt-1">Laba kotor transaksi dikurangi HPP tambahan dan operasional rutin</p>
+                    <p class="mt-1 text-[11px] text-muted-foreground">
+                        Laba kotor transaksi dikurangi HPP tambahan dan
+                        operasional rutin
+                    </p>
                 </CardContent>
-                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500"></div>
+                <div
+                    class="absolute right-0 bottom-0 left-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500"
+                ></div>
             </Card>
         </div>
 
-        <div v-if="unallocatedHppTotal > 0" class="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+        <div
+            v-if="unallocatedHppTotal > 0"
+            class="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300"
+        >
             <div class="flex items-start gap-3">
                 <i class="fas fa-triangle-exclamation mt-0.5"></i>
                 <div>
-                    <p class="font-bold">HPP belum dialokasikan: Rp {{ formatRupiah(unallocatedHppTotal) }}</p>
-                    <p class="text-xs mt-0.5">Nilai ini tetap mengurangi laba bersih, tetapi laba per jenis usaha belum sepenuhnya terekspos sampai sisa pembayaran vendor dialokasikan ke nota atau item.</p>
+                    <p class="font-bold">
+                        HPP belum dialokasikan: Rp
+                        {{ formatRupiah(unallocatedHppTotal) }}
+                    </p>
+                    <p class="mt-0.5 text-xs">
+                        Nilai ini tetap mengurangi laba bersih, tetapi laba per
+                        jenis usaha belum sepenuhnya terekspos sampai sisa
+                        pembayaran vendor dialokasikan ke nota atau item.
+                    </p>
                 </div>
             </div>
         </div>
 
-        <Card class="border-border/50 shadow-sm overflow-hidden bg-card text-card-foreground">
-            <CardHeader class="border-b border-border/40 py-4 bg-muted/10">
+        <Card
+            class="overflow-hidden border-border/50 bg-card text-card-foreground shadow-sm"
+        >
+            <CardHeader class="border-b border-border/40 bg-muted/10 py-4">
                 <div class="flex flex-col gap-1">
-                    <CardTitle class="text-sm font-bold text-foreground">Performa per Jenis Usaha</CardTitle>
-                    <CardDescription class="text-xs text-muted-foreground">Breakdown omzet, modal, laba, margin, dan jumlah transaksi periode {{ filterLabel }}.</CardDescription>
+                    <CardTitle class="text-sm font-bold text-foreground"
+                        >Performa per Jenis Usaha</CardTitle
+                    >
+                    <CardDescription class="text-xs text-muted-foreground"
+                        >Breakdown omzet, modal, laba, margin, dan jumlah
+                        transaksi periode {{ filterLabel }}.</CardDescription
+                    >
                 </div>
             </CardHeader>
             <CardContent class="p-0">
                 <div class="overflow-x-auto">
-                    <table class="w-full min-w-[780px] text-left border-collapse">
+                    <table
+                        class="w-full min-w-[780px] border-collapse text-left"
+                    >
                         <thead>
-                            <tr class="border-b border-border bg-muted/30 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                            <tr
+                                class="border-b border-border bg-muted/30 text-xs font-semibold tracking-wider text-muted-foreground uppercase"
+                            >
                                 <th class="p-4 pl-6">Jenis Usaha</th>
                                 <th class="p-4 text-right">Omzet</th>
                                 <th class="p-4 text-right">Modal / HPP</th>
                                 <th class="p-4 text-right">Laba</th>
                                 <th class="p-4 text-right">Margin</th>
-                                <th class="p-4 text-right pr-6">Transaksi</th>
+                                <th class="p-4 pr-6 text-right">Transaksi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border text-sm">
-                            <tr v-for="category in businessCategoryRows" :key="category.key" class="hover:bg-muted/30 transition">
+                            <tr
+                                v-for="category in businessCategoryRows"
+                                :key="category.key"
+                                class="transition hover:bg-muted/30"
+                            >
                                 <td class="p-4 pl-6">
                                     <div class="flex items-center gap-3">
-                                        <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-muted/60 border border-border/60">
-                                            <i :class="[category.icon, category.iconClass]" class="text-sm"></i>
+                                        <div
+                                            class="flex h-9 w-9 items-center justify-center rounded-xl border border-border/60 bg-muted/60"
+                                        >
+                                            <i
+                                                :class="[
+                                                    category.icon,
+                                                    category.iconClass,
+                                                ]"
+                                                class="text-sm"
+                                            ></i>
                                         </div>
                                         <div>
-                                            <p class="font-bold text-foreground">{{ category.label }}</p>
-                                            <p class="text-[11px] text-muted-foreground">{{ category.description }}</p>
+                                            <p
+                                                class="font-bold text-foreground"
+                                            >
+                                                {{ category.label }}
+                                            </p>
+                                            <p
+                                                class="text-[11px] text-muted-foreground"
+                                            >
+                                                {{ category.description }}
+                                            </p>
                                         </div>
                                     </div>
                                 </td>
-                                <td class="p-4 text-right font-bold font-mono text-foreground">Rp {{ formatRupiah(category.omzet) }}</td>
-                                <td class="p-4 text-right font-mono text-muted-foreground">
-                                    <div>Rp {{ formatRupiah(category.modal) }}</div>
-                                    <div v-if="category.adjustmentTotal > 0" class="text-[10px] text-amber-600 dark:text-amber-400">+HPP eksternal Rp {{ formatRupiah(category.adjustmentTotal) }}</div>
-                                    <div v-if="category.noteLevelAdjustmentTotal > 0" class="text-[10px] text-muted-foreground">Rp {{ formatRupiah(category.noteLevelAdjustmentTotal) }} tingkat nota</div>
+                                <td
+                                    class="p-4 text-right font-mono font-bold text-foreground"
+                                >
+                                    Rp {{ formatRupiah(category.omzet) }}
                                 </td>
-                                <td class="p-4 text-right font-bold font-mono" :class="category.laba >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'">
+                                <td
+                                    class="p-4 text-right font-mono text-muted-foreground"
+                                >
+                                    <div>
+                                        Rp {{ formatRupiah(category.modal) }}
+                                    </div>
+                                    <div
+                                        v-if="category.adjustmentTotal > 0"
+                                        class="text-[10px] text-amber-600 dark:text-amber-400"
+                                    >
+                                        +HPP eksternal Rp
+                                        {{
+                                            formatRupiah(
+                                                category.adjustmentTotal,
+                                            )
+                                        }}
+                                    </div>
+                                    <div
+                                        v-if="
+                                            category.noteLevelAdjustmentTotal >
+                                            0
+                                        "
+                                        class="text-[10px] text-muted-foreground"
+                                    >
+                                        Rp
+                                        {{
+                                            formatRupiah(
+                                                category.noteLevelAdjustmentTotal,
+                                            )
+                                        }}
+                                        tingkat nota
+                                    </div>
+                                </td>
+                                <td
+                                    class="p-4 text-right font-mono font-bold"
+                                    :class="
+                                        category.laba >= 0
+                                            ? 'text-emerald-600 dark:text-emerald-400'
+                                            : 'text-red-600 dark:text-red-400'
+                                    "
+                                >
                                     Rp {{ formatRupiah(category.laba) }}
                                 </td>
-                                <td class="p-4 text-right font-bold font-mono" :class="category.margin >= 0 ? 'text-foreground' : 'text-red-600 dark:text-red-400'">
+                                <td
+                                    class="p-4 text-right font-mono font-bold"
+                                    :class="
+                                        category.margin >= 0
+                                            ? 'text-foreground'
+                                            : 'text-red-600 dark:text-red-400'
+                                    "
+                                >
                                     {{ category.margin.toFixed(1) }}%
                                 </td>
-                                <td class="p-4 text-right pr-6 font-bold text-foreground">{{ category.transactionCount }}</td>
+                                <td
+                                    class="p-4 pr-6 text-right font-bold text-foreground"
+                                >
+                                    {{ category.transactionCount }}
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -932,11 +1360,19 @@ const flash = computed(() => usePage().props.flash ?? {});
         </Card>
 
         <!-- History Table -->
-        <Card class="border-border/50 shadow-sm overflow-hidden bg-card text-card-foreground">
-            <CardHeader class="border-b border-border/40 py-4 bg-muted/10 gap-4">
-                <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <Card
+            class="overflow-hidden border-border/50 bg-card text-card-foreground shadow-sm"
+        >
+            <CardHeader
+                class="gap-4 border-b border-border/40 bg-muted/10 py-4"
+            >
+                <div
+                    class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
+                >
                     <div>
-                        <CardTitle class="text-sm font-bold text-foreground">Riwayat Nota Penjualan</CardTitle>
+                        <CardTitle class="text-sm font-bold text-foreground"
+                            >Riwayat Nota Penjualan</CardTitle
+                        >
                         <CardDescription class="text-xs text-muted-foreground">
                             Daftar transaksi periode
                             <strong class="text-foreground">
@@ -945,30 +1381,53 @@ const flash = computed(() => usePage().props.flash ?? {});
                         </CardDescription>
                     </div>
                     <div class="flex flex-wrap gap-2">
-                        <Button type="button" variant="outline" size="sm" class="rounded-xl text-xs text-emerald-600 dark:text-emerald-400" :disabled="filteredTransactions.length === 0" @click="exportExcel">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            class="rounded-xl text-xs text-emerald-600 dark:text-emerald-400"
+                            :disabled="filteredTransactions.length === 0"
+                            @click="exportExcel"
+                        >
                             <i class="fas fa-file-excel"></i>
                             Export Excel
                         </Button>
-                        <Button type="button" variant="outline" size="sm" class="rounded-xl text-xs text-red-500" :disabled="filteredTransactions.length === 0" @click="exportPdf">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            class="rounded-xl text-xs text-red-500"
+                            :disabled="filteredTransactions.length === 0"
+                            @click="exportPdf"
+                        >
                             <i class="fas fa-file-pdf"></i>
                             Export PDF
                         </Button>
                     </div>
                 </div>
 
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div
+                    class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+                >
                     <div class="relative w-full sm:max-w-md">
-                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground"></i>
+                        <i
+                            class="fas fa-search absolute top-1/2 left-3 -translate-y-1/2 text-xs text-muted-foreground"
+                        ></i>
                         <input
                             v-model="searchQuery"
                             type="search"
                             placeholder="Cari invoice, nama customer, atau metode pembayaran..."
-                            class="h-9 w-full rounded-xl border border-input bg-background pl-8 pr-3 text-xs text-foreground outline-none transition focus:ring-2 focus:ring-indigo-500"
+                            class="h-9 w-full rounded-xl border border-input bg-background pr-3 pl-8 text-xs text-foreground transition outline-none focus:ring-2 focus:ring-indigo-500"
                         />
                     </div>
-                    <div class="flex items-center gap-2 text-xs text-muted-foreground">
+                    <div
+                        class="flex items-center gap-2 text-xs text-muted-foreground"
+                    >
                         <span>Tampilkan</span>
-                        <select v-model.number="perPage" class="h-9 rounded-xl border border-input bg-background px-3 text-xs text-foreground outline-none focus:ring-2 focus:ring-indigo-500">
+                        <select
+                            v-model.number="perPage"
+                            class="h-9 rounded-xl border border-input bg-background px-3 text-xs text-foreground outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
                             <option :value="10">10</option>
                             <option :value="25">25</option>
                             <option :value="50">50</option>
@@ -980,9 +1439,11 @@ const flash = computed(() => usePage().props.flash ?? {});
             </CardHeader>
             <CardContent class="p-0">
                 <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
+                    <table class="w-full border-collapse text-left">
                         <thead>
-                            <tr class="border-b border-border bg-muted/30 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                            <tr
+                                class="border-b border-border bg-muted/30 text-xs font-semibold tracking-wider text-muted-foreground uppercase"
+                            >
                                 <th class="p-4 pl-6">Nomor Nota</th>
                                 <th class="p-4">Tanggal Transaksi</th>
                                 <th class="p-4">Customer</th>
@@ -990,86 +1451,180 @@ const flash = computed(() => usePage().props.flash ?? {});
                                 <th class="p-4">Status</th>
                                 <th class="p-4 text-right">Total Belanja</th>
                                 <th class="p-4 text-right">Keuntungan</th>
-                                <th class="p-4 text-center pr-6">Aksi</th>
+                                <th class="p-4 pr-6 text-center">Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border text-sm">
                             <!-- Empty state -->
                             <tr v-if="filteredTransactions.length === 0">
-                                <td colspan="8" class="p-14 text-center text-muted-foreground">
-                                    <i class="fas fa-filter text-4xl mb-3 opacity-20 block"></i>
-                                    <p class="font-semibold text-sm">Tidak ada transaksi pada periode ini.</p>
-                                    <p class="text-xs text-muted-foreground mt-1 opacity-70">Coba ubah filter tanggal, bulan, atau tahun.</p>
+                                <td
+                                    colspan="8"
+                                    class="p-14 text-center text-muted-foreground"
+                                >
+                                    <i
+                                        class="fas fa-filter mb-3 block text-4xl opacity-20"
+                                    ></i>
+                                    <p class="text-sm font-semibold">
+                                        Tidak ada transaksi pada periode ini.
+                                    </p>
+                                    <p
+                                        class="mt-1 text-xs text-muted-foreground opacity-70"
+                                    >
+                                        Coba ubah filter tanggal, bulan, atau
+                                        tahun.
+                                    </p>
                                 </td>
                             </tr>
 
                             <!-- Data rows -->
-                            <tr v-for="trx in paginatedTransactions" :key="trx.id" class="hover:bg-muted/30 transition">
-                                <td class="p-4 pl-6 font-mono font-semibold text-foreground">
+                            <tr
+                                v-for="trx in paginatedTransactions"
+                                :key="trx.id"
+                                class="transition hover:bg-muted/30"
+                            >
+                                <td
+                                    class="p-4 pl-6 font-mono font-semibold text-foreground"
+                                >
                                     <div class="flex items-center gap-1.5">
                                         {{ trx.invoice_number }}
                                         <Button
-                                            @click="copyToClipboard(trx.invoice_number)"
+                                            @click="
+                                                copyToClipboard(
+                                                    trx.invoice_number,
+                                                )
+                                            "
                                             variant="ghost"
                                             size="xs"
                                             data-click-feedback="none"
                                             title="Salin nomor invoice"
                                             aria-label="Salin nomor invoice"
-                                            class="h-6 w-6 p-0 rounded-full transition-colors"
-                                            :class="copiedInvoice === trx.invoice_number
-                                                ? 'bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400'
-                                                : 'text-muted-foreground hover:text-foreground hover:bg-muted'"
+                                            class="h-6 w-6 rounded-full p-0 transition-colors"
+                                            :class="
+                                                copiedInvoice ===
+                                                trx.invoice_number
+                                                    ? 'bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400'
+                                                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                                            "
                                         >
-                                            <i :class="copiedInvoice === trx.invoice_number ? 'fas fa-check' : 'fas fa-copy'" class="text-[10px]"></i>
+                                            <i
+                                                :class="
+                                                    copiedInvoice ===
+                                                    trx.invoice_number
+                                                        ? 'fas fa-check'
+                                                        : 'fas fa-copy'
+                                                "
+                                                class="text-[10px]"
+                                            ></i>
                                         </Button>
                                     </div>
                                 </td>
-                                <td class="p-4 text-muted-foreground text-xs">{{ formatDate(trx.created_at) }}</td>
-                                <td class="p-4 text-xs font-semibold text-foreground">{{ getCustomerName(trx) }}</td>
+                                <td class="p-4 text-xs text-muted-foreground">
+                                    {{ formatDate(trx.created_at) }}
+                                </td>
+                                <td
+                                    class="p-4 text-xs font-semibold text-foreground"
+                                >
+                                    {{ getCustomerName(trx) }}
+                                </td>
                                 <td class="p-4">
-                                    <Badge variant="secondary" class="capitalize px-2 py-0.5 rounded-full text-[11px] font-medium border"
+                                    <Badge
+                                        variant="secondary"
+                                        class="rounded-full border px-2 py-0.5 text-[11px] font-medium capitalize"
                                         :class="{
-                                            'bg-emerald-100/40 text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-400 border-emerald-500/20': trx.payment_method === 'cash',
-                                            'bg-blue-100/40 text-blue-800 dark:bg-blue-950/20 dark:text-blue-400 border-blue-500/20': trx.payment_method === 'transfer',
-                                            'bg-purple-100/40 text-purple-800 dark:bg-purple-950/20 dark:text-purple-400 border-purple-500/20': trx.payment_method === 'qris',
+                                            'border-emerald-500/20 bg-emerald-100/40 text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-400':
+                                                trx.payment_method === 'cash',
+                                            'border-blue-500/20 bg-blue-100/40 text-blue-800 dark:bg-blue-950/20 dark:text-blue-400':
+                                                trx.payment_method ===
+                                                'transfer',
+                                            'border-purple-500/20 bg-purple-100/40 text-purple-800 dark:bg-purple-950/20 dark:text-purple-400':
+                                                trx.payment_method === 'qris',
                                         }"
                                     >
-                                        <i class="mr-1 text-[10px]" :class="{
-                                            'fas fa-money-bill-wave': trx.payment_method === 'cash',
-                                            'fas fa-university':      trx.payment_method === 'transfer',
-                                            'fas fa-qrcode':          trx.payment_method === 'qris',
-                                        }"></i>
+                                        <i
+                                            class="mr-1 text-[10px]"
+                                            :class="{
+                                                'fas fa-money-bill-wave':
+                                                    trx.payment_method ===
+                                                    'cash',
+                                                'fas fa-university':
+                                                    trx.payment_method ===
+                                                    'transfer',
+                                                'fas fa-qrcode':
+                                                    trx.payment_method ===
+                                                    'qris',
+                                            }"
+                                        ></i>
                                         {{ trx.payment_method }}
                                     </Badge>
                                 </td>
                                 <td class="p-4 text-center">
-                                    <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border"
+                                    <span
+                                        class="inline-block rounded-full border px-2.5 py-0.5 text-[10px] font-black tracking-wider uppercase"
                                         :class="{
-                                            'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20': trx.status_bayar === 'lunas' || !trx.status_bayar,
-                                            'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20': trx.status_bayar === 'dp',
-                                            'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20': trx.status_bayar === 'piutang',
+                                            'border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400':
+                                                trx.status_bayar === 'lunas' ||
+                                                !trx.status_bayar,
+                                            'border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400':
+                                                trx.status_bayar === 'dp',
+                                            'border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-400':
+                                                trx.status_bayar === 'piutang',
                                         }"
                                     >
                                         {{ trx.status_bayar || 'lunas' }}
                                     </span>
                                 </td>
-                                <td class="p-4 text-right font-bold text-foreground font-mono">Rp {{ formatRupiah(trx.total_price) }}</td>
-                                <td class="p-4 text-right font-bold text-emerald-600 dark:text-emerald-400 font-mono">Rp {{ formatRupiah(trx.total_profit) }}</td>
-                                <td class="p-4 text-right pr-6">
-                                    <div class="flex items-center justify-end gap-1.5">
-                                        <Button @click="openDetail(trx)" variant="ghost" size="icon-sm" title="Detail transaksi" aria-label="Detail transaksi" class="h-8 rounded-xl text-indigo-600 hover:text-indigo-900 dark:text-indigo-400">
+                                <td
+                                    class="p-4 text-right font-mono font-bold text-foreground"
+                                >
+                                    Rp {{ formatRupiah(trx.total_price) }}
+                                </td>
+                                <td
+                                    class="p-4 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400"
+                                >
+                                    Rp {{ formatRupiah(trx.total_profit) }}
+                                </td>
+                                <td class="p-4 pr-6 text-right">
+                                    <div
+                                        class="flex items-center justify-end gap-1.5"
+                                    >
+                                        <Button
+                                            @click="openDetail(trx)"
+                                            variant="ghost"
+                                            size="icon-sm"
+                                            title="Detail transaksi"
+                                            aria-label="Detail transaksi"
+                                            class="h-8 rounded-xl text-indigo-600 hover:text-indigo-900 dark:text-indigo-400"
+                                        >
                                             <i class="fas fa-eye"></i>
                                         </Button>
-                                        <Button @click="openCustomerEdit(trx)" variant="ghost" size="icon-sm" title="Edit customer nota" aria-label="Edit customer nota" class="h-8 rounded-xl text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">
+                                        <Button
+                                            @click="openCustomerEdit(trx)"
+                                            variant="ghost"
+                                            size="icon-sm"
+                                            title="Edit customer nota"
+                                            aria-label="Edit customer nota"
+                                            class="h-8 rounded-xl text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                                        >
                                             <i class="fas fa-user-edit"></i>
                                         </Button>
-                                        <a :href="`/pos/print/${trx.invoice_number}`" target="_blank"
+                                        <a
+                                            :href="`/pos/print/${trx.invoice_number}`"
+                                            target="_blank"
                                             data-click-feedback="action"
-                                            title="Cetak transaksi" aria-label="Cetak transaksi"
-                                            class="inline-flex items-center justify-center rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 dark:bg-neutral-800 dark:hover:bg-neutral-700 dark:text-neutral-200 h-8 w-8 shadow-xs transition">
+                                            title="Cetak transaksi"
+                                            aria-label="Cetak transaksi"
+                                            class="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-neutral-100 text-neutral-800 shadow-xs transition hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+                                        >
                                             <i class="fas fa-print"></i>
                                         </a>
-                                        <Button @click="openDeleteConfirm(trx)" variant="ghost" size="icon-sm" title="Hapus transaksi" aria-label="Hapus transaksi" class="h-8 rounded-xl text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/30">
+                                        <Button
+                                            @click="openDeleteConfirm(trx)"
+                                            variant="ghost"
+                                            size="icon-sm"
+                                            title="Hapus transaksi"
+                                            aria-label="Hapus transaksi"
+                                            class="h-8 rounded-xl text-red-500 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950/30 dark:hover:text-red-300"
+                                        >
                                             <i class="fas fa-trash-alt"></i>
                                         </Button>
                                     </div>
@@ -1079,10 +1634,24 @@ const flash = computed(() => usePage().props.flash ?? {});
                     </table>
                 </div>
 
-                <div class="flex flex-col gap-3 border-t border-border/50 px-4 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-                    <span>Menampilkan {{ paginationStart }} - {{ paginationEnd }} dari {{ filteredTransactions.length }} transaksi</span>
+                <div
+                    class="flex flex-col gap-3 border-t border-border/50 px-4 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between"
+                >
+                    <span
+                        >Menampilkan {{ paginationStart }} -
+                        {{ paginationEnd }} dari
+                        {{ filteredTransactions.length }} transaksi</span
+                    >
                     <div class="flex items-center gap-1">
-                        <Button type="button" variant="outline" size="sm" data-click-feedback="none" class="h-8 rounded-lg px-3 text-xs" :disabled="currentPage === 1" @click="goToPage(currentPage - 1)">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            data-click-feedback="none"
+                            class="h-8 rounded-lg px-3 text-xs"
+                            :disabled="currentPage === 1"
+                            @click="goToPage(currentPage - 1)"
+                        >
                             Sebelumnya
                         </Button>
                         <Button
@@ -1091,13 +1660,23 @@ const flash = computed(() => usePage().props.flash ?? {});
                             type="button"
                             size="sm"
                             class="h-8 w-8 rounded-lg p-0 text-xs"
-                            :variant="page === currentPage ? 'default' : 'outline'"
+                            :variant="
+                                page === currentPage ? 'default' : 'outline'
+                            "
                             data-click-feedback="none"
                             @click="goToPage(page)"
                         >
                             {{ page }}
                         </Button>
-                        <Button type="button" variant="outline" size="sm" data-click-feedback="none" class="h-8 rounded-lg px-3 text-xs" :disabled="currentPage === totalPages" @click="goToPage(currentPage + 1)">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            data-click-feedback="none"
+                            class="h-8 rounded-lg px-3 text-xs"
+                            :disabled="currentPage === totalPages"
+                            @click="goToPage(currentPage + 1)"
+                        >
                             Berikutnya
                         </Button>
                     </div>
@@ -1105,63 +1684,142 @@ const flash = computed(() => usePage().props.flash ?? {});
             </CardContent>
         </Card>
 
-        <div class="fixed left-[-10000px] top-0 w-[1100px] bg-white p-8 text-black">
+        <div
+            class="fixed top-0 left-[-10000px] w-[1100px] bg-white p-8 text-black"
+        >
             <div ref="exportPdfRef">
                 <h1 class="mb-1 text-xl font-bold">Laporan Penjualan</h1>
-                <p class="mb-5 text-xs">Periode: {{ filterLabel }} | Jumlah transaksi: {{ filteredTransactions.length }}</p>
-                <p class="mb-3 text-xs">Biaya pengurang laba: Rp {{ formatRupiah(totalExpenses) }} | Arus kas keluar: Rp {{ formatRupiah(totalCashOut) }} | Pendapatan bersih: Rp {{ formatRupiah(netProfit) }}</p>
-                <p v-if="unallocatedHppTotal > 0" class="mb-3 text-xs">HPP belum dialokasikan: Rp {{ formatRupiah(unallocatedHppTotal) }}</p>
+                <p class="mb-5 text-xs">
+                    Periode: {{ filterLabel }} | Jumlah transaksi:
+                    {{ filteredTransactions.length }}
+                </p>
+                <p class="mb-3 text-xs">
+                    Biaya pengurang laba: Rp {{ formatRupiah(totalExpenses) }} |
+                    Arus kas keluar: Rp {{ formatRupiah(totalCashOut) }} |
+                    Pendapatan bersih: Rp {{ formatRupiah(netProfit) }}
+                </p>
+                <p v-if="unallocatedHppTotal > 0" class="mb-3 text-xs">
+                    HPP belum dialokasikan: Rp
+                    {{ formatRupiah(unallocatedHppTotal) }}
+                </p>
                 <h2 class="mb-2 text-sm font-bold">Performa per Jenis Usaha</h2>
                 <table class="mb-5 w-full border-collapse text-xs">
                     <thead>
                         <tr>
-                            <th class="border border-gray-400 p-2 text-left">Jenis Usaha</th>
-                            <th class="border border-gray-400 p-2 text-right">Omzet</th>
-                            <th class="border border-gray-400 p-2 text-right">Modal / HPP</th>
-                            <th class="border border-gray-400 p-2 text-right">Laba</th>
-                            <th class="border border-gray-400 p-2 text-right">Margin</th>
-                            <th class="border border-gray-400 p-2 text-right">Transaksi</th>
+                            <th class="border border-gray-400 p-2 text-left">
+                                Jenis Usaha
+                            </th>
+                            <th class="border border-gray-400 p-2 text-right">
+                                Omzet
+                            </th>
+                            <th class="border border-gray-400 p-2 text-right">
+                                Modal / HPP
+                            </th>
+                            <th class="border border-gray-400 p-2 text-right">
+                                Laba
+                            </th>
+                            <th class="border border-gray-400 p-2 text-right">
+                                Margin
+                            </th>
+                            <th class="border border-gray-400 p-2 text-right">
+                                Transaksi
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="category in businessCategoryRows" :key="`pdf-category-${category.key}`">
-                            <td class="border border-gray-300 p-2">{{ category.label }}</td>
-                            <td class="border border-gray-300 p-2 text-right">Rp {{ formatRupiah(category.omzet) }}</td>
-                            <td class="border border-gray-300 p-2 text-right">Rp {{ formatRupiah(category.modal) }}</td>
-                            <td class="border border-gray-300 p-2 text-right">Rp {{ formatRupiah(category.laba) }}</td>
-                            <td class="border border-gray-300 p-2 text-right">{{ category.margin.toFixed(1) }}%</td>
-                            <td class="border border-gray-300 p-2 text-right">{{ category.transactionCount }}</td>
+                        <tr
+                            v-for="category in businessCategoryRows"
+                            :key="`pdf-category-${category.key}`"
+                        >
+                            <td class="border border-gray-300 p-2">
+                                {{ category.label }}
+                            </td>
+                            <td class="border border-gray-300 p-2 text-right">
+                                Rp {{ formatRupiah(category.omzet) }}
+                            </td>
+                            <td class="border border-gray-300 p-2 text-right">
+                                Rp {{ formatRupiah(category.modal) }}
+                            </td>
+                            <td class="border border-gray-300 p-2 text-right">
+                                Rp {{ formatRupiah(category.laba) }}
+                            </td>
+                            <td class="border border-gray-300 p-2 text-right">
+                                {{ category.margin.toFixed(1) }}%
+                            </td>
+                            <td class="border border-gray-300 p-2 text-right">
+                                {{ category.transactionCount }}
+                            </td>
                         </tr>
                     </tbody>
                 </table>
                 <table class="w-full border-collapse text-xs">
                     <thead>
                         <tr>
-                            <th class="border border-gray-400 p-2 text-left">Invoice</th>
-                            <th class="border border-gray-400 p-2 text-left">Tanggal</th>
-                            <th class="border border-gray-400 p-2 text-left">Customer</th>
-                            <th class="border border-gray-400 p-2 text-left">Metode</th>
-                            <th class="border border-gray-400 p-2 text-left">Status</th>
-                            <th class="border border-gray-400 p-2 text-right">Total Belanja</th>
-                            <th class="border border-gray-400 p-2 text-right">Keuntungan</th>
+                            <th class="border border-gray-400 p-2 text-left">
+                                Invoice
+                            </th>
+                            <th class="border border-gray-400 p-2 text-left">
+                                Tanggal
+                            </th>
+                            <th class="border border-gray-400 p-2 text-left">
+                                Customer
+                            </th>
+                            <th class="border border-gray-400 p-2 text-left">
+                                Metode
+                            </th>
+                            <th class="border border-gray-400 p-2 text-left">
+                                Status
+                            </th>
+                            <th class="border border-gray-400 p-2 text-right">
+                                Total Belanja
+                            </th>
+                            <th class="border border-gray-400 p-2 text-right">
+                                Keuntungan
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="transaction in filteredTransactions" :key="`pdf-${transaction.id}`">
-                            <td class="border border-gray-300 p-2">{{ transaction.invoice_number }}</td>
-                            <td class="border border-gray-300 p-2">{{ formatDate(transaction.created_at) }}</td>
-                            <td class="border border-gray-300 p-2">{{ getCustomerName(transaction) }}</td>
-                            <td class="border border-gray-300 p-2">{{ transaction.payment_method }}</td>
-                            <td class="border border-gray-300 p-2">{{ transaction.status_bayar || 'lunas' }}</td>
-                            <td class="border border-gray-300 p-2 text-right">Rp {{ formatRupiah(transaction.total_price) }}</td>
-                            <td class="border border-gray-300 p-2 text-right">Rp {{ formatRupiah(transaction.total_profit) }}</td>
+                        <tr
+                            v-for="transaction in filteredTransactions"
+                            :key="`pdf-${transaction.id}`"
+                        >
+                            <td class="border border-gray-300 p-2">
+                                {{ transaction.invoice_number }}
+                            </td>
+                            <td class="border border-gray-300 p-2">
+                                {{ formatDate(transaction.created_at) }}
+                            </td>
+                            <td class="border border-gray-300 p-2">
+                                {{ getCustomerName(transaction) }}
+                            </td>
+                            <td class="border border-gray-300 p-2">
+                                {{ transaction.payment_method }}
+                            </td>
+                            <td class="border border-gray-300 p-2">
+                                {{ transaction.status_bayar || 'lunas' }}
+                            </td>
+                            <td class="border border-gray-300 p-2 text-right">
+                                Rp {{ formatRupiah(transaction.total_price) }}
+                            </td>
+                            <td class="border border-gray-300 p-2 text-right">
+                                Rp {{ formatRupiah(transaction.total_profit) }}
+                            </td>
                         </tr>
                     </tbody>
                     <tfoot>
                         <tr class="font-bold">
-                            <td colspan="5" class="border border-gray-400 p-2 text-right">TOTAL</td>
-                            <td class="border border-gray-400 p-2 text-right">Rp {{ formatRupiah(totalSales) }}</td>
-                            <td class="border border-gray-400 p-2 text-right">Rp {{ formatRupiah(totalTransactionProfit) }}</td>
+                            <td
+                                colspan="5"
+                                class="border border-gray-400 p-2 text-right"
+                            >
+                                TOTAL
+                            </td>
+                            <td class="border border-gray-400 p-2 text-right">
+                                Rp {{ formatRupiah(totalSales) }}
+                            </td>
+                            <td class="border border-gray-400 p-2 text-right">
+                                Rp {{ formatRupiah(totalTransactionProfit) }}
+                            </td>
                         </tr>
                     </tfoot>
                 </table>
@@ -1170,156 +1828,381 @@ const flash = computed(() => usePage().props.flash ?? {});
 
         <!-- DIALOG DETAIL NOTA -->
         <Dialog :open="detailOpen" @update:open="detailOpen = $event">
-            <DialogContent class="sm:max-w-[600px] rounded-2xl bg-card border-border text-foreground overflow-y-auto max-h-[85vh]">
+            <DialogContent
+                class="max-h-[85vh] overflow-y-auto rounded-2xl border-border bg-card text-foreground sm:max-w-[600px]"
+            >
                 <DialogHeader v-if="selectedTransaction">
                     <DialogTitle class="flex items-center gap-2 font-mono">
                         <i class="fas fa-receipt text-indigo-500"></i>
                         {{ selectedTransaction.invoice_number }}
                     </DialogTitle>
-                    <DialogDescription class="text-xs">Dicatat pada {{ formatDate(selectedTransaction.created_at) }}</DialogDescription>
+                    <DialogDescription class="text-xs"
+                        >Dicatat pada
+                        {{
+                            formatDate(selectedTransaction.created_at)
+                        }}</DialogDescription
+                    >
                 </DialogHeader>
 
-                <div v-if="selectedTransaction" class="space-y-4 my-2 text-sm">
+                <div v-if="selectedTransaction" class="my-2 space-y-4 text-sm">
                     <!-- Pelanggan & Catatan -->
-                    <div class="grid grid-cols-2 gap-4 p-4 rounded-2xl bg-indigo-50/5 dark:bg-indigo-950/20 border border-indigo-100/10 text-xs">
+                    <div
+                        class="grid grid-cols-2 gap-4 rounded-2xl border border-indigo-100/10 bg-indigo-50/5 p-4 text-xs dark:bg-indigo-950/20"
+                    >
                         <div>
-                            <span class="text-muted-foreground block">Pelanggan:</span>
-                            <span class="font-bold text-foreground text-sm mt-0.5">{{ selectedTransaction.customer_name || selectedTransaction.customer?.name || 'Cash / Umum' }}</span>
-                            <span v-if="selectedTransaction.customer_phone || selectedTransaction.customer?.phone" class="text-[10px] text-muted-foreground block">
-                                Telp: {{ selectedTransaction.customer_phone || selectedTransaction.customer?.phone }}
+                            <span class="block text-muted-foreground"
+                                >Pelanggan:</span
+                            >
+                            <span
+                                class="mt-0.5 text-sm font-bold text-foreground"
+                                >{{
+                                    selectedTransaction.customer_name ||
+                                    selectedTransaction.customer?.name ||
+                                    'Cash / Umum'
+                                }}</span
+                            >
+                            <span
+                                v-if="
+                                    selectedTransaction.customer_phone ||
+                                    selectedTransaction.customer?.phone
+                                "
+                                class="block text-[10px] text-muted-foreground"
+                            >
+                                Telp:
+                                {{
+                                    selectedTransaction.customer_phone ||
+                                    selectedTransaction.customer?.phone
+                                }}
                             </span>
                         </div>
                         <div>
-                            <span class="text-muted-foreground block">Catatan / Keterangan:</span>
-                            <span class="font-medium text-foreground block mt-0.5 whitespace-pre-line">{{ selectedTransaction.keterangan || '-' }}</span>
+                            <span class="block text-muted-foreground"
+                                >Catatan / Keterangan:</span
+                            >
+                            <span
+                                class="mt-0.5 block font-medium whitespace-pre-line text-foreground"
+                                >{{
+                                    selectedTransaction.keterangan || '-'
+                                }}</span
+                            >
                         </div>
                     </div>
 
-                    <div class="space-y-2 rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-4">
+                    <div
+                        class="space-y-2 rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-4"
+                    >
                         <div>
-                            <p class="text-xs font-bold text-foreground">Penerima Invoice</p>
-                            <p class="text-[10px] text-muted-foreground">Bisa diisi untuk customer sekali beli tanpa menyimpan ke master pelanggan.</p>
+                            <p class="text-xs font-bold text-foreground">
+                                Penerima Invoice
+                            </p>
+                            <p class="text-[10px] text-muted-foreground">
+                                Bisa diisi untuk customer sekali beli tanpa
+                                menyimpan ke master pelanggan.
+                            </p>
                         </div>
                         <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                            <input v-model="invoiceRecipientName" type="text" placeholder="Nama penerima invoice" class="h-9 rounded-xl border border-input bg-background px-3 text-xs text-foreground outline-none focus:ring-1 focus:ring-ring" />
-                            <input v-model="invoiceRecipientPhone" type="text" placeholder="Nomor telepon (opsional)" class="h-9 rounded-xl border border-input bg-background px-3 text-xs text-foreground outline-none focus:ring-1 focus:ring-ring" />
+                            <input
+                                v-model="invoiceRecipientName"
+                                type="text"
+                                placeholder="Nama penerima invoice"
+                                class="h-9 rounded-xl border border-input bg-background px-3 text-xs text-foreground outline-none focus:ring-1 focus:ring-ring"
+                            />
+                            <input
+                                v-model="invoiceRecipientPhone"
+                                type="text"
+                                placeholder="Nomor telepon (opsional)"
+                                class="h-9 rounded-xl border border-input bg-background px-3 text-xs text-foreground outline-none focus:ring-1 focus:ring-ring"
+                            />
                         </div>
-                        <Button type="button" size="sm" class="rounded-xl" :disabled="isSavingInvoiceRecipient" @click="saveInvoiceRecipient">
+                        <Button
+                            type="button"
+                            size="sm"
+                            class="rounded-xl"
+                            :disabled="isSavingInvoiceRecipient"
+                            @click="saveInvoiceRecipient"
+                        >
                             <i class="fas fa-save text-xs"></i>
                             Simpan Penerima Invoice
                         </Button>
                     </div>
 
                     <!-- Status & Metode -->
-                    <div class="grid grid-cols-2 gap-4 p-4 rounded-2xl bg-muted/30 border border-border/50">
+                    <div
+                        class="grid grid-cols-2 gap-4 rounded-2xl border border-border/50 bg-muted/30 p-4"
+                    >
                         <div>
-                            <p class="text-xs text-muted-foreground">Metode Pembayaran</p>
-                            <p class="text-sm font-bold capitalize text-foreground mt-0.5">{{ selectedTransaction.payment_method }}</p>
+                            <p class="text-xs text-muted-foreground">
+                                Metode Pembayaran
+                            </p>
+                            <p
+                                class="mt-0.5 text-sm font-bold text-foreground capitalize"
+                            >
+                                {{ selectedTransaction.payment_method }}
+                            </p>
                         </div>
                         <div>
-                            <p class="text-xs text-muted-foreground">Status Transaksi</p>
-                            <p class="text-sm font-black mt-0.5 uppercase tracking-wider"
-                                :class="selectedTransaction.status_bayar === 'lunas' || !selectedTransaction.status_bayar ? 'text-emerald-600 dark:text-emerald-400' : (selectedTransaction.status_bayar === 'dp' ? 'text-amber-600 dark:text-amber-400' : 'text-red-500')"
-                            >{{ selectedTransaction.status_bayar || 'lunas' }}</p>
+                            <p class="text-xs text-muted-foreground">
+                                Status Transaksi
+                            </p>
+                            <p
+                                class="mt-0.5 text-sm font-black tracking-wider uppercase"
+                                :class="
+                                    selectedTransaction.status_bayar ===
+                                        'lunas' ||
+                                    !selectedTransaction.status_bayar
+                                        ? 'text-emerald-600 dark:text-emerald-400'
+                                        : selectedTransaction.status_bayar ===
+                                            'dp'
+                                          ? 'text-amber-600 dark:text-amber-400'
+                                          : 'text-red-500'
+                                "
+                            >
+                                {{
+                                    selectedTransaction.status_bayar || 'lunas'
+                                }}
+                            </p>
                         </div>
                     </div>
 
                     <!-- Riwayat Pembayaran -->
-                    <div v-if="selectedTransaction.payment_histories?.length > 0" class="space-y-2">
-                        <h4 class="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                    <div
+                        v-if="selectedTransaction.payment_histories?.length > 0"
+                        class="space-y-2"
+                    >
+                        <h4
+                            class="flex items-center justify-between text-xs font-bold tracking-wider text-muted-foreground uppercase"
+                        >
                             <span>Riwayat Pembayaran Kronologis</span>
-                            <span class="text-[10px] font-normal">({{ selectedTransaction.payment_histories.length }} pembayaran)</span>
+                            <span class="text-[10px] font-normal"
+                                >({{
+                                    selectedTransaction.payment_histories.length
+                                }}
+                                pembayaran)</span
+                            >
                         </h4>
-                        <div class="border border-border rounded-2xl overflow-hidden bg-background divide-y divide-border/60">
-                            <div v-for="(pay, pIdx) in selectedTransaction.payment_histories" :key="pay.id" class="p-3 flex justify-between items-center text-xs">
+                        <div
+                            class="divide-y divide-border/60 overflow-hidden rounded-2xl border border-border bg-background"
+                        >
+                            <div
+                                v-for="(
+                                    pay, pIdx
+                                ) in selectedTransaction.payment_histories"
+                                :key="pay.id"
+                                class="flex items-center justify-between p-3 text-xs"
+                            >
                                 <div class="flex items-center gap-2.5">
-                                    <div class="w-5 h-5 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold text-[10px]">{{ pIdx + 1 }}</div>
+                                    <div
+                                        class="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/10 text-[10px] font-bold text-emerald-500"
+                                    >
+                                        {{ pIdx + 1 }}
+                                    </div>
                                     <div>
-                                        <p class="font-bold text-foreground">{{ pay.keterangan || 'Pembayaran' }}</p>
-                                        <p class="text-[10px] text-muted-foreground mt-0.5">{{ formatDate(pay.tanggal_bayar) }} &bull; <span class="capitalize">{{ pay.metode_bayar }}</span></p>
+                                        <p class="font-bold text-foreground">
+                                            {{ pay.keterangan || 'Pembayaran' }}
+                                        </p>
+                                        <p
+                                            class="mt-0.5 text-[10px] text-muted-foreground"
+                                        >
+                                            {{ formatDate(pay.tanggal_bayar) }}
+                                            &bull;
+                                            <span class="capitalize">{{
+                                                pay.metode_bayar
+                                            }}</span>
+                                        </p>
                                     </div>
                                 </div>
-                                <span class="font-mono font-bold text-emerald-600 dark:text-emerald-400">Rp {{ formatRupiah(pay.jumlah_bayar) }}</span>
+                                <span
+                                    class="font-mono font-bold text-emerald-600 dark:text-emerald-400"
+                                    >Rp
+                                    {{ formatRupiah(pay.jumlah_bayar) }}</span
+                                >
                             </div>
                         </div>
                     </div>
 
                     <!-- Item Belanja -->
                     <div class="space-y-2">
-                        <h4 class="text-xs font-bold uppercase tracking-wider text-muted-foreground">Item yang Dibeli</h4>
-                        <div class="divide-y divide-border border border-border rounded-2xl overflow-hidden bg-background">
-                            <div v-for="item in selectedTransaction.items" :key="item.id" class="p-3 flex justify-between items-center text-xs">
+                        <h4
+                            class="text-xs font-bold tracking-wider text-muted-foreground uppercase"
+                        >
+                            Item yang Dibeli
+                        </h4>
+                        <div
+                            class="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-background"
+                        >
+                            <div
+                                v-for="item in selectedTransaction.items"
+                                :key="item.id"
+                                class="flex items-center justify-between p-3 text-xs"
+                            >
                                 <div>
-                                    <p class="font-bold text-foreground text-sm leading-tight">{{ item.item_name }}</p>
-                                    <p class="text-[11px] text-muted-foreground mt-0.5">
-                                        {{ parseFloat(item.quantity) }} {{ item.unit || 'pcs' }} &times; Rp {{ formatRupiah(item.selling_price) }}
+                                    <p
+                                        class="text-sm leading-tight font-bold text-foreground"
+                                    >
+                                        {{ item.item_name }}
                                     </p>
-                                    <p v-if="item.metadata?.detail" class="text-[10px] text-indigo-500 font-mono mt-0.5">{{ item.metadata.detail }}</p>
-                                    <p v-if="item.print_vendor" class="text-[10px] text-orange-500 mt-0.5">Mitra internal: {{ item.print_vendor.name }}</p>
+                                    <p
+                                        class="mt-0.5 text-[11px] text-muted-foreground"
+                                    >
+                                        {{ parseFloat(item.quantity) }}
+                                        {{ item.unit || 'pcs' }} &times; Rp
+                                        {{ formatRupiah(item.selling_price) }}
+                                    </p>
+                                    <p
+                                        v-if="item.metadata?.detail"
+                                        class="mt-0.5 font-mono text-[10px] text-indigo-500"
+                                    >
+                                        {{ item.metadata.detail }}
+                                    </p>
+                                    <p
+                                        v-if="item.print_vendor"
+                                        class="mt-0.5 text-[10px] text-orange-500"
+                                    >
+                                        Mitra internal:
+                                        {{ item.print_vendor.name }}
+                                    </p>
                                 </div>
                                 <div class="text-right">
-                                    <p class="font-bold text-foreground text-sm">Rp {{ formatRupiah(item.subtotal_price) }}</p>
-                                    <p class="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5">Untung: Rp {{ formatRupiah(item.profit) }}</p>
+                                    <p
+                                        class="text-sm font-bold text-foreground"
+                                    >
+                                        Rp
+                                        {{ formatRupiah(item.subtotal_price) }}
+                                    </p>
+                                    <p
+                                        class="mt-0.5 text-[11px] text-emerald-600 dark:text-emerald-400"
+                                    >
+                                        Untung: Rp
+                                        {{ formatRupiah(item.profit) }}
+                                    </p>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     <!-- Ringkasan Keuangan -->
-                    <div class="bg-muted/20 p-4 rounded-2xl border border-border/50 text-xs space-y-1.5">
+                    <div
+                        class="space-y-1.5 rounded-2xl border border-border/50 bg-muted/20 p-4 text-xs"
+                    >
                         <div class="flex justify-between">
-                            <span class="text-muted-foreground">Total Belanjaan:</span>
-                            <span class="font-bold font-mono text-foreground">Rp {{ formatRupiah(selectedTransaction.total_price) }}</span>
+                            <span class="text-muted-foreground"
+                                >Total Belanjaan:</span
+                            >
+                            <span class="font-mono font-bold text-foreground"
+                                >Rp
+                                {{
+                                    formatRupiah(
+                                        selectedTransaction.total_price,
+                                    )
+                                }}</span
+                            >
                         </div>
                         <div class="flex justify-between font-semibold">
-                            <span class="text-emerald-600 dark:text-emerald-400">Total Uang Masuk:</span>
-                            <span class="font-bold font-mono text-emerald-600 dark:text-emerald-400">Rp {{ formatRupiah(selectedTransaction.jumlah_dibayar || 0) }}</span>
+                            <span class="text-emerald-600 dark:text-emerald-400"
+                                >Total Uang Masuk:</span
+                            >
+                            <span
+                                class="font-mono font-bold text-emerald-600 dark:text-emerald-400"
+                                >Rp
+                                {{
+                                    formatRupiah(
+                                        selectedTransaction.jumlah_dibayar || 0,
+                                    )
+                                }}</span
+                            >
                         </div>
-                        <div v-if="selectedTransaction.sisa_tagihan > 0" class="flex justify-between font-bold text-red-500">
+                        <div
+                            v-if="selectedTransaction.sisa_tagihan > 0"
+                            class="flex justify-between font-bold text-red-500"
+                        >
                             <span>Sisa Kurang / Piutang:</span>
-                            <span class="font-mono">Rp {{ formatRupiah(selectedTransaction.sisa_tagihan) }}</span>
+                            <span class="font-mono"
+                                >Rp
+                                {{
+                                    formatRupiah(
+                                        selectedTransaction.sisa_tagihan,
+                                    )
+                                }}</span
+                            >
                         </div>
                     </div>
 
-                    <div class="pt-2 border-t border-border flex justify-between items-center">
-                        <span class="text-sm font-medium text-muted-foreground">Total Profit Transaksi:</span>
-                        <span class="text-lg font-black text-emerald-600 dark:text-emerald-400">Rp {{ formatRupiah(selectedTransaction.total_profit) }}</span>
+                    <div
+                        class="flex items-center justify-between border-t border-border pt-2"
+                    >
+                        <span class="text-sm font-medium text-muted-foreground"
+                            >Total Profit Transaksi:</span
+                        >
+                        <span
+                            class="text-lg font-black text-emerald-600 dark:text-emerald-400"
+                            >Rp
+                            {{
+                                formatRupiah(selectedTransaction.total_profit)
+                            }}</span
+                        >
                     </div>
                 </div>
 
                 <DialogFooter>
                     <DialogClose as-child>
-                        <Button type="button" variant="secondary" class="rounded-xl">Tutup</Button>
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            class="rounded-xl"
+                            >Tutup</Button
+                        >
                     </DialogClose>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
 
         <!-- DIALOG EDIT CUSTOMER NOTA -->
-        <Dialog :open="customerEditOpen" @update:open="customerEditOpen = $event">
-            <DialogContent class="sm:max-w-[520px] rounded-2xl bg-card border-border text-foreground">
+        <Dialog
+            :open="customerEditOpen"
+            @update:open="customerEditOpen = $event"
+        >
+            <DialogContent
+                class="rounded-2xl border-border bg-card text-foreground sm:max-w-[520px]"
+            >
                 <DialogHeader v-if="customerEditTarget">
                     <DialogTitle class="flex items-center gap-2">
                         <i class="fas fa-user-edit text-blue-500"></i>
                         Edit Customer Nota
                     </DialogTitle>
                     <DialogDescription class="text-xs">
-                        Ubah customer pada nota {{ customerEditTarget.invoice_number }}.
+                        Ubah customer pada nota
+                        {{ customerEditTarget.invoice_number }}.
                     </DialogDescription>
                 </DialogHeader>
 
                 <div v-if="customerEditTarget" class="space-y-4 py-2">
-                    <div class="rounded-2xl border border-border bg-muted/20 p-4 text-xs">
+                    <div
+                        class="rounded-2xl border border-border bg-muted/20 p-4 text-xs"
+                    >
                         <p class="text-muted-foreground">Customer saat ini</p>
-                        <p class="mt-1 font-bold text-foreground">{{ getCustomerName(customerEditTarget) }}</p>
-                        <p class="text-muted-foreground">{{ customerEditTarget.customer_phone || customerEditTarget.customer?.phone || '-' }}</p>
+                        <p class="mt-1 font-bold text-foreground">
+                            {{ getCustomerName(customerEditTarget) }}
+                        </p>
+                        <p class="text-muted-foreground">
+                            {{
+                                customerEditTarget.customer_phone ||
+                                customerEditTarget.customer?.phone ||
+                                '-'
+                            }}
+                        </p>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-2 rounded-xl bg-muted/40 p-1">
+                    <div
+                        class="grid grid-cols-2 gap-2 rounded-xl bg-muted/40 p-1"
+                    >
                         <button
                             type="button"
                             class="rounded-lg px-3 py-2 text-xs font-bold transition"
-                            :class="customerEditMode === 'existing' ? 'bg-blue-600 text-white shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+                            :class="
+                                customerEditMode === 'existing'
+                                    ? 'bg-blue-600 text-white shadow-sm'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            "
                             @click="customerEditMode = 'existing'"
                         >
                             Customer Tersimpan
@@ -1327,15 +2210,26 @@ const flash = computed(() => usePage().props.flash ?? {});
                         <button
                             type="button"
                             class="rounded-lg px-3 py-2 text-xs font-bold transition"
-                            :class="customerEditMode === 'manual' ? 'bg-blue-600 text-white shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+                            :class="
+                                customerEditMode === 'manual'
+                                    ? 'bg-blue-600 text-white shadow-sm'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            "
                             @click="customerEditMode = 'manual'"
                         >
                             Manual / Umum
                         </button>
                     </div>
 
-                    <div v-if="customerEditMode === 'existing'" class="space-y-1.5">
-                        <label for="report-customer-select" class="text-xs font-bold text-foreground">Pilih Customer</label>
+                    <div
+                        v-if="customerEditMode === 'existing'"
+                        class="space-y-1.5"
+                    >
+                        <label
+                            for="report-customer-select"
+                            class="text-xs font-bold text-foreground"
+                            >Pilih Customer</label
+                        >
                         <SearchableSelect
                             id="report-customer-select"
                             v-model="customerEditSelectedId"
@@ -1350,7 +2244,11 @@ const flash = computed(() => usePage().props.flash ?? {});
 
                     <div v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div class="space-y-1.5">
-                            <label for="report-customer-name" class="text-xs font-bold text-foreground">Nama Customer</label>
+                            <label
+                                for="report-customer-name"
+                                class="text-xs font-bold text-foreground"
+                                >Nama Customer</label
+                            >
                             <input
                                 id="report-customer-name"
                                 v-model="customerEditName"
@@ -1360,7 +2258,11 @@ const flash = computed(() => usePage().props.flash ?? {});
                             />
                         </div>
                         <div class="space-y-1.5">
-                            <label for="report-customer-phone" class="text-xs font-bold text-foreground">Nomor HP</label>
+                            <label
+                                for="report-customer-phone"
+                                class="text-xs font-bold text-foreground"
+                                >Nomor HP</label
+                            >
                             <input
                                 id="report-customer-phone"
                                 v-model="customerEditPhone"
@@ -1374,51 +2276,93 @@ const flash = computed(() => usePage().props.flash ?? {});
 
                 <DialogFooter class="gap-2">
                     <DialogClose as-child>
-                        <Button type="button" variant="secondary" class="rounded-xl" :disabled="isSavingCustomerEdit">Batal</Button>
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            class="rounded-xl"
+                            :disabled="isSavingCustomerEdit"
+                            >Batal</Button
+                        >
                     </DialogClose>
-                    <Button type="button" class="rounded-xl bg-blue-600 hover:bg-blue-700 text-white" :disabled="isSavingCustomerEdit || (customerEditMode === 'existing' && !customerEditSelectedId)" @click="saveCustomerEdit">
+                    <Button
+                        type="button"
+                        class="rounded-xl bg-blue-600 text-white hover:bg-blue-700"
+                        :disabled="
+                            isSavingCustomerEdit ||
+                            (customerEditMode === 'existing' &&
+                                !customerEditSelectedId)
+                        "
+                        @click="saveCustomerEdit"
+                    >
                         <i class="fas fa-save text-xs"></i>
-                        {{ isSavingCustomerEdit ? 'Menyimpan...' : 'Simpan Customer' }}
+                        {{
+                            isSavingCustomerEdit
+                                ? 'Menyimpan...'
+                                : 'Simpan Customer'
+                        }}
                     </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
 
         <!-- DIALOG KONFIRMASI HAPUS -->
-        <Dialog :open="deleteConfirmOpen" @update:open="deleteConfirmOpen = $event">
-            <DialogContent class="sm:max-w-[420px] rounded-3xl bg-card border-border text-foreground shadow-2xl p-6">
-                <div class="flex flex-col items-center text-center space-y-4">
-                    <div class="w-16 h-16 rounded-full bg-red-500/10 dark:bg-red-500/20 text-red-500 flex items-center justify-center text-3xl">
+        <Dialog
+            :open="deleteConfirmOpen"
+            @update:open="deleteConfirmOpen = $event"
+        >
+            <DialogContent
+                class="rounded-3xl border-border bg-card p-6 text-foreground shadow-2xl sm:max-w-[420px]"
+            >
+                <div class="flex flex-col items-center space-y-4 text-center">
+                    <div
+                        class="flex h-16 w-16 items-center justify-center rounded-full bg-red-500/10 text-3xl text-red-500 dark:bg-red-500/20"
+                    >
                         <i class="fas fa-exclamation-triangle"></i>
                     </div>
                     <div class="space-y-1.5">
-                        <DialogTitle class="text-lg font-black text-foreground">Hapus Transaksi?</DialogTitle>
-                        <DialogDescription class="text-xs text-muted-foreground leading-relaxed px-2">
+                        <DialogTitle class="text-lg font-black text-foreground"
+                            >Hapus Transaksi?</DialogTitle
+                        >
+                        <DialogDescription
+                            class="px-2 text-xs leading-relaxed text-muted-foreground"
+                        >
                             Anda akan menghapus nota
-                            <strong class="font-mono text-foreground">{{ deleteTarget?.invoice_number }}</strong>
-                            secara permanen. Stok produk fisik akan dikembalikan. Tindakan ini tidak dapat dibatalkan.
+                            <strong class="font-mono text-foreground">{{
+                                deleteTarget?.invoice_number
+                            }}</strong>
+                            secara permanen. Stok produk fisik akan
+                            dikembalikan. Tindakan ini tidak dapat dibatalkan.
                         </DialogDescription>
                     </div>
                 </div>
-                <p v-if="deleteError" class="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
+                <p
+                    v-if="deleteError"
+                    class="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400"
+                >
                     {{ deleteError }}
                 </p>
-                <DialogFooter class="grid grid-cols-2 gap-3 mt-5">
+                <DialogFooter class="mt-5 grid grid-cols-2 gap-3">
                     <Button
                         @click="deleteConfirmOpen = false"
                         variant="outline"
-                        class="rounded-xl font-bold border-border hover:bg-muted text-foreground"
+                        class="rounded-xl border-border font-bold text-foreground hover:bg-muted"
                         :disabled="isDeleting"
                     >
                         Batal
                     </Button>
                     <Button
                         @click="confirmDelete"
-                        class="rounded-xl font-bold bg-red-600 hover:bg-red-700 text-white shadow-sm flex items-center justify-center gap-2"
+                        class="flex items-center justify-center gap-2 rounded-xl bg-red-600 font-bold text-white shadow-sm hover:bg-red-700"
                         :disabled="isDeleting"
                     >
-                        <i v-if="!isDeleting" class="fas fa-trash-alt text-xs"></i>
-                        <i v-else class="fas fa-circle-notch fa-spin text-xs"></i>
+                        <i
+                            v-if="!isDeleting"
+                            class="fas fa-trash-alt text-xs"
+                        ></i>
+                        <i
+                            v-else
+                            class="fas fa-circle-notch fa-spin text-xs"
+                        ></i>
                         {{ isDeleting ? 'Menghapus...' : 'Ya, Hapus' }}
                     </Button>
                 </DialogFooter>

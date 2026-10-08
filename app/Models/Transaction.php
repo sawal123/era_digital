@@ -10,7 +10,7 @@ class Transaction extends Model
         'invoice_number', 'cashier_id', 'customer_id', 'customer_name', 'customer_phone',
         'total_base_price', 'total_price', 'total_profit',
         'payment_method', 'payment_method_id', 'payment_status', 'status_bayar',
-        'jumlah_dibayar', 'uang_diterima', 'kembalian', 'sisa_tagihan', 'keterangan'
+        'jumlah_dibayar', 'uang_diterima', 'kembalian', 'sisa_tagihan', 'keterangan',
     ];
 
     public function cashier()

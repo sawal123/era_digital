@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Expense;
-use App\Models\Transaction;
-use App\Models\Product;
 use App\Models\Customer;
+use App\Models\Expense;
+use App\Models\Product;
+use App\Models\Transaction;
 use App\Services\ProfitCalculationService;
-use Inertia\Inertia;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
 
 class ReportController extends Controller
 {
@@ -21,11 +21,11 @@ class ReportController extends Controller
             ->get();
 
         $expenses = Expense::with([
-                'transaction.customer',
-                'allocations.transaction.customer',
-                'allocations.transactionItem.product.category',
-                'allocations.transactionItem.printVendor',
-            ])
+            'transaction.customer',
+            'allocations.transaction.customer',
+            'allocations.transactionItem.product.category',
+            'allocations.transactionItem.printVendor',
+        ])
             ->orderByDesc('date')
             ->latest()
             ->get()
@@ -42,7 +42,6 @@ class ReportController extends Controller
             'customers' => $customers,
         ]);
     }
-    
 
     public function destroy(Transaction $transaction)
     {
@@ -74,8 +73,9 @@ class ReportController extends Controller
                 ->with('success', "Transaksi {$transaction->invoice_number} berhasil dihapus.");
         } catch (\Exception $e) {
             DB::rollBack();
+
             return redirect()->route('reports.index')
-                ->with('error', 'Gagal menghapus transaksi: ' . $e->getMessage());
+                ->with('error', 'Gagal menghapus transaksi: '.$e->getMessage());
         }
     }
 
@@ -103,7 +103,7 @@ class ReportController extends Controller
             'customer_phone' => 'nullable|string|max:30',
         ]);
 
-        if (!empty($validated['customer_id'])) {
+        if (! empty($validated['customer_id'])) {
             $customer = Customer::findOrFail($validated['customer_id']);
 
             $transaction->update([

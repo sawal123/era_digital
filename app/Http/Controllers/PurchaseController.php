@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Expense;
 use App\Models\Product;
 use App\Models\Purchase;
-use App\Models\Expense;
 use App\Models\StockMovement;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -75,17 +75,17 @@ class PurchaseController extends Controller
                 'type' => 'in',
                 'quantity' => $request->quantity,
                 'reference_id' => $purchase->id,
-                'note' => 'Restock: ' . ($request->note ?? 'Stok masuk supplier')
+                'note' => 'Restock: '.($request->note ?? 'Stok masuk supplier'),
             ]);
 
             // 4. Catat otomatis ke Tabel Pengeluaran (expenses) kategori pembelian stok
             Expense::create([
                 'date' => $request->purchase_date,
-                'name' => 'Belanja Stok: ' . $product->name,
+                'name' => 'Belanja Stok: '.$product->name,
                 'amount' => $totalPrice,
                 'category' => 'pembelian_stok',
                 'hpp_status' => 'not_applicable',
-                'note' => 'Jumlah: ' . parseFloatAsString($request->quantity) . ' ' . $product->unit . ' @ Rp ' . number_format($request->cost_price, 0, ',', '.') . '. ' . ($request->note ?? '')
+                'note' => 'Jumlah: '.parseFloatAsString($request->quantity).' '.$product->unit.' @ Rp '.number_format($request->cost_price, 0, ',', '.').'. '.($request->note ?? ''),
             ]);
 
             DB::commit();
@@ -93,7 +93,8 @@ class PurchaseController extends Controller
             return redirect()->back()->with('success', 'Belanja barang berhasil disimpan, stok & pengeluaran telah diperbarui!');
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->back()->with('error', 'Gagal memproses pembelian: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', 'Gagal memproses pembelian: '.$e->getMessage());
         }
     }
 
@@ -144,12 +145,12 @@ class PurchaseController extends Controller
                 ->where('type', 'in')
                 ->update([
                     'quantity' => $request->quantity,
-                    'note' => 'Restock: ' . ($request->note ?? 'Stok masuk supplier'),
+                    'note' => 'Restock: '.($request->note ?? 'Stok masuk supplier'),
                 ]);
 
             // Try to update matching expense (best-effort), otherwise create one
             $expense = Expense::where('category', 'pembelian_stok')
-                ->where('name', 'like', 'Belanja Stok: ' . $product->name . '%')
+                ->where('name', 'like', 'Belanja Stok: '.$product->name.'%')
                 ->where('amount', $oldTotal)
                 ->where('date', $purchase->purchase_date)
                 ->first();
@@ -158,16 +159,16 @@ class PurchaseController extends Controller
                 $expense->update([
                     'date' => $request->purchase_date,
                     'amount' => $newTotal,
-                    'note' => 'Jumlah: ' . parseFloatAsString($request->quantity) . ' ' . $product->unit . ' @ Rp ' . number_format($request->cost_price, 0, ',', '.') . '. ' . ($request->note ?? ''),
+                    'note' => 'Jumlah: '.parseFloatAsString($request->quantity).' '.$product->unit.' @ Rp '.number_format($request->cost_price, 0, ',', '.').'. '.($request->note ?? ''),
                 ]);
             } else {
                 Expense::create([
                     'date' => $request->purchase_date,
-                    'name' => 'Belanja Stok: ' . $product->name,
+                    'name' => 'Belanja Stok: '.$product->name,
                     'amount' => $newTotal,
                     'category' => 'pembelian_stok',
                     'hpp_status' => 'not_applicable',
-                    'note' => 'Jumlah: ' . parseFloatAsString($request->quantity) . ' ' . $product->unit . ' @ Rp ' . number_format($request->cost_price, 0, ',', '.') . '. ' . ($request->note ?? ''),
+                    'note' => 'Jumlah: '.parseFloatAsString($request->quantity).' '.$product->unit.' @ Rp '.number_format($request->cost_price, 0, ',', '.').'. '.($request->note ?? ''),
                 ]);
             }
 
@@ -176,7 +177,8 @@ class PurchaseController extends Controller
             return redirect()->back()->with('success', 'Pembelian berhasil diperbarui.');
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->back()->with('error', 'Gagal memperbarui pembelian: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', 'Gagal memperbarui pembelian: '.$e->getMessage());
         }
     }
 
@@ -200,7 +202,7 @@ class PurchaseController extends Controller
 
             // Try to delete matching expense (best-effort)
             Expense::where('category', 'pembelian_stok')
-                ->where('name', 'like', 'Belanja Stok: ' . ($product ? $product->name : '%'))
+                ->where('name', 'like', 'Belanja Stok: '.($product ? $product->name : '%'))
                 ->where('amount', $purchase->total_price)
                 ->where('date', $purchase->purchase_date)
                 ->delete();
@@ -213,7 +215,8 @@ class PurchaseController extends Controller
             return redirect()->back()->with('success', 'Pembelian berhasil dihapus dan stok telah disesuaikan.');
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->back()->with('error', 'Gagal menghapus pembelian: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', 'Gagal menghapus pembelian: '.$e->getMessage());
         }
     }
 }

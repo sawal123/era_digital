@@ -19,7 +19,7 @@ function makeTransaction(array $attributes = [], array $itemAttributes = []): ar
 {
     $user = User::factory()->create();
     $transaction = Transaction::create(array_merge([
-        'invoice_number' => 'TRX-' . fake()->unique()->numerify('###'),
+        'invoice_number' => 'TRX-'.fake()->unique()->numerify('###'),
         'cashier_id' => $user->id,
         'customer_name' => 'Customer Test',
         'total_base_price' => 100000,

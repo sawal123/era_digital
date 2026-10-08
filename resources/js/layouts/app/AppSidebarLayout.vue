@@ -1,29 +1,29 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
+import {
+    LayoutGrid,
+    MonitorSmartphone,
+    Layers,
+    Package,
+    RefreshCw,
+    Users,
+    BarChart3,
+    Wallet,
+    Settings,
+    Menu,
+    X,
+    Receipt,
+    CreditCard,
+    Handshake,
+    MailOpen,
+} from 'lucide-vue-next';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import AppContent from '@/components/AppContent.vue';
 import AppShell from '@/components/AppShell.vue';
 import AppSidebar from '@/components/AppSidebar.vue';
 import AppSidebarHeader from '@/components/AppSidebarHeader.vue';
 import { Toaster } from '@/components/ui/sonner';
 import type { BreadcrumbItem } from '@/types';
-import { 
-    LayoutGrid, 
-    MonitorSmartphone, 
-    Layers, 
-    Package, 
-    RefreshCw, 
-    Users, 
-    BarChart3, 
-    Wallet, 
-    Settings, 
-    Menu, 
-    X,
-    Receipt,
-    CreditCard,
-    Handshake,
-    MailOpen
-} from 'lucide-vue-next';
 
 type Props = {
     breadcrumbs?: BreadcrumbItem[];
@@ -121,6 +121,7 @@ const isItemActive = (href: string) => {
     if (href === '/dashboard') {
         return currentPath.value === '/dashboard';
     }
+
     return currentPath.value.startsWith(href);
 };
 
@@ -162,124 +163,168 @@ onUnmounted(() => {
     </AppShell>
 
     <!-- FLOATING ACTION BUTTON (KHUSUS MOBILE - DEFAULT) -->
-    <div v-if="currentPath !== '/pos'" class="fixed bottom-6 right-6 z-[90] md:hidden">
+    <div
+        v-if="currentPath !== '/pos'"
+        class="fixed right-6 bottom-6 z-[90] md:hidden"
+    >
         <button
             @click="toggleMobileMenu"
-            class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-3 rounded-full shadow-[0_10px_25px_-5px_rgba(79,70,229,0.5)] active:scale-95 transition-all duration-300 border border-white/10 group"
+            class="group flex items-center gap-2 rounded-full border border-white/10 bg-indigo-600 px-5 py-3 font-bold text-white shadow-[0_10px_25px_-5px_rgba(79,70,229,0.5)] transition-all duration-300 hover:bg-indigo-700 active:scale-95"
         >
             <component
                 :is="isMobileMenuOpen ? X : Menu"
-                class="w-5 h-5 transition-transform duration-300 group-hover:rotate-90"
+                class="h-5 w-5 transition-transform duration-300 group-hover:rotate-90"
             />
-            <span class="text-sm tracking-wider uppercase font-extrabold">MENU</span>
+            <span class="text-sm font-extrabold tracking-wider uppercase"
+                >MENU</span
+            >
         </button>
     </div>
 
     <!-- FLOATING CONTAINER FOR BOTH MENU AND CART (VERTICALLY STACKED) ON POS PAGE -->
-    <div v-if="currentPath === '/pos'" class="fixed bottom-4 right-4 z-[90] md:hidden flex flex-col items-end gap-2">
+    <div
+        v-if="currentPath === '/pos'"
+        class="fixed right-4 bottom-4 z-[90] flex flex-col items-end gap-2 md:hidden"
+    >
         <!-- Tombol KERANJANG / BAYAR (Warna Hijau) -->
-        <button 
+        <button
             v-if="mobileCart.hasItems"
             @click="openMobileCart"
-            class="flex items-center gap-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold px-5 py-3.5 rounded-full shadow-[0_10px_25px_-5px_rgba(16,185,129,0.4)] active:scale-[0.98] transition-all duration-300 border border-white/10"
+            class="flex items-center gap-2.5 rounded-full border border-white/10 bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-3.5 font-bold text-white shadow-[0_10px_25px_-5px_rgba(16,185,129,0.4)] transition-all duration-300 active:scale-[0.98]"
         >
             <div class="flex items-center gap-1.5">
-                <i class="fas fa-shopping-cart text-xs animate-pulse"></i>
-                <span class="text-xs font-bold">{{ mobileCart.count }} Item</span>
+                <i class="fas fa-shopping-cart animate-pulse text-xs"></i>
+                <span class="text-xs font-bold"
+                    >{{ mobileCart.count }} Item</span
+                >
             </div>
             <span class="h-3 w-px bg-white/20"></span>
-            <span class="text-xs font-black">Rp {{ formatRupiah(mobileCart.total) }}</span>
+            <span class="text-xs font-black"
+                >Rp {{ formatRupiah(mobileCart.total) }}</span
+            >
         </button>
 
         <!-- Tombol MENU (Warna Ungu) -->
         <button
             @click="toggleMobileMenu"
-            class="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-bold px-5 py-3 rounded-full shadow-[0_10px_25px_-5px_rgba(147,51,234,0.4)] active:scale-95 transition-all duration-300 border border-white/10 group"
+            class="group flex items-center gap-2 rounded-full border border-white/10 bg-purple-600 px-5 py-3 font-bold text-white shadow-[0_10px_25px_-5px_rgba(147,51,234,0.4)] transition-all duration-300 hover:bg-purple-700 active:scale-95"
         >
             <component
                 :is="isMobileMenuOpen ? X : Menu"
-                class="w-4 h-4 transition-transform duration-300 group-hover:rotate-90"
+                class="h-4 w-4 transition-transform duration-300 group-hover:rotate-90"
             />
-            <span class="text-xs tracking-wider uppercase font-extrabold">MENU</span>
+            <span class="text-xs font-extrabold tracking-wider uppercase"
+                >MENU</span
+            >
         </button>
     </div>
 
     <!-- BACKDROP / OVERLAY WITH TRANSITION -->
-    <div 
+    <div
         v-if="isMobileMenuOpen"
         @click="closeMobileMenu"
-        class="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100] md:hidden transition-all duration-300"
+        class="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs transition-all duration-300 md:hidden"
     ></div>
 
     <!-- BOTTOM SHEET PANEL WITH SLIDE UP ANIMATION -->
-    <div 
-        class="fixed bottom-0 left-0 right-0 max-h-[85vh] bg-card border-t border-border rounded-t-[2.5rem] z-[101] md:hidden flex flex-col transition-all duration-500 ease-out shadow-2xl overflow-hidden transform"
+    <div
+        class="fixed right-0 bottom-0 left-0 z-[101] flex max-h-[85vh] transform flex-col overflow-hidden rounded-t-[2.5rem] border-t border-border bg-card shadow-2xl transition-all duration-500 ease-out md:hidden"
         :class="isMobileMenuOpen ? 'translate-y-0' : 'translate-y-full'"
     >
         <!-- Drag Handle Indicator -->
-        <div class="w-12 h-1.5 bg-muted rounded-full mx-auto my-3.5 opacity-60"></div>
+        <div
+            class="mx-auto my-3.5 h-1.5 w-12 rounded-full bg-muted opacity-60"
+        ></div>
 
         <!-- Header -->
-        <div class="flex justify-between items-center px-6 pb-3 border-b border-border/60">
+        <div
+            class="flex items-center justify-between border-b border-border/60 px-6 pb-3"
+        >
             <div>
-                <h3 class="text-base font-black tracking-tight text-foreground">Menu Navigasi</h3>
-                <p class="text-xs text-muted-foreground">Pilih menu untuk berpindah halaman.</p>
+                <h3 class="text-base font-black tracking-tight text-foreground">
+                    Menu Navigasi
+                </h3>
+                <p class="text-xs text-muted-foreground">
+                    Pilih menu untuk berpindah halaman.
+                </p>
             </div>
-            <button 
+            <button
                 @click="closeMobileMenu"
-                class="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition"
+                class="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground transition hover:bg-accent hover:text-foreground"
             >
-                <X class="w-4 h-4" />
+                <X class="h-4 w-4" />
             </button>
         </div>
 
         <!-- Grid Menu Content -->
         <div class="overflow-y-auto px-5 py-6 pb-12">
-            <p class="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">Menu Utama</p>
+            <p
+                class="mb-2 text-[10px] font-black tracking-[0.18em] text-muted-foreground uppercase"
+            >
+                Menu Utama
+            </p>
             <div class="grid grid-cols-3 gap-3.5">
-                <Link 
-                    v-for="item in mainNavItems" 
+                <Link
+                    v-for="item in mainNavItems"
                     :key="item.href"
                     :href="item.href"
                     @click="closeMobileMenu"
-                    class="flex flex-col items-center justify-center p-4 rounded-2xl border text-center transition-all duration-200 select-none group"
-                    :class="isItemActive(item.href) 
-                        ? 'bg-indigo-500/10 text-indigo-600 border-indigo-500/30 dark:bg-indigo-500/20 dark:text-indigo-400 font-extrabold shadow-xs' 
-                        : 'bg-muted/30 text-muted-foreground hover:text-foreground hover:bg-muted/80 border-border/80'"
+                    class="group flex flex-col items-center justify-center rounded-2xl border p-4 text-center transition-all duration-200 select-none"
+                    :class="
+                        isItemActive(item.href)
+                            ? 'border-indigo-500/30 bg-indigo-500/10 font-extrabold text-indigo-600 shadow-xs dark:bg-indigo-500/20 dark:text-indigo-400'
+                            : 'border-border/80 bg-muted/30 text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+                    "
                 >
-                    <div 
-                        class="w-10 h-10 rounded-xl flex items-center justify-center mb-2 transition-transform duration-300 group-active:scale-90"
-                        :class="isItemActive(item.href) 
-                            ? 'bg-indigo-500 text-white shadow-sm' 
-                            : 'bg-background text-muted-foreground group-hover:text-foreground border border-border'"
+                    <div
+                        class="mb-2 flex h-10 w-10 items-center justify-center rounded-xl transition-transform duration-300 group-active:scale-90"
+                        :class="
+                            isItemActive(item.href)
+                                ? 'bg-indigo-500 text-white shadow-sm'
+                                : 'border border-border bg-background text-muted-foreground group-hover:text-foreground'
+                        "
                     >
-                        <component :is="item.icon" class="w-5 h-5" />
+                        <component :is="item.icon" class="h-5 w-5" />
                     </div>
-                    <span class="text-[10px] leading-snug font-bold uppercase tracking-wider block truncate w-full">{{ item.title }}</span>
+                    <span
+                        class="block w-full truncate text-[10px] leading-snug font-bold tracking-wider uppercase"
+                        >{{ item.title }}</span
+                    >
                 </Link>
             </div>
 
-            <p class="mb-2 mt-6 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">Data Master</p>
+            <p
+                class="mt-6 mb-2 text-[10px] font-black tracking-[0.18em] text-muted-foreground uppercase"
+            >
+                Data Master
+            </p>
             <div class="grid grid-cols-3 gap-3.5">
                 <Link
                     v-for="item in masterNavItems"
                     :key="item.href"
                     :href="item.href"
                     @click="closeMobileMenu"
-                    class="flex flex-col items-center justify-center p-4 rounded-2xl border text-center transition-all duration-200 select-none group"
-                    :class="isItemActive(item.href)
-                        ? 'bg-indigo-500/10 text-indigo-600 border-indigo-500/30 dark:bg-indigo-500/20 dark:text-indigo-400 font-extrabold shadow-xs'
-                        : 'bg-muted/30 text-muted-foreground hover:text-foreground hover:bg-muted/80 border-border/80'"
+                    class="group flex flex-col items-center justify-center rounded-2xl border p-4 text-center transition-all duration-200 select-none"
+                    :class="
+                        isItemActive(item.href)
+                            ? 'border-indigo-500/30 bg-indigo-500/10 font-extrabold text-indigo-600 shadow-xs dark:bg-indigo-500/20 dark:text-indigo-400'
+                            : 'border-border/80 bg-muted/30 text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+                    "
                 >
                     <div
-                        class="w-10 h-10 rounded-xl flex items-center justify-center mb-2 transition-transform duration-300 group-active:scale-90"
-                        :class="isItemActive(item.href)
-                            ? 'bg-indigo-500 text-white shadow-sm'
-                            : 'bg-background text-muted-foreground group-hover:text-foreground border border-border'"
+                        class="mb-2 flex h-10 w-10 items-center justify-center rounded-xl transition-transform duration-300 group-active:scale-90"
+                        :class="
+                            isItemActive(item.href)
+                                ? 'bg-indigo-500 text-white shadow-sm'
+                                : 'border border-border bg-background text-muted-foreground group-hover:text-foreground'
+                        "
                     >
-                        <component :is="item.icon" class="w-5 h-5" />
+                        <component :is="item.icon" class="h-5 w-5" />
                     </div>
-                    <span class="text-[10px] leading-snug font-bold uppercase tracking-wider block truncate w-full">{{ item.title }}</span>
+                    <span
+                        class="block w-full truncate text-[10px] leading-snug font-bold tracking-wider uppercase"
+                        >{{ item.title }}</span
+                    >
                 </Link>
             </div>
         </div>

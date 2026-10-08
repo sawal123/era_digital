@@ -10,7 +10,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('expenses', function (Blueprint $table) {
-            if (!Schema::hasColumn('expenses', 'transaction_id')) {
+            if (! Schema::hasColumn('expenses', 'transaction_id')) {
                 $table->foreignId('transaction_id')
                     ->nullable()
                     ->after('category')
@@ -18,7 +18,7 @@ return new class extends Migration
                     ->nullOnDelete();
             }
 
-            if (!Schema::hasColumn('expenses', 'hpp_status')) {
+            if (! Schema::hasColumn('expenses', 'hpp_status')) {
                 $table->string('hpp_status', 40)
                     ->default('not_applicable')
                     ->after('transaction_id');
@@ -30,7 +30,7 @@ return new class extends Migration
         if ($driver === 'mysql') {
             DB::statement("ALTER TABLE expenses MODIFY category VARCHAR(40) NOT NULL DEFAULT 'operasional_rutin'");
         } elseif ($driver === 'pgsql') {
-            DB::statement("ALTER TABLE expenses ALTER COLUMN category TYPE VARCHAR(40)");
+            DB::statement('ALTER TABLE expenses ALTER COLUMN category TYPE VARCHAR(40)');
             DB::statement("ALTER TABLE expenses ALTER COLUMN category SET DEFAULT 'operasional_rutin'");
         }
 

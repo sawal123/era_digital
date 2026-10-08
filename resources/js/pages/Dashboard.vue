@@ -1,6 +1,6 @@
 <script setup>
-import { ref, computed } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
+import { ref, computed } from 'vue';
 import { dashboard } from '@/routes';
 
 defineOptions({
@@ -35,18 +35,22 @@ const paddingY = 25;
 const maxProfit = computed(() => {
     const values = props.chartData.map((d) => d.profit);
     const max = Math.max(...values, 10000); // Fallback ceiling
+
     return max * 1.15; // 15% top margin
 });
 
 const minProfit = computed(() => {
     const values = props.chartData.map((d) => d.profit);
     const min = Math.min(...values, 0); // Scale floor
+
     return min < 0 ? min * 1.15 : 0;
 });
 
 // Calculate coordinate points for the SVG path
 const chartPoints = computed(() => {
-    if (!props.chartData || props.chartData.length === 0) return [];
+    if (!props.chartData || props.chartData.length === 0) {
+        return [];
+    }
 
     const range = maxProfit.value - minProfit.value;
     const count = props.chartData.length;
@@ -60,13 +64,17 @@ const chartPoints = computed(() => {
             paddingY -
             ((d.profit - minProfit.value) * (chartHeight - 2 * paddingY)) /
                 (range || 1);
+
         return { x, y, ...d };
     });
 });
 
 // Path string for the line
 const linePath = computed(() => {
-    if (chartPoints.value.length === 0) return '';
+    if (chartPoints.value.length === 0) {
+        return '';
+    }
+
     return chartPoints.value.reduce((path, p, i) => {
         return i === 0 ? `M ${p.x} ${p.y}` : `${path} L ${p.x} ${p.y}`;
     }, '');
@@ -74,7 +82,10 @@ const linePath = computed(() => {
 
 // Path string for the filled area under the line
 const areaPath = computed(() => {
-    if (chartPoints.value.length === 0) return '';
+    if (chartPoints.value.length === 0) {
+        return '';
+    }
+
     const first = chartPoints.value[0];
     const last = chartPoints.value[chartPoints.value.length - 1];
     const baselineY = chartHeight - paddingY;
@@ -94,6 +105,7 @@ const yGridLines = computed(() => {
             chartHeight - paddingY - (i * (chartHeight - 2 * paddingY)) / steps;
         lines.push({ y, val });
     }
+
     return lines;
 });
 
@@ -118,6 +130,7 @@ const handleMouseMove = (e) => {
 
     chartPoints.value.forEach((p) => {
         const dist = Math.abs(p.x - svgX);
+
         if (dist < minDist) {
             minDist = dist;
             closest = p;
@@ -209,11 +222,22 @@ const handleMouseLeave = () => {
                 ></div>
 
                 <!-- Tooltip -->
-                <div class="absolute left-3 top-3 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition transform -translate-y-1 group-hover:translate-y-0 pointer-events-none z-20">
-                    <div class="w-56 rounded-xl bg-slate-900 px-3 py-2 text-xs text-white shadow-xl border border-white/10 dark:bg-white dark:text-slate-900 dark:border-slate-200">
-                        <div class="font-bold text-[12px]">Ringkasan Omset</div>
-                        <div class="mt-1 text-[12px]">Total omset hari ini: <span class="font-mono">Rp {{ formatRupiah(stats.total_omset) }}</span></div>
-                        <div class="mt-1 text-[11px] text-muted-foreground">Klik untuk membuka laporan dan analisis rinci.</div>
+                <div
+                    class="pointer-events-none absolute top-3 left-3 z-20 -translate-y-1 transform opacity-0 transition group-hover:translate-y-0 group-hover:opacity-100 group-focus:opacity-100"
+                >
+                    <div
+                        class="w-56 rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-xs text-white shadow-xl dark:border-slate-200 dark:bg-white dark:text-slate-900"
+                    >
+                        <div class="text-[12px] font-bold">Ringkasan Omset</div>
+                        <div class="mt-1 text-[12px]">
+                            Total omset hari ini:
+                            <span class="font-mono"
+                                >Rp {{ formatRupiah(stats.total_omset) }}</span
+                            >
+                        </div>
+                        <div class="mt-1 text-[11px] text-muted-foreground">
+                            Klik untuk membuka laporan dan analisis rinci.
+                        </div>
                     </div>
                 </div>
 
@@ -275,11 +299,22 @@ const handleMouseLeave = () => {
                 ></div>
 
                 <!-- Tooltip -->
-                <div class="absolute left-3 top-3 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition transform -translate-y-1 group-hover:translate-y-0 pointer-events-none z-20">
-                    <div class="w-56 rounded-xl bg-slate-900 px-3 py-2 text-xs text-white shadow-xl border border-white/10 dark:bg-white dark:text-slate-900 dark:border-slate-200">
-                        <div class="font-bold text-[12px]">Ringkasan Modal</div>
-                        <div class="mt-1 text-[12px]">Total modal saat ini: <span class="font-mono">Rp {{ formatRupiah(stats.total_modal) }}</span></div>
-                        <div class="mt-1 text-[11px] text-muted-foreground">Cepat ke daftar produk atau tambah produk baru.</div>
+                <div
+                    class="pointer-events-none absolute top-3 left-3 z-20 -translate-y-1 transform opacity-0 transition group-hover:translate-y-0 group-hover:opacity-100 group-focus:opacity-100"
+                >
+                    <div
+                        class="w-56 rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-xs text-white shadow-xl dark:border-slate-200 dark:bg-white dark:text-slate-900"
+                    >
+                        <div class="text-[12px] font-bold">Ringkasan Modal</div>
+                        <div class="mt-1 text-[12px]">
+                            Total modal saat ini:
+                            <span class="font-mono"
+                                >Rp {{ formatRupiah(stats.total_modal) }}</span
+                            >
+                        </div>
+                        <div class="mt-1 text-[11px] text-muted-foreground">
+                            Cepat ke daftar produk atau tambah produk baru.
+                        </div>
                     </div>
                 </div>
 
@@ -340,11 +375,27 @@ const handleMouseLeave = () => {
                 ></div>
 
                 <!-- Tooltip -->
-                <div class="absolute left-3 top-3 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition transform -translate-y-1 group-hover:translate-y-0 pointer-events-none z-20">
-                    <div class="w-56 rounded-xl bg-slate-900 px-3 py-2 text-xs text-white shadow-xl border border-white/10 dark:bg-white dark:text-slate-900 dark:border-slate-200">
-                        <div class="font-bold text-[12px]">Ringkasan Pengeluaran</div>
-                        <div class="mt-1 text-[12px]">Total pengeluaran hari ini: <span class="font-mono">Rp {{ formatRupiah(stats.total_pengeluaran) }}</span></div>
-                        <div class="mt-1 text-[11px] text-muted-foreground">Kelola pengeluaran atau tambahkan transaksi baru.</div>
+                <div
+                    class="pointer-events-none absolute top-3 left-3 z-20 -translate-y-1 transform opacity-0 transition group-hover:translate-y-0 group-hover:opacity-100 group-focus:opacity-100"
+                >
+                    <div
+                        class="w-56 rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-xs text-white shadow-xl dark:border-slate-200 dark:bg-white dark:text-slate-900"
+                    >
+                        <div class="text-[12px] font-bold">
+                            Ringkasan Pengeluaran
+                        </div>
+                        <div class="mt-1 text-[12px]">
+                            Total pengeluaran hari ini:
+                            <span class="font-mono"
+                                >Rp
+                                {{
+                                    formatRupiah(stats.total_pengeluaran)
+                                }}</span
+                            >
+                        </div>
+                        <div class="mt-1 text-[11px] text-muted-foreground">
+                            Kelola pengeluaran atau tambahkan transaksi baru.
+                        </div>
                     </div>
                 </div>
 
@@ -405,11 +456,27 @@ const handleMouseLeave = () => {
                 ></div>
 
                 <!-- Tooltip -->
-                <div class="absolute left-3 top-3 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition transform -translate-y-1 group-hover:translate-y-0 pointer-events-none z-20">
-                    <div class="w-56 rounded-xl bg-slate-900 px-3 py-2 text-xs text-white shadow-xl border border-white/10 dark:bg-white dark:text-slate-900 dark:border-slate-200">
-                        <div class="font-bold text-[12px]">Ringkasan Keuntungan</div>
-                        <div class="mt-1 text-[12px]">Keuntungan bersih hari ini: <span class="font-mono">Rp {{ formatRupiah(stats.keuntungan_bersih) }}</span></div>
-                        <div class="mt-1 text-[11px] text-muted-foreground">Lihat rincian laba dan sumber utama.</div>
+                <div
+                    class="pointer-events-none absolute top-3 left-3 z-20 -translate-y-1 transform opacity-0 transition group-hover:translate-y-0 group-hover:opacity-100 group-focus:opacity-100"
+                >
+                    <div
+                        class="w-56 rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-xs text-white shadow-xl dark:border-slate-200 dark:bg-white dark:text-slate-900"
+                    >
+                        <div class="text-[12px] font-bold">
+                            Ringkasan Keuntungan
+                        </div>
+                        <div class="mt-1 text-[12px]">
+                            Keuntungan bersih hari ini:
+                            <span class="font-mono"
+                                >Rp
+                                {{
+                                    formatRupiah(stats.keuntungan_bersih)
+                                }}</span
+                            >
+                        </div>
+                        <div class="mt-1 text-[11px] text-muted-foreground">
+                            Lihat rincian laba dan sumber utama.
+                        </div>
                     </div>
                 </div>
 
@@ -470,11 +537,25 @@ const handleMouseLeave = () => {
                 ></div>
 
                 <!-- Tooltip -->
-                <div class="absolute left-3 top-3 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition transform -translate-y-1 group-hover:translate-y-0 pointer-events-none z-20">
-                    <div class="w-56 rounded-xl bg-slate-900 px-3 py-2 text-xs text-white shadow-xl border border-white/10 dark:bg-white dark:text-slate-900 dark:border-slate-200">
-                        <div class="font-bold text-[12px]">Admin Fee PPOB</div>
-                        <div class="mt-1 text-[12px]">Pendapatan PPOB: <span class="font-mono">Rp {{ formatRupiah(stats.keuntungan_ppob ?? 0) }}</span></div>
-                        <div class="mt-1 text-[11px] text-muted-foreground">Cepat filter laporan PPOB.</div>
+                <div
+                    class="pointer-events-none absolute top-3 left-3 z-20 -translate-y-1 transform opacity-0 transition group-hover:translate-y-0 group-hover:opacity-100 group-focus:opacity-100"
+                >
+                    <div
+                        class="w-56 rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-xs text-white shadow-xl dark:border-slate-200 dark:bg-white dark:text-slate-900"
+                    >
+                        <div class="text-[12px] font-bold">Admin Fee PPOB</div>
+                        <div class="mt-1 text-[12px]">
+                            Pendapatan PPOB:
+                            <span class="font-mono"
+                                >Rp
+                                {{
+                                    formatRupiah(stats.keuntungan_ppob ?? 0)
+                                }}</span
+                            >
+                        </div>
+                        <div class="mt-1 text-[11px] text-muted-foreground">
+                            Cepat filter laporan PPOB.
+                        </div>
                     </div>
                 </div>
 

@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\Product;
 use App\Models\Category;
+use App\Models\Product;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class ProductController extends Controller
@@ -16,7 +16,7 @@ class ProductController extends Controller
 
         return Inertia::render('Product/Index', [
             'products' => $products,
-            'categories' => $categories
+            'categories' => $categories,
         ]);
     }
 
@@ -57,7 +57,7 @@ class ProductController extends Controller
         $imagePath = null;
         if ($request->hasFile('image')) {
             $path = $request->file('image')->store('products', 'public');
-            $imagePath = '/storage/' . $path;
+            $imagePath = '/storage/'.$path;
         }
 
         Product::create([
@@ -82,8 +82,8 @@ class ProductController extends Controller
 
         $rules = [
             'category_id' => 'required|exists:categories,id',
-            'name' => 'required|string|max:255|unique:products,name,' . $product->id,
-            'sku' => 'nullable|string|max:100|unique:products,sku,' . $product->id,
+            'name' => 'required|string|max:255|unique:products,name,'.$product->id,
+            'sku' => 'nullable|string|max:100|unique:products,sku,'.$product->id,
             'unit' => 'nullable|string|max:50',
             'base_price' => 'required|numeric|min:0',
             'selling_price' => 'required|numeric|min:0',
@@ -117,7 +117,7 @@ class ProductController extends Controller
                 \Storage::disk('public')->delete($oldPath);
             }
             $path = $request->file('image')->store('products', 'public');
-            $imagePath = '/storage/' . $path;
+            $imagePath = '/storage/'.$path;
         }
 
         $product->update([
@@ -140,7 +140,7 @@ class ProductController extends Controller
     {
         // Prevent deletion if the product has transaction items (historical data protection)
         $hasTransactions = \DB::table('transaction_items')->where('product_id', $product->id)->exists();
-        
+
         if ($hasTransactions) {
             return redirect()->back()->with('error', 'Produk tidak bisa dihapus karena sudah memiliki riwayat transaksi. Silakan nonaktifkan saja.');
         }

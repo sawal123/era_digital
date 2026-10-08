@@ -23,7 +23,7 @@ class StoreProfileController extends Controller
         ]);
 
         return Inertia::render('settings/Store', [
-            'profile' => $profile
+            'profile' => $profile,
         ]);
     }
 
@@ -42,8 +42,8 @@ class StoreProfileController extends Controller
         ]);
 
         $profile = StoreProfile::first();
-        if (!$profile) {
-            $profile = new StoreProfile();
+        if (! $profile) {
+            $profile = new StoreProfile;
         }
 
         $data = [
@@ -60,7 +60,7 @@ class StoreProfileController extends Controller
             }
 
             $path = $request->file('logo')->store('logos', 'public');
-            $data['logo_path'] = '/storage/' . $path;
+            $data['logo_path'] = '/storage/'.$path;
         }
 
         if ($request->hasFile('signature')) {
@@ -72,7 +72,7 @@ class StoreProfileController extends Controller
 
             // Simpan gambar baru
             $path = $request->file('signature')->store('signatures', 'public');
-            $data['signature_path'] = '/storage/' . $path;
+            $data['signature_path'] = '/storage/'.$path;
         }
 
         $profile->fill($data)->save();

@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Expense extends Model
 {
     protected $fillable = [
-        'date', 'name', 'amount', 'category', 'transaction_id', 'hpp_status', 'note'
+        'date', 'name', 'amount', 'category', 'transaction_id', 'hpp_status', 'note',
     ];
 
     protected $casts = [

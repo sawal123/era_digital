@@ -72,4 +72,4 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('settings.store.update');
 });
 
-require __DIR__ . '/settings.php';
+require __DIR__.'/settings.php';

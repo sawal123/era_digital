@@ -45,7 +45,7 @@ test('index mengambil daftar undangan-cetak dan jenis-undangan dari API', functi
     $response = $this->get('/undangan');
 
     $response->assertInertia(
-        fn(Assert $page) => $page
+        fn (Assert $page) => $page
             ->component('Undangan/Index')
             ->has('undangan', 1)
             ->has('jenisUndangan', 2)

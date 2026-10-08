@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         // 1. Add admin_fee to products table if not exists
-        if (!Schema::hasColumn('products', 'admin_fee')) {
+        if (! Schema::hasColumn('products', 'admin_fee')) {
             Schema::table('products', function (Blueprint $table) {
                 $table->decimal('admin_fee', 15, 2)->default(0)->after('selling_price');
             });

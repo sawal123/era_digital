@@ -1,9 +1,8 @@
 <script setup>
-import { onBeforeUnmount, watch } from 'vue';
-import { EditorContent, useEditor } from '@tiptap/vue-3';
-import StarterKit from '@tiptap/starter-kit';
-import Placeholder from '@tiptap/extension-placeholder';
 import Link from '@tiptap/extension-link';
+import Placeholder from '@tiptap/extension-placeholder';
+import StarterKit from '@tiptap/starter-kit';
+import { EditorContent, useEditor } from '@tiptap/vue-3';
 import {
     Undo2,
     Redo2,
@@ -20,6 +19,7 @@ import {
     Link as LinkIcon,
     RemoveFormatting,
 } from 'lucide-vue-next';
+import { onBeforeUnmount, watch } from 'vue';
 
 const props = defineProps({
     modelValue: { type: String, default: '' },
@@ -65,22 +65,37 @@ const isActive = (type, attrs) => editor.value?.isActive(type, attrs) ?? false;
 const setLink = () => {
     const previousUrl = editor.value?.getAttributes('link').href ?? '';
     const url = window.prompt('Masukkan URL:', previousUrl || 'https://');
-    if (url === null) return;
-    if (url === '') {
-        editor.value?.chain().focus().extendMarkRange('link').unsetLink().run();
+
+    if (url === null) {
         return;
     }
-    editor.value?.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+
+    if (url === '') {
+        editor.value?.chain().focus().extendMarkRange('link').unsetLink().run();
+
+        return;
+    }
+
+    editor.value
+        ?.chain()
+        .focus()
+        .extendMarkRange('link')
+        .setLink({ href: url })
+        .run();
 };
 </script>
 
 <template>
-    <div class="rounded-xl border border-input bg-background overflow-hidden focus-within:ring-2 focus-within:ring-ring">
+    <div
+        class="overflow-hidden rounded-xl border border-input bg-background focus-within:ring-2 focus-within:ring-ring"
+    >
         <!-- Toolbar -->
-        <div class="flex flex-wrap items-center gap-0.5 border-b border-border bg-muted/30 px-2 py-1.5">
+        <div
+            class="flex flex-wrap items-center gap-0.5 border-b border-border bg-muted/30 px-2 py-1.5"
+        >
             <button
                 type="button"
-                class="h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground transition disabled:opacity-40"
+                class="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:opacity-40"
                 title="Batal (undo)"
                 :disabled="!editor?.can().chain().focus().undo().run()"
                 @click="editor?.chain().focus().undo().run()"
@@ -89,7 +104,7 @@ const setLink = () => {
             </button>
             <button
                 type="button"
-                class="h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground transition disabled:opacity-40"
+                class="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:opacity-40"
                 title="Ulang (redo)"
                 :disabled="!editor?.can().chain().focus().redo().run()"
                 @click="editor?.chain().focus().redo().run()"
@@ -101,8 +116,12 @@ const setLink = () => {
 
             <button
                 type="button"
-                class="h-7 w-7 rounded-md flex items-center justify-center transition"
-                :class="isActive('bold') ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' : 'text-muted-foreground hover:bg-accent hover:text-foreground'"
+                class="flex h-7 w-7 items-center justify-center rounded-md transition"
+                :class="
+                    isActive('bold')
+                        ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
+                        : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                "
                 title="Tebal"
                 @click="editor?.chain().focus().toggleBold().run()"
             >
@@ -110,8 +129,12 @@ const setLink = () => {
             </button>
             <button
                 type="button"
-                class="h-7 w-7 rounded-md flex items-center justify-center transition"
-                :class="isActive('italic') ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' : 'text-muted-foreground hover:bg-accent hover:text-foreground'"
+                class="flex h-7 w-7 items-center justify-center rounded-md transition"
+                :class="
+                    isActive('italic')
+                        ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
+                        : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                "
                 title="Miring"
                 @click="editor?.chain().focus().toggleItalic().run()"
             >
@@ -119,8 +142,12 @@ const setLink = () => {
             </button>
             <button
                 type="button"
-                class="h-7 w-7 rounded-md flex items-center justify-center transition"
-                :class="isActive('strike') ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' : 'text-muted-foreground hover:bg-accent hover:text-foreground'"
+                class="flex h-7 w-7 items-center justify-center rounded-md transition"
+                :class="
+                    isActive('strike')
+                        ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
+                        : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                "
                 title="Coret"
                 @click="editor?.chain().focus().toggleStrike().run()"
             >
@@ -131,28 +158,46 @@ const setLink = () => {
 
             <button
                 type="button"
-                class="h-7 w-7 rounded-md flex items-center justify-center transition"
-                :class="isActive('heading', { level: 1 }) ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' : 'text-muted-foreground hover:bg-accent hover:text-foreground'"
+                class="flex h-7 w-7 items-center justify-center rounded-md transition"
+                :class="
+                    isActive('heading', { level: 1 })
+                        ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
+                        : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                "
                 title="Heading 1"
-                @click="editor?.chain().focus().toggleHeading({ level: 1 }).run()"
+                @click="
+                    editor?.chain().focus().toggleHeading({ level: 1 }).run()
+                "
             >
                 <Heading1 class="size-4" />
             </button>
             <button
                 type="button"
-                class="h-7 w-7 rounded-md flex items-center justify-center transition"
-                :class="isActive('heading', { level: 2 }) ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' : 'text-muted-foreground hover:bg-accent hover:text-foreground'"
+                class="flex h-7 w-7 items-center justify-center rounded-md transition"
+                :class="
+                    isActive('heading', { level: 2 })
+                        ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
+                        : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                "
                 title="Heading 2"
-                @click="editor?.chain().focus().toggleHeading({ level: 2 }).run()"
+                @click="
+                    editor?.chain().focus().toggleHeading({ level: 2 }).run()
+                "
             >
                 <Heading2 class="size-4" />
             </button>
             <button
                 type="button"
-                class="h-7 w-7 rounded-md flex items-center justify-center transition"
-                :class="isActive('heading', { level: 3 }) ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' : 'text-muted-foreground hover:bg-accent hover:text-foreground'"
+                class="flex h-7 w-7 items-center justify-center rounded-md transition"
+                :class="
+                    isActive('heading', { level: 3 })
+                        ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
+                        : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                "
                 title="Heading 3"
-                @click="editor?.chain().focus().toggleHeading({ level: 3 }).run()"
+                @click="
+                    editor?.chain().focus().toggleHeading({ level: 3 }).run()
+                "
             >
                 <Heading3 class="size-4" />
             </button>
@@ -161,8 +206,12 @@ const setLink = () => {
 
             <button
                 type="button"
-                class="h-7 w-7 rounded-md flex items-center justify-center transition"
-                :class="isActive('bulletList') ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' : 'text-muted-foreground hover:bg-accent hover:text-foreground'"
+                class="flex h-7 w-7 items-center justify-center rounded-md transition"
+                :class="
+                    isActive('bulletList')
+                        ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
+                        : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                "
                 title="Daftar poin"
                 @click="editor?.chain().focus().toggleBulletList().run()"
             >
@@ -170,8 +219,12 @@ const setLink = () => {
             </button>
             <button
                 type="button"
-                class="h-7 w-7 rounded-md flex items-center justify-center transition"
-                :class="isActive('orderedList') ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' : 'text-muted-foreground hover:bg-accent hover:text-foreground'"
+                class="flex h-7 w-7 items-center justify-center rounded-md transition"
+                :class="
+                    isActive('orderedList')
+                        ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
+                        : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                "
                 title="Daftar nomor"
                 @click="editor?.chain().focus().toggleOrderedList().run()"
             >
@@ -179,8 +232,12 @@ const setLink = () => {
             </button>
             <button
                 type="button"
-                class="h-7 w-7 rounded-md flex items-center justify-center transition"
-                :class="isActive('blockquote') ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' : 'text-muted-foreground hover:bg-accent hover:text-foreground'"
+                class="flex h-7 w-7 items-center justify-center rounded-md transition"
+                :class="
+                    isActive('blockquote')
+                        ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
+                        : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                "
                 title="Kutipan"
                 @click="editor?.chain().focus().toggleBlockquote().run()"
             >
@@ -188,8 +245,12 @@ const setLink = () => {
             </button>
             <button
                 type="button"
-                class="h-7 w-7 rounded-md flex items-center justify-center transition"
-                :class="isActive('code') ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' : 'text-muted-foreground hover:bg-accent hover:text-foreground'"
+                class="flex h-7 w-7 items-center justify-center rounded-md transition"
+                :class="
+                    isActive('code')
+                        ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
+                        : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                "
                 title="Kode"
                 @click="editor?.chain().focus().toggleCode().run()"
             >
@@ -200,8 +261,12 @@ const setLink = () => {
 
             <button
                 type="button"
-                class="h-7 w-7 rounded-md flex items-center justify-center transition"
-                :class="isActive('link') ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' : 'text-muted-foreground hover:bg-accent hover:text-foreground'"
+                class="flex h-7 w-7 items-center justify-center rounded-md transition"
+                :class="
+                    isActive('link')
+                        ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
+                        : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                "
                 title="Tautan"
                 @click="setLink"
             >
@@ -209,9 +274,11 @@ const setLink = () => {
             </button>
             <button
                 type="button"
-                class="h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground transition"
+                class="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent hover:text-foreground"
                 title="Bersihkan format"
-                @click="editor?.chain().focus().clearNodes().unsetAllMarks().run()"
+                @click="
+                    editor?.chain().focus().clearNodes().unsetAllMarks().run()
+                "
             >
                 <RemoveFormatting class="size-4" />
             </button>

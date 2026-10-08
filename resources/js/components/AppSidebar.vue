@@ -1,6 +1,21 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
-import { LayoutGrid, MonitorSmartphone, Layers, Package, BarChart3, Wallet, RefreshCw, Users, Settings, Receipt, CreditCard, Handshake, MailOpen } from 'lucide-vue-next';
+import {
+    LayoutGrid,
+    MonitorSmartphone,
+    Layers,
+    Package,
+    BarChart3,
+    Wallet,
+    RefreshCw,
+    Users,
+    Settings,
+    Receipt,
+    CreditCard,
+    Handshake,
+    MailOpen,
+} from 'lucide-vue-next';
+import { computed } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
@@ -15,7 +30,6 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import type { NavItem } from '@/types';
-import { computed } from 'vue';
 
 const page = usePage();
 const isDemoUser = computed(() => page.props.auth.user?.role === 'demo');
@@ -53,11 +67,13 @@ const mainNavItems = computed<NavItem[]>(() => [
     },
     ...(isDemoUser.value
         ? []
-        : [{
-            title: 'Pengaturan Toko',
-            href: '/settings/store',
-            icon: Settings,
-        }]),
+        : [
+              {
+                  title: 'Pengaturan Toko',
+                  href: '/settings/store',
+                  icon: Settings,
+              },
+          ]),
 ]);
 
 const masterNavItems: NavItem[] = [
@@ -92,7 +108,6 @@ const masterNavItems: NavItem[] = [
         icon: MailOpen,
     },
 ];
-
 </script>
 
 <template>
