@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Expense;
 use App\Models\ExpenseAllocation;
 use App\Models\Transaction;
+use App\Models\TransactionItem;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
@@ -19,6 +20,7 @@ class ProfitCalculationService
         $transactions = Transaction::query()
             ->whereDate('created_at', '>=', $start)
             ->whereDate('created_at', '<=', $end)
+            ->with('items')
             ->get(['id', 'total_base_price', 'total_price', 'total_profit']);
 
         $expenses = Expense::query()
@@ -33,8 +35,8 @@ class ProfitCalculationService
     public function summarizeCollections(iterable $transactions, iterable $expenses): array
     {
         $totalSales = $this->sum($transactions, 'total_price');
-        $totalBase = $this->sum($transactions, 'total_base_price');
-        $grossProfit = $this->sum($transactions, 'total_profit');
+        $totalBase = (float) collect($transactions)->sum(fn (Transaction $transaction) => $this->transactionBase($transaction));
+        $grossProfit = (float) collect($transactions)->sum(fn (Transaction $transaction) => $this->transactionProfit($transaction));
         $expenseRows = collect($expenses)->map(fn (Expense $expense) => $this->expenseImpact($expense));
         $additionalHpp = (float) $expenseRows->sum('additional_hpp');
         $operationalExpenses = (float) $expenseRows->sum('operational_expense');
@@ -52,6 +54,38 @@ class ProfitCalculationService
             'transaction_count' => collect($transactions)->count(),
             'expense_count' => $expenseRows->count(),
         ];
+    }
+
+    public function transactionBase(Transaction $transaction): float
+    {
+        if ($transaction->relationLoaded('items') && $transaction->items->isNotEmpty()) {
+            return (float) $transaction->items->sum(fn (TransactionItem $item) => $this->itemBase($item));
+        }
+
+        return (float) $transaction->total_base_price;
+    }
+
+    public function transactionProfit(Transaction $transaction): float
+    {
+        if ($transaction->relationLoaded('items') && $transaction->items->isNotEmpty()) {
+            return round((float) $transaction->total_price - $this->transactionBase($transaction), 2);
+        }
+
+        return (float) $transaction->total_profit;
+    }
+
+    public function itemBase(TransactionItem $item): float
+    {
+        if ($item->type === 'ppob' && $item->provider_cost !== null) {
+            return round((float) $item->provider_cost * (float) $item->quantity, 2);
+        }
+
+        return (float) $item->subtotal_base;
+    }
+
+    public function itemProfit(TransactionItem $item): float
+    {
+        return round((float) $item->subtotal_price - $this->itemBase($item), 2);
     }
 
     public function expenseImpact(Expense $expense): array

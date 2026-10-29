@@ -22,7 +22,8 @@ import {
     Receipt,
     CreditCard,
     Handshake,
-    MailOpen
+    MailOpen,
+    Landmark
 } from 'lucide-vue-next';
 
 type Props = {
@@ -76,6 +77,11 @@ const mainNavItems = [
         title: 'Pengeluaran',
         href: '/expenses',
         icon: Wallet,
+    },
+    {
+        title: 'Ledger Modal',
+        href: '/capital',
+        icon: Landmark,
     },
     {
         title: 'Pengaturan',

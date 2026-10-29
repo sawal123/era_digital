@@ -1,0 +1,11 @@
+# Taste
+- Communicates in Indonesian (Bahasa Indonesia) and expects the conversation to be conducted in Indonesian. Confidence: 0.9
+- The business/store operates in WIB (UTC+7); any date/time handling in the app (POS sale dates, reports, daily filters) must be consistent with WIB, not UTC. Confidence: 0.7
+- When a feature depends on an external API, verify the API directly (e.g. curl the endpoints) to pin down whether the root cause is the external service or the app code, rather than assuming the app is at fault. Confidence: 0.6
+- Prefers concise final reporting over step-by-step narration: do not explain every working step; wrap up with a short structured summary (files changed, fix confirmation, regression test, test/build/lint results, status). Confidence: 0.9
+- Prefers tightly scoped PRs: do not expand scope into unrelated systems/files, and do not refactor unrelated files just to make a global lint pass — only fix lint errors introduced by the change and leave pre-existing ones alone. Confidence: 0.9
+- Git workflow for PR work: update the same PR branch with a normal push, never force-push, never merge, and never create extra branches or extra PRs — work stays on the designated branch with its single PR kept draft until the user approves. Confidence: 0.9
+- QA status discipline: never claim real-device PASS without actually running on the device; the user installs the APK and does physical-device retests themselves, so report code fixes as FIXED_IN_CODE_PENDING_DEVICE_RETEST and keep unverified scenarios as NOT_RUN. Confidence: 0.8
+- Persists app-critical state through native SQLite (Capacitor) hydration rather than localStorage/sessionStorage; startup decisions must read hydrated persisted state, not hardcoded URLs or web storage. Confidence: 0.7
+- Expects regression tests that map to each acceptance scenario of a bug fix (e.g. every startup state combination), not just the happy path. Confidence: 0.7
+- For data-correction migrations, expects regression tests that explicitly prove the untouched fields (e.g. updated_at) remain unchanged, not just that the corrected value is right. Confidence: 0.7

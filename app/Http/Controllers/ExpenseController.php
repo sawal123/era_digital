@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Expense;
 use App\Models\ExpenseAllocation;
 use App\Models\Transaction;
 use App\Models\TransactionItem;
 use App\Services\ProfitCalculationService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
@@ -17,10 +17,10 @@ class ExpenseController extends Controller
     public function index(ProfitCalculationService $profitCalculator)
     {
         $expenses = Expense::with([
-                'transaction.customer',
-                'allocations.transaction.customer',
-                'allocations.transactionItem.printVendor',
-            ])
+            'transaction.customer',
+            'allocations.transaction.customer',
+            'allocations.transactionItem.printVendor',
+        ])
             ->orderByDesc('date')
             ->latest()
             ->get()
@@ -31,15 +31,15 @@ class ExpenseController extends Controller
             });
 
         $transactions = Transaction::select([
-                'id',
-                'invoice_number',
-                'customer_name',
-                'customer_id',
-                'total_base_price',
-                'total_price',
-                'total_profit',
-                'created_at',
-            ])
+            'id',
+            'invoice_number',
+            'customer_name',
+            'customer_id',
+            'total_base_price',
+            'total_price',
+            'total_profit',
+            'created_at',
+        ])
             ->with([
                 'customer:id,name',
                 'items' => function ($query) {
@@ -67,11 +67,10 @@ class ExpenseController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request, ProfitCalculationService $profitCalculator)
     {
-        [$expenseData, $allocations] = $this->validateExpense($request);
-
-        DB::transaction(function () use ($expenseData, $allocations) {
+        DB::transaction(function () use ($request, $profitCalculator) {
+            [$expenseData, $allocations] = $this->validateExpense($request, null, $profitCalculator);
             $expense = Expense::create($expenseData);
             $this->syncAllocations($expense, $allocations);
         });
@@ -79,11 +78,10 @@ class ExpenseController extends Controller
         return redirect()->back()->with('success', 'Pengeluaran berhasil dicatat!');
     }
 
-    public function update(Request $request, Expense $expense)
+    public function update(Request $request, Expense $expense, ProfitCalculationService $profitCalculator)
     {
-        [$expenseData, $allocations] = $this->validateExpense($request);
-
-        DB::transaction(function () use ($expense, $expenseData, $allocations) {
+        DB::transaction(function () use ($request, $expense, $profitCalculator) {
+            [$expenseData, $allocations] = $this->validateExpense($request, $expense, $profitCalculator);
             $expense->update($expenseData);
             $this->syncAllocations($expense, $allocations);
         });
@@ -100,13 +98,17 @@ class ExpenseController extends Controller
         return redirect()->back()->with('success', 'Pengeluaran berhasil dihapus!');
     }
 
-    private function validateExpense(Request $request): array
-    {
+    private function validateExpense(
+        Request $request,
+        ?Expense $currentExpense,
+        ProfitCalculationService $profitCalculator,
+    ): array {
         $validator = Validator::make($request->all(), [
             'date' => 'required|date',
             'name' => 'required|string|max:255',
             'amount' => 'required|numeric|min:0.01',
             'category' => 'required|in:hpp_pesanan,pembelian_stok,operasional_rutin,aset_peralatan,pribadi_pemilik',
+            'purchase_id' => 'nullable|exists:purchases,id',
             'transaction_id' => 'nullable|exists:transactions,id',
             'hpp_status' => 'nullable|in:not_applicable,belum_masuk_hpp,sudah_masuk_hpp',
             'allocations' => 'nullable|array',
@@ -118,14 +120,40 @@ class ExpenseController extends Controller
             'note' => 'nullable|string',
         ]);
 
-        $validator->after(function ($validator) use ($request) {
+        $validator->after(function ($validator) use ($request, $currentExpense, $profitCalculator) {
             $category = $request->input('category');
             $allocations = collect($request->input('allocations', []))
                 ->filter(fn ($allocation) => is_array($allocation))
                 ->values();
 
+            $purchaseId = $request->input('purchase_id') ?: $currentExpense?->purchase_id;
+            if ($category === 'pembelian_stok') {
+                if (! $purchaseId) {
+                    $validator->errors()->add(
+                        'category',
+                        'Pembelian stok harus dicatat melalui menu Restock agar tidak salah memengaruhi laba.'
+                    );
+                } elseif (Expense::query()
+                    ->where('purchase_id', $purchaseId)
+                    ->when($currentExpense, fn ($query) => $query->where('id', '<>', $currentExpense->id))
+                    ->exists()) {
+                    $validator->errors()->add(
+                        'purchase_id',
+                        'Restock tersebut sudah memiliki catatan pengeluaran.'
+                    );
+                }
+            }
+
             if ($category !== 'hpp_pesanan') {
                 return;
+            }
+
+            if ($allocations->isEmpty() && $request->filled('transaction_id')) {
+                $allocations->push([
+                    'transaction_id' => $request->input('transaction_id'),
+                    'transaction_item_id' => null,
+                    'amount' => $request->input('amount'),
+                ]);
             }
 
             $totalAllocation = 0.0;
@@ -151,7 +179,7 @@ class ExpenseController extends Controller
                     }
                 }
 
-                $key = $transactionId . ':' . ($transactionItemId ?: 'nota');
+                $key = $transactionId.':'.($transactionItemId ?: 'nota');
                 if (isset($keys[$key])) {
                     $validator->errors()->add(
                         "allocations.{$index}.transaction_id",
@@ -164,6 +192,8 @@ class ExpenseController extends Controller
             if ($totalAllocation > ((float) $request->input('amount', 0)) + 0.00001) {
                 $validator->errors()->add('allocations', 'Total alokasi tidak boleh lebih besar dari nominal pengeluaran.');
             }
+
+            $this->validateAllocationCapacity($validator, $allocations, $currentExpense, $profitCalculator);
         });
 
         $validated = $validator->validate();
@@ -197,7 +227,96 @@ class ExpenseController extends Controller
             $validated['hpp_status'] = $validated['hpp_status'] ?? 'belum_masuk_hpp';
         }
 
+        if ($validated['category'] !== 'pembelian_stok') {
+            $validated['purchase_id'] = null;
+        } elseif (empty($validated['purchase_id']) && $currentExpense?->purchase_id) {
+            $validated['purchase_id'] = $currentExpense->purchase_id;
+        }
+
         return [$validated, $allocations];
+    }
+
+    private function validateAllocationCapacity(
+        $validator,
+        $allocations,
+        ?Expense $currentExpense,
+        ProfitCalculationService $profitCalculator,
+    ): void {
+        $transactionIds = $allocations
+            ->pluck('transaction_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($transactionIds->isEmpty()) {
+            return;
+        }
+
+        $transactions = Transaction::query()
+            ->with('items')
+            ->whereIn('id', $transactionIds)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get()
+            ->keyBy('id');
+
+        $existingAllocations = ExpenseAllocation::query()
+            ->whereIn('transaction_id', $transactionIds)
+            ->when($currentExpense, fn ($query) => $query->where('expense_id', '<>', $currentExpense->id))
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get(['transaction_id', 'transaction_item_id', 'amount']);
+
+        $existingByTransaction = $existingAllocations->groupBy('transaction_id')->map(
+            fn ($rows) => (float) $rows->sum(fn ($row) => (float) $row->amount)
+        );
+        $existingByItem = $existingAllocations
+            ->filter(fn ($row) => $row->transaction_item_id)
+            ->groupBy('transaction_item_id')
+            ->map(fn ($rows) => (float) $rows->sum(fn ($row) => (float) $row->amount));
+        $requestedByTransaction = $allocations->groupBy('transaction_id')->map(
+            fn ($rows) => (float) $rows->sum(fn ($row) => (float) ($row['amount'] ?? 0))
+        );
+        $requestedByItem = $allocations
+            ->filter(fn ($allocation) => ! empty($allocation['transaction_item_id']))
+            ->groupBy('transaction_item_id')
+            ->map(fn ($rows) => (float) $rows->sum(fn ($row) => (float) ($row['amount'] ?? 0)));
+
+        foreach ($transactions as $transactionId => $transaction) {
+            $transactionBase = $profitCalculator->transactionBase($transaction);
+            $allocatedTransaction = (float) ($existingByTransaction[$transactionId] ?? 0)
+                + (float) ($requestedByTransaction[$transactionId] ?? 0);
+
+            if ($allocatedTransaction > $transactionBase + 0.00001) {
+                $validator->errors()->add(
+                    'allocations',
+                    'Total alokasi untuk nota '.$transaction->invoice_number
+                        .' melebihi HPP yang tersedia (Rp '.number_format($transactionBase, 2, ',', '.').').'
+                );
+            }
+        }
+
+        foreach ($requestedByItem as $itemId => $requestedAmount) {
+            $item = $transactions
+                ->flatMap(fn (Transaction $transaction) => $transaction->items)
+                ->firstWhere('id', (int) $itemId);
+
+            if (! $item) {
+                continue;
+            }
+
+            $itemBase = $profitCalculator->itemBase($item);
+            $allocatedItem = (float) ($existingByItem[$itemId] ?? 0) + $requestedAmount;
+
+            if ($allocatedItem > $itemBase + 0.00001) {
+                $validator->errors()->add(
+                    'allocations',
+                    'Total alokasi untuk item '.$item->item_name
+                        .' melebihi HPP item yang tersedia (Rp '.number_format($itemBase, 2, ',', '.').').'
+                );
+            }
+        }
     }
 
     private function syncAllocations(Expense $expense, array $allocations): void

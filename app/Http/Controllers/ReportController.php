@@ -2,14 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Expense;
-use App\Models\Transaction;
-use App\Models\Product;
 use App\Models\Customer;
+use App\Models\Expense;
+use App\Models\Product;
+use App\Models\StockMovement;
+use App\Models\Transaction;
+use App\Services\CapitalLedgerService;
 use App\Services\ProfitCalculationService;
-use Inertia\Inertia;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
 
 class ReportController extends Controller
 {
@@ -20,12 +22,17 @@ class ReportController extends Controller
             ->latest()
             ->get();
 
+        $transactions->each(function (Transaction $transaction) use ($profitCalculator) {
+            $transaction->setAttribute('total_base_price', $profitCalculator->transactionBase($transaction));
+            $transaction->setAttribute('total_profit', $profitCalculator->transactionProfit($transaction));
+        });
+
         $expenses = Expense::with([
-                'transaction.customer',
-                'allocations.transaction.customer',
-                'allocations.transactionItem.product.category',
-                'allocations.transactionItem.printVendor',
-            ])
+            'transaction.customer',
+            'allocations.transaction.customer',
+            'allocations.transactionItem.product.category',
+            'allocations.transactionItem.printVendor',
+        ])
             ->orderByDesc('date')
             ->latest()
             ->get()
@@ -42,9 +49,8 @@ class ReportController extends Controller
             'customers' => $customers,
         ]);
     }
-    
 
-    public function destroy(Transaction $transaction)
+    public function destroy(Transaction $transaction, CapitalLedgerService $ledger)
     {
         if ($transaction->expenseAllocations()->exists()) {
             return redirect()->route('reports.index')
@@ -61,11 +67,23 @@ class ReportController extends Controller
                     $product = Product::find($item->product_id);
                     if ($product && $product->category?->type === 'fisik') {
                         $product->increment('stock', $item->quantity);
+                        StockMovement::create([
+                            'product_id' => $product->id,
+                            'type' => 'in',
+                            'quantity' => $item->quantity,
+                            'reference_type' => 'transaction_reversal',
+                            'reference_id' => $transaction->id,
+                            'note' => 'Pembatalan penjualan: '.$transaction->invoice_number,
+                        ]);
                     }
                 }
             }
 
             // Hapus transaksi (cascade ke items & payment_histories via FK)
+            foreach ($transaction->items as $item) {
+                $ledger->deleteReference('transaction_item', $item->id);
+            }
+
             $transaction->delete();
 
             DB::commit();
@@ -74,8 +92,9 @@ class ReportController extends Controller
                 ->with('success', "Transaksi {$transaction->invoice_number} berhasil dihapus.");
         } catch (\Exception $e) {
             DB::rollBack();
+
             return redirect()->route('reports.index')
-                ->with('error', 'Gagal menghapus transaksi: ' . $e->getMessage());
+                ->with('error', 'Gagal menghapus transaksi: '.$e->getMessage());
         }
     }
 
@@ -103,7 +122,7 @@ class ReportController extends Controller
             'customer_phone' => 'nullable|string|max:30',
         ]);
 
-        if (!empty($validated['customer_id'])) {
+        if (! empty($validated['customer_id'])) {
             $customer = Customer::findOrFail($validated['customer_id']);
 
             $transaction->update([

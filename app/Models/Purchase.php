@@ -7,11 +7,16 @@ use Illuminate\Database\Eloquent\Model;
 class Purchase extends Model
 {
     protected $fillable = [
-        'product_id', 'quantity', 'cost_price', 'total_price', 'purchase_date', 'note'
+        'product_id', 'quantity', 'cost_price', 'total_price', 'purchase_date', 'note',
     ];
 
     public function product()
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function expense()
+    {
+        return $this->hasOne(Expense::class);
     }
 }

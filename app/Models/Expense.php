@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Expense extends Model
 {
     protected $fillable = [
-        'date', 'name', 'amount', 'category', 'transaction_id', 'hpp_status', 'note'
+        'date', 'name', 'amount', 'category', 'transaction_id', 'purchase_id', 'hpp_status', 'note',
     ];
 
     protected $casts = [
@@ -23,6 +23,11 @@ class Expense extends Model
     public function transaction()
     {
         return $this->belongsTo(Transaction::class);
+    }
+
+    public function purchase()
+    {
+        return $this->belongsTo(Purchase::class);
     }
 
     public function allocations()
