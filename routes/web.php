@@ -14,6 +14,7 @@ use App\Http\Controllers\ReceivableController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\StoreProfileController;
 use App\Http\Controllers\UndanganController;
+use App\Http\Controllers\UpdateController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
@@ -23,6 +24,7 @@ Route::inertia('/', 'Welcome', [
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/updates', [UpdateController::class, 'index'])->name('updates.index');
 
     // POS Routes
     Route::get('/pos', [PosController::class, 'index'])->name('pos.index');

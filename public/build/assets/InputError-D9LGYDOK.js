@@ -1,0 +1,1 @@
+import{$t as e,Ht as t,Mt as n,_t as r,lt as i,mt as a,xt as o}from"./app-CLXlKPOl.js";var s={class:`text-sm text-red-600 dark:text-red-500`},c=o({__name:`InputError`,props:{message:{}},setup(o){return(c,l)=>t((n(),r(`div`,null,[a(`p`,s,e(o.message),1)],512)),[[i,o.message]])}});export{c as t};
