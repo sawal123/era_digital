@@ -27,15 +27,18 @@ class CustomerController extends Controller
         ])
             ->withCount('transactions')
             ->withSum('transactions as total_spent', 'total_price')
+            ->withSum('transactions as total_profit', 'total_profit')
             ->orderBy('name')
             ->get();
 
         $customers->each(function (Customer $customer) use ($profitCalculator) {
             $customer->setAttribute(
                 'total_profit',
-                (float) $customer->transactions->sum(
-                    fn (Transaction $transaction) => $profitCalculator->transactionProfit($transaction)
-                )
+                $customer->transactions_count > 0
+                    ? (float) $customer->transactions->sum(
+                        fn (Transaction $transaction) => $profitCalculator->transactionProfit($transaction)
+                    )
+                    : null
             );
         });
 

@@ -56,6 +56,12 @@ const isMobileCartOpen = ref(false);
 const duplicateCetakDialogOpen = ref(false);
 const pendingCetakItem = ref(null);
 const duplicateCetakIndex = ref(-1);
+// Qty Numeric Keypad State
+const qtyKeypadOpen = ref(false);
+const qtyKeypadItem = ref(null);
+const qtyKeypadInput = ref('');
+const qtyKeypadFresh = ref(true);
+
 const normalizeQuantity = (value) =>
     Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 const formatQuantity = (value) =>
@@ -105,8 +111,28 @@ const updateTime = () => {
     });
 };
 
-// Keyboard Shortcuts Listener
+// Keyboard Shortcuts & Keypad Listener
 const handleKeyDown = (e) => {
+    if (qtyKeypadOpen.value) {
+        if (e.key >= '0' && e.key <= '9') {
+            e.preventDefault();
+            appendQtyDigit(e.key);
+        } else if (e.key === 'Backspace') {
+            e.preventDefault();
+            backspaceQtyInput();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            closeQtyKeypad();
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            saveQtyKeypad();
+        } else if (e.key === 'Delete' || e.key === 'c' || e.key === 'C') {
+            e.preventDefault();
+            clearQtyInput();
+        }
+        return;
+    }
+
     if (e.key === 'F2') {
         e.preventDefault();
         prosesBayar();
@@ -894,6 +920,102 @@ const updateQty = (item, delta) => {
             );
         }
     }
+};
+
+const openQtyKeypad = (item) => {
+    qtyKeypadItem.value = item;
+    qtyKeypadInput.value = String(normalizeQuantity(item.quantity));
+    qtyKeypadFresh.value = true;
+    qtyKeypadOpen.value = true;
+};
+
+const appendQtyDigit = (digit) => {
+    if (qtyKeypadFresh.value) {
+        qtyKeypadInput.value = digit;
+        qtyKeypadFresh.value = false;
+        return;
+    }
+    if (qtyKeypadInput.value === '0') {
+        qtyKeypadInput.value = digit;
+    } else {
+        qtyKeypadInput.value += digit;
+    }
+};
+
+const clearQtyInput = () => {
+    qtyKeypadInput.value = '0';
+    qtyKeypadFresh.value = false;
+};
+
+const backspaceQtyInput = () => {
+    qtyKeypadFresh.value = false;
+    if (qtyKeypadInput.value.length <= 1) {
+        qtyKeypadInput.value = '0';
+    } else {
+        qtyKeypadInput.value = qtyKeypadInput.value.slice(0, -1);
+    }
+};
+
+const closeQtyKeypad = () => {
+    qtyKeypadOpen.value = false;
+    qtyKeypadItem.value = null;
+    qtyKeypadInput.value = '';
+    qtyKeypadFresh.value = true;
+};
+
+const saveQtyKeypad = () => {
+    if (!qtyKeypadItem.value) return;
+
+    const rawVal = String(qtyKeypadInput.value).trim();
+    const parsedVal = Number(rawVal);
+
+    if (
+        !rawVal ||
+        isNaN(parsedVal) ||
+        !Number.isFinite(parsedVal) ||
+        parsedVal <= 0
+    ) {
+        showNotification(
+            'Jumlah quantity harus berupa angka valid dan lebih besar dari 0 (nol).',
+            'Quantity Tidak Valid',
+            'warning',
+        );
+        return;
+    }
+
+    const item = qtyKeypadItem.value;
+    const isAreaBased = item.is_area_based;
+    const isDigital = item.type === 'digital' || item.type === 'ppob';
+
+    if (isAreaBased || isDigital) {
+        if (!Number.isInteger(parsedVal)) {
+            showNotification(
+                'Jumlah produk ini harus berupa bilangan bulat (pcs).',
+                'Quantity Tidak Valid',
+                'warning',
+            );
+            return;
+        }
+    }
+
+    const idx = cart.value.findIndex((i) => i._cartKey === item._cartKey);
+    if (idx !== -1) {
+        const newQty = normalizeQuantity(parsedVal);
+        cart.value[idx].quantity = newQty;
+
+        if (cart.value[idx].is_area_based) {
+            cart.value[idx].total_area = roundArea(
+                (cart.value[idx].area_per_piece || 0) * newQty,
+            );
+        }
+
+        if (cart.value[idx].type === 'fotokopi') {
+            cart.value[idx].detail =
+                `${formatQuantity(newQty)} lembar x Rp ${formatRupiah(cart.value[idx].price)}`;
+        }
+    }
+
+    closeQtyKeypad();
 };
 
 const removeFromCart = (index) => {
@@ -2633,12 +2755,15 @@ const formatRupiah = (angka) => {
                                         class="flex h-5 w-5 items-center justify-center rounded-full bg-muted p-0 text-[10px] text-foreground transition hover:bg-accent"
                                         >-</Button
                                     >
-                                    <span
-                                        class="min-w-4 text-center text-xs font-bold text-foreground"
-                                        >{{
-                                            formatQuantity(item.quantity)
-                                        }}</span
+                                    <button
+                                        type="button"
+                                        @click="openQtyKeypad(item)"
+                                        data-click-feedback="none"
+                                        title="Ubah Qty"
+                                        class="min-w-8 cursor-pointer rounded-lg border border-border bg-muted/50 px-2 py-0.5 text-center text-xs font-bold text-foreground transition hover:border-indigo-500/50 hover:bg-muted"
                                     >
+                                        {{ formatQuantity(item.quantity) }}
+                                    </button>
                                     <Button
                                         @click="updateQty(item, 1)"
                                         variant="ghost"
@@ -3026,10 +3151,15 @@ const formatRupiah = (angka) => {
                                 class="flex h-5 w-5 items-center justify-center rounded-full border border-border bg-background p-0 text-xs text-foreground transition hover:bg-muted"
                                 >-</Button
                             >
-                            <span
-                                class="min-w-4 text-center text-xs font-bold text-foreground"
-                                >{{ formatQuantity(item.quantity) }}</span
+                            <button
+                                type="button"
+                                @click="openQtyKeypad(item)"
+                                data-click-feedback="none"
+                                title="Ubah Qty"
+                                class="min-w-8 cursor-pointer rounded-lg border border-border bg-background px-2.5 py-0.5 text-center text-xs font-bold text-foreground transition hover:border-indigo-500/50 hover:bg-muted"
                             >
+                                {{ formatQuantity(item.quantity) }}
+                            </button>
                             <Button
                                 @click="updateQty(item, 1)"
                                 variant="ghost"
@@ -3450,6 +3580,136 @@ const formatRupiah = (angka) => {
                     >
                         Gunakan Nominal
                     </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
+        <!-- DIALOG NUMERIC KEYPAD QUANTITY -->
+        <Dialog
+            :open="qtyKeypadOpen"
+            @update:open="
+                (val) => (val ? (qtyKeypadOpen = true) : closeQtyKeypad())
+            "
+        >
+            <DialogContent
+                class="z-[9999] rounded-3xl border-border bg-card p-6 text-foreground sm:max-w-[400px]"
+            >
+                <DialogHeader>
+                    <DialogTitle
+                        class="flex items-center gap-2 text-foreground"
+                    >
+                        <i class="fas fa-calculator text-indigo-500"></i>
+                        Numeric Keypad Quantity
+                    </DialogTitle>
+                    <DialogDescription
+                        class="truncate text-xs text-muted-foreground"
+                    >
+                        {{ qtyKeypadItem?.name || 'Ubah kuantitas item' }}
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div class="space-y-4 py-2">
+                    <div
+                        class="space-y-2 rounded-2xl border border-border bg-muted/30 p-4"
+                    >
+                        <div
+                            class="flex justify-between text-xs text-muted-foreground"
+                        >
+                            <span>Harga Satuan / Pcs</span>
+                            <span class="font-mono font-bold text-foreground"
+                                >Rp
+                                {{
+                                    formatRupiah(qtyKeypadItem?.price || 0)
+                                }}</span
+                            >
+                        </div>
+                        <div
+                            class="flex min-h-[52px] items-center justify-end rounded-xl border border-border bg-background p-3 text-right font-mono text-2xl font-black tracking-wider text-foreground shadow-inner select-none"
+                        >
+                            {{ qtyKeypadInput || '0' }}
+                        </div>
+                        <div
+                            class="flex justify-between pt-1 text-xs font-bold"
+                        >
+                            <span class="text-muted-foreground"
+                                >Subtotal Item</span
+                            >
+                            <span
+                                class="font-mono text-indigo-600 dark:text-indigo-400"
+                            >
+                                Rp
+                                {{
+                                    formatRupiah(
+                                        (qtyKeypadItem?.price || 0) *
+                                            (Number(qtyKeypadInput) || 0),
+                                    )
+                                }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2">
+                        <button
+                            v-for="digit in [
+                                '1',
+                                '2',
+                                '3',
+                                '4',
+                                '5',
+                                '6',
+                                '7',
+                                '8',
+                                '9',
+                            ]"
+                            :key="digit"
+                            type="button"
+                            @click="appendQtyDigit(digit)"
+                            data-click-feedback="none"
+                            class="h-12 rounded-xl border border-border bg-background text-lg font-black text-foreground transition hover:bg-muted active:scale-95"
+                        >
+                            {{ digit }}
+                        </button>
+                        <button
+                            type="button"
+                            @click="clearQtyInput"
+                            data-click-feedback="none"
+                            class="h-12 rounded-xl border border-red-500/20 bg-red-500/5 text-xs font-black text-red-500 transition hover:bg-red-500/10 active:scale-95"
+                        >
+                            Clear
+                        </button>
+                        <button
+                            type="button"
+                            @click="appendQtyDigit('0')"
+                            data-click-feedback="none"
+                            class="h-12 rounded-xl border border-border bg-background text-lg font-black text-foreground transition hover:bg-muted active:scale-95"
+                        >
+                            0
+                        </button>
+                        <button
+                            type="button"
+                            @click="backspaceQtyInput"
+                            data-click-feedback="none"
+                            class="flex h-12 items-center justify-center rounded-xl border border-border bg-background text-foreground transition hover:bg-muted active:scale-95"
+                        >
+                            <i class="fas fa-backspace"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <DialogFooter class="gap-2 sm:grid sm:grid-cols-2">
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        @click="closeQtyKeypad"
+                        class="rounded-xl"
+                        >Batal</Button
+                    >
+                    <Button
+                        type="button"
+                        @click="saveQtyKeypad"
+                        class="rounded-xl bg-indigo-600 font-bold text-white hover:bg-indigo-700"
+                        >Simpan</Button
+                    >
                 </DialogFooter>
             </DialogContent>
         </Dialog>

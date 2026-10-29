@@ -289,6 +289,12 @@ const selectedTotalSpent = computed(() =>
         0,
     ),
 );
+const selectedTotalProfit = computed(() =>
+    selectedTransactions.value.reduce(
+        (sum, transaction) => sum + toNumber(transaction.total_profit),
+        0,
+    ),
+);
 
 const toNumber = (value) => Number.parseFloat(value ?? 0) || 0;
 const formatRupiah = (value) =>
@@ -718,12 +724,13 @@ const customerTypeLabel = (type) =>
                     <DialogDescription>
                         Total belanja Rp
                         {{ formatRupiah(selectedTotalSpent) }} dari
-                        {{ selectedTransactions.length }} transaksi.
+                        {{ selectedTransactions.length }} transaksi. Keuntungan
+                        Rp {{ formatRupiah(selectedTotalProfit) }}.
                     </DialogDescription>
                 </DialogHeader>
 
                 <div v-if="selectedHistoryCustomer" class="space-y-4 py-2">
-                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-4">
                         <div
                             class="rounded-2xl border border-border bg-muted/20 p-4"
                         >
@@ -734,6 +741,20 @@ const customerTypeLabel = (type) =>
                             </p>
                             <p class="mt-1 text-lg font-black text-foreground">
                                 Rp {{ formatRupiah(selectedTotalSpent) }}
+                            </p>
+                        </div>
+                        <div
+                            class="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4"
+                        >
+                            <p
+                                class="text-[11px] font-semibold tracking-wider text-emerald-600 uppercase dark:text-emerald-400"
+                            >
+                                Total Keuntungan
+                            </p>
+                            <p
+                                class="mt-1 text-lg font-black text-emerald-600 dark:text-emerald-400"
+                            >
+                                Rp {{ formatRupiah(selectedTotalProfit) }}
                             </p>
                         </div>
                         <div
