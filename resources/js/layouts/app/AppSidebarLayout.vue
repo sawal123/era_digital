@@ -91,11 +91,6 @@ const mainNavItems = [
         icon: LayoutGrid,
     },
     {
-        title: 'Update Aplikasi',
-        href: '/updates',
-        icon: Sparkles,
-    },
-    {
         title: 'POS Kasir',
         href: '/pos',
         icon: MonitorSmartphone,
@@ -129,6 +124,11 @@ const mainNavItems = [
         title: 'Pengaturan',
         href: '/settings/store',
         icon: Settings,
+    },
+    {
+        title: 'Update Aplikasi',
+        href: '/updates',
+        icon: Sparkles,
     },
 ];
 

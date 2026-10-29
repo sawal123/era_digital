@@ -43,11 +43,6 @@ const mainNavItems = computed<NavItem[]>(() => [
         icon: LayoutGrid,
     },
     {
-        title: 'Update Aplikasi',
-        href: '/updates',
-        icon: Sparkles,
-    },
-    {
         title: 'POS Kasir',
         href: '/pos',
         icon: MonitorSmartphone,
@@ -86,6 +81,11 @@ const mainNavItems = computed<NavItem[]>(() => [
                   icon: Settings,
               },
           ]),
+    {
+        title: 'Update Aplikasi',
+        href: '/updates',
+        icon: Sparkles,
+    },
 ]);
 
 const masterNavItems: NavItem[] = [
