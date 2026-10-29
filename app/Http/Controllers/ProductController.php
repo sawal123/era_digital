@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\StockMovement;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -11,7 +12,10 @@ class ProductController extends Controller
 {
     public function index()
     {
-        $products = Product::with('category')->latest()->get();
+        $products = Product::with('category')
+            ->withSum('transactionItems as total_sold', 'quantity')
+            ->latest()
+            ->get();
         $categories = Category::all();
 
         return Inertia::render('Product/Index', [
@@ -78,6 +82,8 @@ class ProductController extends Controller
 
     public function update(Request $request, Product $product)
     {
+        $oldCategoryType = $product->category?->type;
+        $oldStock = $oldCategoryType === 'fisik' ? (float) ($product->stock ?? 0) : null;
         $category = Category::findOrFail($request->category_id);
 
         $rules = [
@@ -132,6 +138,22 @@ class ProductController extends Controller
             'stock' => $category->type === 'fisik' ? $request->stock : null,
             'is_active' => $request->is_active,
         ]);
+
+        $newStock = $category->type === 'fisik' ? (float) $request->stock : null;
+        if ($oldStock !== $newStock && ($oldStock !== null || $newStock !== null)) {
+            $difference = abs(($newStock ?? 0) - ($oldStock ?? 0));
+
+            if ($difference > 0.00001) {
+                StockMovement::create([
+                    'product_id' => $product->id,
+                    'type' => 'adjustment',
+                    'quantity' => $difference,
+                    'reference_type' => 'product_edit',
+                    'reference_id' => $product->id,
+                    'note' => 'Penyesuaian stok manual: '.($oldStock ?? 0).' menjadi '.($newStock ?? 0),
+                ]);
+            }
+        }
 
         return redirect()->back()->with('success', 'Produk berhasil diperbarui!');
     }

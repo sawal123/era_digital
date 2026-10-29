@@ -12,6 +12,7 @@ Status yang digunakan: `TODO` → `IN PROGRESS` → `BLOCKED` / `REVIEW` → `DO
 | UI-006 | Menambahkan tombol Tarik semua pada penarikan modal | DONE | High | - |
 | UI-007 | Merapikan Ledger Modal agar saldo digital tidak tampil ganda | DONE | Medium | - |
 | UI-008 | Menambahkan filter riwayat ledger modal | DONE | Medium | - |
+| UI-009 | Menambahkan modal dan halaman informasi update aplikasi | DONE | Low | - |
 | AUDIT-001 | Audit dan penguatan integritas data stok, piutang, ledger, dan customer | DONE | High | - |
 | DOC-001 | Menetapkan instruksi kerja AI coding agent dan dokumentasi arsitektur repository | DONE | Medium | — |
 | BUG-001 | Verifikasi dan perbaikan perhitungan laba untuk pengeluaran belanja/restock | DONE | High | — |
@@ -23,6 +24,19 @@ Status yang digunakan: `TODO` → `IN PROGRESS` → `BLOCKED` / `REVIEW` → `DO
 | BUG-005 | Mencegah kategori pembelian stok tanpa restock menghilangkan biaya dari laba | DONE | High | - |
 | BUG-006 | Membatasi alokasi HPP pesanan agar tidak terhitung ganda atau melebihi HPP tersedia | DONE | High | - |
 | BUG-007 | Memblokir penjualan saldo digital saat saldo provider habis | DONE | High | - |
+| FEAT-003 | Menampilkan total terjual produk dan mencatat adjustment stok manual | DONE | Medium | - |
+
+## UI-009
+
+- Perubahan: modal update global pada area authenticated, halaman `/updates`, data versi dari `config/updates.php`, serta link Update Aplikasi di sidebar.
+- Perilaku: modal hanya muncul sekali per versi pada browser; tombol detail menandai update sudah dibaca lalu membuka halaman informasi.
+- Validasi: `UpdatesTest` lulus dan build Vite berhasil.
+
+## FEAT-003
+
+- Perubahan: master produk menerima agregat `total_sold` kumulatif dari `transaction_items`, lalu menampilkannya pada tabel produk.
+- Pengamanan: perubahan stok manual pada edit produk dicatat sebagai `StockMovement` bertipe `adjustment`.
+- Validasi: `ProductSalesAggregateTest` lulus dan build Vite berhasil.
 
 ## FEAT-001
 

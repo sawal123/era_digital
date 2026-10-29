@@ -1,0 +1,1 @@
+import{Ft as e,Mt as t,Xt as n,Yt as r,_t as i,q as a,xt as o}from"./app-CLXlKPOl.js";var s=o({__name:`CardDescription`,props:{class:{type:[Boolean,null,String,Object,Array]}},setup(o){let s=o;return(o,c)=>(t(),i(`p`,{"data-slot":`card-description`,class:n(r(a)(`text-muted-foreground text-sm`,s.class))},[e(o.$slots,`default`)],2))}});export{s as t};

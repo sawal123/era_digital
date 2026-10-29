@@ -282,13 +282,14 @@ const getTypeBadgeClass = (type) => {
                             <th class="p-4">Harga Modal</th>
                             <th class="p-4">Harga Jual</th>
                             <th class="p-4">Stok</th>
+                            <th class="p-4">Terjual</th>
                             <th class="p-4">Status</th>
                             <th class="p-4 text-right pr-6">Aksi</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-border text-sm">
                         <tr v-if="filteredProducts.length === 0">
-                            <td colspan="7" class="p-8 text-center text-muted-foreground">
+                            <td colspan="8" class="p-8 text-center text-muted-foreground">
                                 <i class="fas fa-box-open text-3xl mb-2 opacity-30"></i>
                                 <p>Tidak ada data produk ditemukan.</p>
                             </td>
@@ -327,6 +328,13 @@ const getTypeBadgeClass = (type) => {
                                 <span v-else class="text-muted-foreground text-xs italic">
                                     Unlimited ({{ product.category?.type === 'jasa' ? 'Jasa' : 'Digital' }})
                                 </span>
+                            </td>
+                            <!-- total sold -->
+                            <td class="p-4">
+                                <p class="font-semibold text-foreground">
+                                    {{ Number(product.total_sold || 0).toLocaleString('id-ID') }}
+                                    <span class="text-xs font-normal text-muted-foreground">{{ product.unit || 'unit' }}</span>
+                                </p>
                             </td>
                             <!-- status -->
                             <td class="p-4">
