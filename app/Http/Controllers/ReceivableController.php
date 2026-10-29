@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Transaction;
-use Inertia\Inertia;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
 
 class ReceivableController extends Controller
 {
@@ -20,7 +21,7 @@ class ReceivableController extends Controller
             ->get();
 
         return Inertia::render('Receivables/Index', [
-            'transactions' => $transactions
+            'transactions' => $transactions,
         ]);
     }
 
@@ -36,9 +37,27 @@ class ReceivableController extends Controller
         DB::beginTransaction();
 
         try {
-            $bayarNominal = $request->bayar_nominal;
-            $newJumlahDibayar = $transaction->jumlah_dibayar + $bayarNominal;
-            $totalPrice = $transaction->total_price;
+            $transaction = Transaction::query()
+                ->lockForUpdate()
+                ->findOrFail($transaction->id);
+
+            if (! in_array($transaction->status_bayar, ['dp', 'piutang'], true)) {
+                throw ValidationException::withMessages([
+                    'bayar_nominal' => 'Transaksi ini sudah lunas atau tidak lagi memiliki tagihan.',
+                ]);
+            }
+
+            $bayarNominal = round((float) $request->bayar_nominal, 2);
+            $totalPrice = (float) $transaction->total_price;
+            $sisaTagihanSaatIni = max(0, $totalPrice - (float) $transaction->jumlah_dibayar);
+
+            if ($bayarNominal > $sisaTagihanSaatIni + 0.00001) {
+                throw ValidationException::withMessages([
+                    'bayar_nominal' => 'Nominal pembayaran tidak boleh melebihi sisa tagihan Rp '.number_format($sisaTagihanSaatIni, 0, ',', '.').'.',
+                ]);
+            }
+
+            $newJumlahDibayar = round((float) $transaction->jumlah_dibayar + $bayarNominal, 2);
             $sisaTagihan = max(0, $totalPrice - $newJumlahDibayar);
 
             if ($newJumlahDibayar >= $totalPrice) {
@@ -56,7 +75,7 @@ class ReceivableController extends Controller
                 'sisa_tagihan' => $sisaTagihan,
                 'status_bayar' => $statusBayar,
                 'payment_status' => $paymentStatus,
-                'keterangan' => $transaction->keterangan . "\n[Lunas Tambahan Rp " . number_format($bayarNominal, 0, ',', '.') . " pada " . now()->format('d/m/Y H:i') . "]"
+                'keterangan' => trim(($transaction->keterangan ?? '')."\n[Pembayaran Tambahan Rp ".number_format($bayarNominal, 0, ',', '.').' pada '.now()->format('d/m/Y H:i').']'),
             ]);
 
             // Record chronicled payment history
@@ -70,9 +89,13 @@ class ReceivableController extends Controller
             DB::commit();
 
             return redirect()->back()->with('success', 'Pembayaran cicilan / pelunasan piutang berhasil disimpan!');
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->back()->with('error', 'Gagal memproses pelunasan: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', 'Gagal memproses pelunasan: '.$e->getMessage());
         }
     }
 }

@@ -90,6 +90,7 @@
 }
 
 :root {
+    color-scheme: light;
     --background: hsl(0 0% 100%);
     --foreground: hsl(0 0% 3.9%);
     --card: hsl(0 0% 100%);
@@ -129,6 +130,7 @@
 }
 
 .dark {
+    color-scheme: dark;
     --background: hsl(0 0% 3.9%);
     --foreground: hsl(0 0% 98%);
     --card: hsl(0 0% 3.9%);
@@ -174,6 +176,24 @@
     }
     body {
         @apply bg-background text-foreground;
+    }
+
+    /* Keep native select menus aligned with the active application theme. */
+    select,
+    select option,
+    select optgroup {
+        color: var(--foreground);
+        background-color: var(--popover);
+    }
+
+    select option:checked {
+        color: var(--primary-foreground);
+        background-color: var(--primary);
+    }
+
+    select:focus-visible {
+        outline: 2px solid var(--ring);
+        outline-offset: 1px;
     }
 
     *::-webkit-scrollbar {

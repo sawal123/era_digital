@@ -6,6 +6,8 @@ use App\Models\StoreProfile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
+use App\Services\CapitalLedgerService;
+use Illuminate\Support\Facades\DB;
 
 class StoreProfileController extends Controller
 {
@@ -75,7 +77,18 @@ class StoreProfileController extends Controller
             $data['signature_path'] = '/storage/' . $path;
         }
 
-        $profile->fill($data)->save();
+        DB::transaction(function () use ($profile, $data) {
+            $ledger = app(CapitalLedgerService::class);
+            $digitalAccount = $ledger->ensureAccounts()->firstWhere('slug', CapitalLedgerService::DIGITAL_ACCOUNT_SLUG);
+            $oldBalance = (float) ($digitalAccount?->current_balance ?? $profile->saldo_digital ?? 0);
+            $profile->fill($data)->save();
+
+            $ledger->syncDigitalBalance(
+                $oldBalance,
+                (float) $data['saldo_digital'],
+                now()->toDateString(),
+            );
+        });
 
         return redirect()->back()->with('success', 'Pengaturan Toko berhasil diperbarui!');
     }

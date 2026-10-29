@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
-import { LayoutGrid, MonitorSmartphone, Layers, Package, BarChart3, Wallet, RefreshCw, Users, Settings, Receipt, CreditCard, Handshake, MailOpen } from 'lucide-vue-next';
+import { LayoutGrid, MonitorSmartphone, Layers, Package, BarChart3, Wallet, RefreshCw, Users, Settings, Receipt, CreditCard, Handshake, MailOpen, Landmark } from 'lucide-vue-next';
 import AppLogo from '@/components/AppLogo.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
@@ -50,6 +50,11 @@ const mainNavItems = computed<NavItem[]>(() => [
         title: 'Pengeluaran',
         href: '/expenses',
         icon: Wallet,
+    },
+    {
+        title: 'Ledger Modal',
+        href: '/capital',
+        icon: Landmark,
     },
     ...(isDemoUser.value
         ? []

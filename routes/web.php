@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\CapitalLedgerController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExpenseController;
@@ -33,6 +34,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('categories', CategoryController::class);
     Route::resource('products', ProductController::class);
     Route::resource('customers', CustomerController::class);
+    Route::post('/customers/{customer}/merge', [CustomerController::class, 'merge'])->name('customers.merge');
+    Route::post('/customers/{customer}/digital-accounts', [CustomerController::class, 'storeDigitalAccount'])->name('customers.digital-accounts.store');
+    Route::put('/customers/{customer}/digital-accounts/{account}', [CustomerController::class, 'updateDigitalAccount'])->name('customers.digital-accounts.update');
+    Route::delete('/customers/{customer}/digital-accounts/{account}', [CustomerController::class, 'destroyDigitalAccount'])->name('customers.digital-accounts.destroy');
     Route::resource('payment-methods', PaymentMethodController::class)->except(['show', 'create', 'edit']);
     Route::resource('print-vendors', PrintVendorController::class)->except(['show', 'create', 'edit']);
 
@@ -47,6 +52,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/expenses', [ExpenseController::class, 'store'])->name('expenses.store');
     Route::patch('/expenses/{expense}', [ExpenseController::class, 'update'])->name('expenses.update');
     Route::delete('/expenses/{expense}', [ExpenseController::class, 'destroy'])->name('expenses.destroy');
+
+    // Ledger modal dan riwayat penambahan/pemakaian modal
+    Route::get('/capital', [CapitalLedgerController::class, 'index'])->name('capital.index');
+    Route::post('/capital/entries', [CapitalLedgerController::class, 'store'])->name('capital.entries.store');
+    Route::delete('/capital/entries/{entry}', [CapitalLedgerController::class, 'destroy'])->name('capital.entries.destroy');
 
     // Restock / Belanja Barang (Stok Masuk)
     Route::get('/purchases', [PurchaseController::class, 'index'])->name('purchases.index');

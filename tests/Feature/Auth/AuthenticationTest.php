@@ -1,13 +1,49 @@
 <?php
 
+use App\Models\StoreProfile;
 use App\Models\User;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Testing\Fluent\AssertableJson;
 use Laravel\Fortify\Features;
 
 test('login screen can be rendered', function () {
     $response = $this->get(route('login'));
 
     $response->assertOk();
+});
+
+test('login membagikan logo toko dari setting', function () {
+    StoreProfile::create([
+        'store_name' => 'Era Digital',
+        'address' => 'Alamat test',
+        'phone' => '0800000000',
+        'logo_path' => '/storage/logos/era-digital.png',
+        'saldo_digital' => 0,
+    ]);
+
+    $this->get(route('login'))
+        ->assertOk()
+        ->assertInertia(fn (AssertableJson $page) => $page
+            ->component('auth/Login')
+            ->where('storeProfile.store_name', 'Era Digital')
+            ->where('storeProfile.logo_path', '/storage/logos/era-digital.png'));
+});
+
+test('metadata browser menggunakan identitas toko dan bukan branding Laravel', function () {
+    StoreProfile::create([
+        'store_name' => 'Era Digital',
+        'address' => 'Alamat test',
+        'phone' => '0800000000',
+        'logo_path' => '/storage/logos/era-digital.png',
+        'saldo_digital' => 0,
+    ]);
+
+    $this->get(route('login'))
+        ->assertOk()
+        ->assertSee('<title inertia>Era Digital</title>', false)
+        ->assertSee('<link rel="icon" href="/storage/logos/era-digital.png?v=', false)
+        ->assertDontSee('href="/favicon.ico"', false)
+        ->assertDontSee('>Laravel<', false);
 });
 
 test('users can authenticate using the login screen', function () {

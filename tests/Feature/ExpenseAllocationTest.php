@@ -19,7 +19,7 @@ function makeTransaction(array $attributes = [], array $itemAttributes = []): ar
 {
     $user = User::factory()->create();
     $transaction = Transaction::create(array_merge([
-        'invoice_number' => 'TRX-' . fake()->unique()->numerify('###'),
+        'invoice_number' => 'TRX-'.fake()->unique()->numerify('###'),
         'cashier_id' => $user->id,
         'customer_name' => 'Customer Test',
         'total_base_price' => 100000,
@@ -329,6 +329,35 @@ it('pembelian stok tidak langsung mengurangi laba bersih', function () {
     expect($summary['net_profit'])->toBe(50000.0);
 });
 
+it('menolak pembelian stok manual tanpa restock yang terhubung', function () {
+    actingUser($this);
+
+    $this->from('/expenses')->post('/expenses', [
+        'date' => now()->toDateString(),
+        'name' => 'Belanja stok manual',
+        'amount' => 30000,
+        'category' => 'pembelian_stok',
+        'allocations' => [],
+    ])->assertSessionHasErrors('category');
+
+    expect(Expense::count())->toBe(0);
+});
+
+it('restock tetap menjadi arus kas modal sementara operasional mengurangi laba', function () {
+    [$transaction] = makeTransaction(['total_profit' => 50000]);
+    $stockPurchase = makeExpense(['category' => 'pembelian_stok', 'amount' => 30000], []);
+    $operationalExpense = makeExpense(['category' => 'operasional_rutin', 'amount' => 10000], []);
+
+    $summary = app(ProfitCalculationService::class)->summarizeCollections(
+        collect([$transaction]),
+        collect([$stockPurchase, $operationalExpense]),
+    );
+
+    expect($summary['cash_out'])->toBe(40000.0)
+        ->and($summary['profit_deducting_costs'])->toBe(10000.0)
+        ->and($summary['net_profit'])->toBe(40000.0);
+});
+
 it('aset peralatan tidak langsung mengurangi laba bersih', function () {
     [$transaction] = makeTransaction(['total_profit' => 50000]);
     $expense = makeExpense(['category' => 'aset_peralatan', 'amount' => 30000], []);
@@ -345,6 +374,39 @@ it('operasional rutin mengurangi laba bersih', function () {
     $summary = app(ProfitCalculationService::class)->summarizeCollections(collect([$transaction]), collect([$expense]));
 
     expect($summary['net_profit'])->toBe(20000.0);
+});
+
+it('membatasi alokasi HPP lintas expense pada HPP item yang tersedia', function () {
+    actingUser($this);
+    [$transaction, $item] = makeTransaction();
+
+    $this->post('/expenses', [
+        'date' => now()->toDateString(),
+        'name' => 'Pembayaran vendor pertama',
+        'amount' => 60000,
+        'category' => 'hpp_pesanan',
+        'allocations' => [[
+            'transaction_id' => $transaction->id,
+            'transaction_item_id' => $item->id,
+            'amount' => 60000,
+            'hpp_status' => 'belum_masuk_hpp',
+        ]],
+    ])->assertRedirect();
+
+    $this->from('/expenses')->post('/expenses', [
+        'date' => now()->toDateString(),
+        'name' => 'Pembayaran vendor kedua',
+        'amount' => 50000,
+        'category' => 'hpp_pesanan',
+        'allocations' => [[
+            'transaction_id' => $transaction->id,
+            'transaction_item_id' => $item->id,
+            'amount' => 50000,
+            'hpp_status' => 'belum_masuk_hpp',
+        ]],
+    ])->assertSessionHasErrors('allocations');
+
+    expect(ExpenseAllocation::count())->toBe(1);
 });
 
 it('penarikan pribadi tidak mengurangi laba usaha', function () {

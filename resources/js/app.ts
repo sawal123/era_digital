@@ -6,7 +6,11 @@ import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { initializeClickFeedback } from '@/lib/clickFeedback';
 import { initializeFlashToast } from '@/lib/flashToast';
 
-const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+const storeNameFromDocument =
+    typeof document !== 'undefined'
+        ? document.documentElement.dataset.storeName
+        : undefined;
+const appName = storeNameFromDocument || 'Era Digital';
 
 createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),

@@ -1,5 +1,12 @@
 <script setup>
-import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import {
+    ref,
+    computed,
+    watch,
+    nextTick,
+    onMounted,
+    onBeforeUnmount,
+} from 'vue';
 import flatpickr from 'flatpickr';
 import 'flatpickr/dist/flatpickr.min.css';
 import { Head, useForm } from '@inertiajs/vue3';
@@ -7,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import SearchableSelect from '@/components/SearchableSelect.vue';
 import {
     Card,
     CardHeader,
@@ -58,7 +66,9 @@ const getCurrentMonthString = () => {
 const getCurrentYearString = () => String(new Date().getFullYear());
 const todayString = getTodayString();
 
-const yearOptions = Array.from({ length: 5 }, (_, i) => String(new Date().getFullYear() - i));
+const yearOptions = Array.from({ length: 5 }, (_, i) =>
+    String(new Date().getFullYear() - i),
+);
 
 const modeOptions = [
     { key: 'harian', label: 'Harian', icon: 'fas fa-calendar-day' },
@@ -105,7 +115,10 @@ const initDateRangePicker = () => {
     dateRangePickerInstance = flatpickr(dateRangeInput.value, {
         mode: 'range',
         dateFormat: 'Y-m-d',
-        defaultDate: [selectedDateRange.value.start, selectedDateRange.value.end],
+        defaultDate: [
+            selectedDateRange.value.start,
+            selectedDateRange.value.end,
+        ],
         onChange: (selectedDates, _dateStr, instance) => {
             if (selectedDates.length === 0) {
                 setDateRange(todayString);
@@ -113,8 +126,13 @@ const initDateRangePicker = () => {
                 return;
             }
 
-            const [startDate, endDate = startDate] = selectedDates.map((date) => instance.formatDate(date, 'Y-m-d'));
-            filterDateRange.value = startDate === endDate ? startDate : `${startDate} to ${endDate}`;
+            const [startDate, endDate = startDate] = selectedDates.map((date) =>
+                instance.formatDate(date, 'Y-m-d'),
+            );
+            filterDateRange.value =
+                startDate === endDate
+                    ? startDate
+                    : `${startDate} to ${endDate}`;
         },
     });
 };
@@ -151,8 +169,8 @@ const filteredPurchases = computed(() => {
         return filterMode.value === 'harian'
             ? purchaseDate >= start && purchaseDate <= end
             : filterMode.value === 'bulanan'
-                ? String(p.purchase_date ?? '').slice(0, 7) === filterMonth.value
-                : String(p.purchase_date ?? '').slice(0, 4) === filterYear.value;
+              ? String(p.purchase_date ?? '').slice(0, 7) === filterMonth.value
+              : String(p.purchase_date ?? '').slice(0, 4) === filterYear.value;
     });
 });
 
@@ -166,6 +184,10 @@ const form = useForm({
     purchase_date: new Date().toISOString().split('T')[0],
     note: '',
 });
+
+const productOptionLabel = (product) => product.name;
+const productOptionDescription = (product) =>
+    `Stok saat ini: ${parseFloatAsString(product.stock)} | Modal: Rp ${formatRupiah(product.base_price)}`;
 
 const isEditing = ref(false);
 const editingId = ref(null);
@@ -194,6 +216,12 @@ const openCreateModal = () => {
 };
 
 const submitForm = () => {
+    if (!form.product_id) {
+        form.setError('product_id', 'Pilih produk fisik terlebih dahulu.');
+
+        return;
+    }
+
     if (isEditing.value && editingId.value) {
         form.patch(`/purchases/${editingId.value}`, {
             onSuccess: () => {
@@ -250,7 +278,10 @@ const totalPurchaseAmount = computed(() => {
 });
 
 const totalItemsRestocked = computed(() => {
-    return filteredPurchases.value.reduce((sum, p) => sum + parseFloat(p.quantity || 0), 0);
+    return filteredPurchases.value.reduce(
+        (sum, p) => sum + parseFloat(p.quantity || 0),
+        0,
+    );
 });
 
 const formatRupiah = (angka) => {
@@ -298,64 +329,96 @@ const parseFloatAsString = (val) => {
                 <i class="fas fa-plus mr-2 text-xs"></i> Restock Barang
             </Button>
         </div>
-            <!-- Filter Panel (Hari / Bulan / Tahun) -->
-            <div class="bg-card border border-border rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4 shadow-xs">
-                <div class="flex gap-1.5 bg-muted/50 p-1 rounded-xl border border-border/50">
-                    <button
-                        v-for="m in modeOptions"
-                        :key="m.key"
-                        @click="setMode(m.key)"
-                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200"
-                        :class="filterMode === m.key
+        <!-- Filter Panel (Hari / Bulan / Tahun) -->
+        <div
+            class="flex flex-col items-start gap-4 rounded-2xl border border-border bg-card p-4 shadow-xs sm:flex-row sm:items-center"
+        >
+            <div
+                class="flex gap-1.5 rounded-xl border border-border/50 bg-muted/50 p-1"
+            >
+                <button
+                    v-for="m in modeOptions"
+                    :key="m.key"
+                    @click="setMode(m.key)"
+                    class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all duration-200"
+                    :class="
+                        filterMode === m.key
                             ? 'bg-indigo-600 text-white shadow-sm'
-                            : 'text-muted-foreground hover:text-foreground hover:bg-muted'"
-                    >
-                        <i :class="m.icon" class="text-[10px]"></i>
-                        {{ m.label }}
-                    </button>
-                </div>
-
-                <div class="flex-1 flex items-center gap-3">
-                    <div v-if="filterMode === 'harian'" class="relative flex-1 max-w-sm">
-                        <i class="fas fa-calendar-day absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
-                        <input
-                            ref="dateRangeInput"
-                            type="text"
-                            :value="filterDateRange"
-                            placeholder="Pilih rentang tanggal"
-                            class="h-9 w-full rounded-xl border border-input bg-background px-3 pl-8 text-sm text-foreground transition focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        />
-                    </div>
-
-                    <div v-else-if="filterMode === 'bulanan'" class="relative flex-1 max-w-xs">
-                        <i class="fas fa-calendar-alt absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
-                        <input
-                            type="month"
-                            v-model="filterMonth"
-                            class="pl-8 h-9 w-full rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 transition px-3"
-                        />
-                    </div>
-
-                    <div v-else class="relative flex-1 max-w-xs">
-                        <i class="fas fa-calendar absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
-                        <select
-                            v-model="filterYear"
-                            class="pl-8 h-9 w-full rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 transition px-3 appearance-none"
-                        >
-                            <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
-                        </select>
-                    </div>
-
-                    <button
-                        @click="filterMode === 'harian' ? setDateRange(todayString) : filterMode === 'bulanan' ? filterMonth = getCurrentMonthString() : filterYear = getCurrentYearString()"
-                        class="text-xs text-indigo-600 hover:text-indigo-800 font-semibold whitespace-nowrap transition underline underline-offset-2"
-                    >
-                        {{ filterMode === 'harian' ? 'Hari ini' : filterMode === 'bulanan' ? 'Bulan ini' : 'Tahun ini' }}
-                    </button>
-                </div>
+                            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                    "
+                >
+                    <i :class="m.icon" class="text-[10px]"></i>
+                    {{ m.label }}
+                </button>
             </div>
 
-            <!-- Metrics Grid -->
+            <div class="flex flex-1 items-center gap-3">
+                <div
+                    v-if="filterMode === 'harian'"
+                    class="relative max-w-sm flex-1"
+                >
+                    <i
+                        class="fas fa-calendar-day absolute top-1/2 left-3 -translate-y-1/2 text-xs text-muted-foreground"
+                    ></i>
+                    <input
+                        ref="dateRangeInput"
+                        type="text"
+                        :value="filterDateRange"
+                        placeholder="Pilih rentang tanggal"
+                        class="h-9 w-full rounded-xl border border-input bg-background px-3 pl-8 text-sm text-foreground transition focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                </div>
+
+                <div
+                    v-else-if="filterMode === 'bulanan'"
+                    class="relative max-w-xs flex-1"
+                >
+                    <i
+                        class="fas fa-calendar-alt absolute top-1/2 left-3 -translate-y-1/2 text-xs text-muted-foreground"
+                    ></i>
+                    <input
+                        type="month"
+                        v-model="filterMonth"
+                        class="h-9 w-full rounded-xl border border-input bg-background px-3 pl-8 text-sm text-foreground transition focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                </div>
+
+                <div v-else class="relative max-w-xs flex-1">
+                    <i
+                        class="fas fa-calendar absolute top-1/2 left-3 -translate-y-1/2 text-xs text-muted-foreground"
+                    ></i>
+                    <select
+                        v-model="filterYear"
+                        class="h-9 w-full appearance-none rounded-xl border border-input bg-background px-3 pl-8 text-sm text-foreground transition focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    >
+                        <option v-for="y in yearOptions" :key="y" :value="y">
+                            {{ y }}
+                        </option>
+                    </select>
+                </div>
+
+                <button
+                    @click="
+                        filterMode === 'harian'
+                            ? setDateRange(todayString)
+                            : filterMode === 'bulanan'
+                              ? (filterMonth = getCurrentMonthString())
+                              : (filterYear = getCurrentYearString())
+                    "
+                    class="text-xs font-semibold whitespace-nowrap text-indigo-600 underline underline-offset-2 transition hover:text-indigo-800"
+                >
+                    {{
+                        filterMode === 'harian'
+                            ? 'Hari ini'
+                            : filterMode === 'bulanan'
+                              ? 'Bulan ini'
+                              : 'Tahun ini'
+                    }}
+                </button>
+            </div>
+        </div>
+
+        <!-- Metrics Grid -->
         <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
             <!-- Total Anggaran Restock -->
             <Card
@@ -610,25 +673,24 @@ const parseFloatAsString = (val) => {
                     <!-- Product Dropdown -->
                     <div class="space-y-1.5">
                         <Label for="restock-prod">Pilih Produk Fisik</Label>
-                        <select
+                        <SearchableSelect
                             id="restock-prod"
                             v-model="form.product_id"
-                            required
-                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
+                            :options="products"
+                            :option-label="productOptionLabel"
+                            :option-description="productOptionDescription"
+                            placeholder="-- Pilih Barang ATK --"
+                            search-placeholder="Cari nama barang, stok, atau modal..."
+                            empty-text="Produk fisik tidak ditemukan."
+                            :disabled="form.processing"
+                            @change="form.clearErrors('product_id')"
+                        />
+                        <p
+                            v-if="form.errors.product_id"
+                            class="text-xs text-red-500"
                         >
-                            <option value="" disabled>
-                                -- Pilih Barang ATK --
-                            </option>
-                            <option
-                                v-for="prod in products"
-                                :key="prod.id"
-                                :value="prod.id"
-                            >
-                                {{ prod.name }} (Stok saat ini:
-                                {{ parseFloatAsString(prod.stock) }} | Modal: Rp
-                                {{ formatRupiah(prod.base_price) }})
-                            </option>
-                        </select>
+                            {{ form.errors.product_id }}
+                        </p>
                     </div>
 
                     <!-- Quantity & Cost Price Grid -->

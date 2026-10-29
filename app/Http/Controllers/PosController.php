@@ -2,18 +2,21 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\Product;
-use App\Models\Transaction;
-use App\Models\TransactionItem;
 use App\Models\Customer;
-use App\Models\StoreProfile;
+use App\Models\CustomerDigitalAccount;
 use App\Models\PaymentMethod;
 use App\Models\PrintVendor;
-use Inertia\Inertia;
+use App\Models\Product;
+use App\Models\StockMovement;
+use App\Models\StoreProfile;
+use App\Models\Transaction;
+use App\Models\TransactionItem;
+use App\Services\AreaPricingService;
+use App\Services\CapitalLedgerService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
-use App\Services\AreaPricingService;
+use Inertia\Inertia;
 
 class PosController extends Controller
 {
@@ -33,12 +36,37 @@ class PosController extends Controller
             'signature_path' => null,
             'saldo_digital' => 350000.00,
         ]);
+        $ledger = app(CapitalLedgerService::class);
+        $digitalAccount = $ledger->ensureAccounts()->firstWhere('slug', CapitalLedgerService::DIGITAL_ACCOUNT_SLUG);
+        if ($digitalAccount && abs((float) $digitalAccount->current_balance - (float) $profile->saldo_digital) >= 0.01) {
+            $ledger->syncDigitalBalance(
+                (float) $digitalAccount->current_balance,
+                (float) $profile->saldo_digital,
+                now()->toDateString(),
+            );
+        }
+
+        $digitalCostSuggestions = TransactionItem::query()
+            ->where('type', 'ppob')
+            ->whereNotNull('provider_cost')
+            ->latest('id')
+            ->get(['product_id', 'provider_cost', 'metadata'])
+            ->map(fn (TransactionItem $item) => [
+                'product_id' => $item->product_id,
+                'nominal' => data_get($item->metadata, 'nominal'),
+                'provider_cost' => (float) $item->provider_cost,
+            ])
+            ->filter(fn (array $suggestion) => $suggestion['product_id'] && $suggestion['nominal'] !== null)
+            ->unique(fn (array $suggestion) => $suggestion['product_id'].'|'.number_format((float) $suggestion['nominal'], 2, '.', ''))
+            ->values();
+
         return Inertia::render('POS/Index', [
             'products' => $products,
             'customers' => $customers,
             'paymentMethods' => $paymentMethods,
             'printVendors' => $printVendors,
             'profile' => $profile,
+            'digitalCostSuggestions' => $digitalCostSuggestions,
         ]);
     }
 
@@ -49,6 +77,7 @@ class PosController extends Controller
             'cart.*.id' => 'required|integer|exists:products,id',
             'cart.*.quantity' => 'required|numeric|min:0.1',
             'cart.*.price' => 'required|numeric|min:0',
+            'cart.*.provider_cost' => 'nullable|numeric|gt:0',
             'cart.*.print_vendor_id' => 'nullable|exists:print_vendors,id',
             'total' => 'required|numeric|min:0',
             'payment_method_id' => 'required|exists:payment_methods,id',
@@ -91,6 +120,15 @@ class PosController extends Controller
         $totalProfit = round(array_sum(array_column($computedItems, 'profit')), 2);
 
         $paymentMethod = PaymentMethod::where('is_active', true)->findOrFail($request->payment_method_id);
+
+        StoreProfile::firstOrCreate([], [
+            'store_name' => 'Era Digital',
+            'address' => 'Jl. Raya Utama No. 45, Kebayoran Baru, Jakarta Selatan',
+            'phone' => '0812-3456-7890',
+            'signature_path' => null,
+            'saldo_digital' => 350000.00,
+        ]);
+        app(CapitalLedgerService::class)->ensureAccounts();
 
         // ------------------------------------------------------------------
         // 4. Status pembayaran dihitung dari TOTAL SERVER (bukan request.total).
@@ -150,23 +188,37 @@ class PosController extends Controller
                 $itemType = $item['type'] ?? 'fisik';
                 if ($itemType === 'digital' || $itemType === 'ppob') {
                     $hasPpob = true;
-                    $ppobAccountNumber = $item['account_number'] ?? null;
+                    $ppobAccountNumber = CustomerDigitalAccount::normalizeNumber($item['account_number'] ?? null);
                     $ppobAccountName = $item['account_name'] ?? null;
                     $ppobDigitalType = $item['digital_type'] ?? 'phone';
                     break;
                 }
             }
 
+            if (! $customerId && $hasPpob && $ppobAccountNumber) {
+                $linkedDigitalAccount = CustomerDigitalAccount::query()
+                    ->where('type', $ppobDigitalType)
+                    ->where('account_number', $ppobAccountNumber)
+                    ->first();
+
+                $customerId = $linkedDigitalAccount?->customer_id;
+            }
+
             if ($hasPpob && ! $customerId && ! $request->invoice_customer_name && $ppobAccountNumber && $ppobAccountName) {
-                // Auto-create customer using PPOB account details
-                $existingCustomer = Customer::where('phone', $ppobAccountNumber)->first();
+                // Reuse customer berdasarkan nama sebelum membuat record baru.
+                $existingCustomer = Customer::query()
+                    ->where('name_key', Customer::normalizeName($ppobAccountName))
+                    ->orderBy('id')
+                    ->first();
+
                 if (! $existingCustomer) {
                     $existingCustomer = Customer::create([
                         'name' => $ppobAccountName,
                         'customer_type' => $ppobDigitalType === 'token' ? 'token' : 'operator',
-                        'phone' => $ppobAccountNumber,
+                        'phone' => null,
                     ]);
                 }
+
                 $customerId = $existingCustomer->id;
             }
 
@@ -178,11 +230,6 @@ class PosController extends Controller
                     $customerName = $customer->name;
                     $customerPhone = $customer->phone;
 
-                    // If customer exists but has no phone number, update it
-                    if ($hasPpob && ! $customerPhone && $ppobAccountNumber) {
-                        $customer->update(['phone' => $ppobAccountNumber]);
-                        $customerPhone = $ppobAccountNumber;
-                    }
                 }
             } else {
                 $customerName = $request->invoice_customer_name;
@@ -209,8 +256,8 @@ class PosController extends Controller
                 'keterangan' => $request->keterangan,
             ]);
 
-            foreach ($computedItems as $computedItem) {
-                TransactionItem::create([
+            foreach ($computedItems as $itemIndex => $computedItem) {
+                $transactionItem = TransactionItem::create([
                     'transaction_id' => $transaction->id,
                     'product_id' => $computedItem['product'] ? $computedItem['product']->id : null,
                     'print_vendor_id' => $computedItem['print_vendor_id'],
@@ -221,6 +268,7 @@ class PosController extends Controller
                     'base_price' => $computedItem['base_price'],
                     'selling_price' => $computedItem['selling_price'],
                     'subtotal_base' => $computedItem['subtotal_base'],
+                    'provider_cost' => $computedItem['provider_cost'],
                     'subtotal_price' => $computedItem['subtotal_price'],
                     'profit' => $computedItem['profit'],
                     'service_status' => $computedItem['item_type'] === 'jasa' ? 'menunggu_file' : 'none',
@@ -229,30 +277,71 @@ class PosController extends Controller
 
                 if ($computedItem['item_type'] === 'ppob') {
                     $digitalType = $computedItem['digital_type'];
-                    $accountNumber = $computedItem['account_number'];
+                    $accountNumber = CustomerDigitalAccount::normalizeNumber($computedItem['account_number']);
                     $accountName = $computedItem['account_name'];
-                    $nominalVal = $computedItem['nominal'];
+                    $providerCostVal = $computedItem['subtotal_base'];
 
                     if ($accountNumber && $accountName) {
-                        \App\Models\CustomerDigitalAccount::firstOrCreate([
+                        $digitalAccount = CustomerDigitalAccount::firstOrCreate([
                             'type' => $digitalType,
                             'account_number' => $accountNumber,
                         ], [
                             'customer_id' => $customerId,
                             'account_name' => $accountName,
                         ]);
+
+                        if (! $digitalAccount->customer_id && $customerId) {
+                            $digitalAccount->update(['customer_id' => $customerId]);
+                        }
                     }
 
-                    // Decrement shop's digital balance in database
-                    $profile = StoreProfile::first();
+                    // Saldo provider berkurang sesuai biaya aktual Mitra Shopee,
+                    // bukan nominal pulsa yang diterima customer.
+                    $profile = StoreProfile::query()->lockForUpdate()->first();
                     if ($profile) {
-                        $profile->decrement('saldo_digital', $nominalVal);
+                        $saldoDigital = (float) $profile->saldo_digital;
+
+                        if ($saldoDigital <= 0) {
+                            throw ValidationException::withMessages([
+                                "cart.{$itemIndex}.provider_cost" => 'Saldo digital toko habis. Isi kembali saldo sebelum menjual layanan digital.',
+                            ]);
+                        }
+
+                        if ($saldoDigital + 0.00001 < $providerCostVal) {
+                            throw ValidationException::withMessages([
+                                "cart.{$itemIndex}.provider_cost" => 'Saldo digital provider tidak mencukupi untuk transaksi ini.',
+                            ]);
+                        }
+
+                        $profile->decrement('saldo_digital', $providerCostVal);
                     }
                 }
 
                 if ($computedItem['product'] && $computedItem['product']->category->type === 'fisik') {
-                    $computedItem['product']->decrement('stock', $computedItem['quantity']);
+                    $stockProduct = Product::query()
+                        ->whereKey($computedItem['product']->id)
+                        ->lockForUpdate()
+                        ->firstOrFail();
+                    $quantity = (float) $computedItem['quantity'];
+
+                    if ((float) ($stockProduct->stock ?? 0) + 0.00001 < $quantity) {
+                        throw ValidationException::withMessages([
+                            "cart.{$itemIndex}.quantity" => "Stok {$stockProduct->name} tidak mencukupi.",
+                        ]);
+                    }
+
+                    $stockProduct->decrement('stock', $quantity);
+                    StockMovement::create([
+                        'product_id' => $stockProduct->id,
+                        'type' => 'out',
+                        'quantity' => $quantity,
+                        'reference_type' => 'transaction',
+                        'reference_id' => $transaction->id,
+                        'note' => 'Penjualan: '.$transaction->invoice_number,
+                    ]);
                 }
+
+                app(CapitalLedgerService::class)->syncTransactionItemUsage($transactionItem);
             }
 
             // Record payment history for initial paid amount
@@ -271,11 +360,12 @@ class PosController extends Controller
             return redirect()->back()->with([
                 'success' => 'Transaksi berhasil disimpan!',
                 'print_invoice' => $invoiceNumber,
-                'recent_transaction' => $freshTransaction
+                'recent_transaction' => $freshTransaction,
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->back()->with('error', 'Gagal memproses transaksi: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', 'Gagal memproses transaksi: '.$e->getMessage());
         }
     }
 
@@ -307,10 +397,9 @@ class PosController extends Controller
      * Hitung satu item cart secara server-side (authoritative).
      *
      * @param  int  $index  indeks cart untuk pesan validasi
+     * @return array<string, mixed>
      *
      * @throws ValidationException
-     *
-     * @return array<string, mixed>
      */
     private function computeCartItem(array $item, Product $product, int $index): array
     {
@@ -326,10 +415,10 @@ class PosController extends Controller
         $quantity = (float) ($item['quantity'] ?? 0);
 
         $metadata = [
-            'detail'    => $item['detail'] ?? '',
-            'note'      => $item['note'] ?? '',
+            'detail' => $item['detail'] ?? '',
+            'note' => $item['note'] ?? '',
             'admin_fee' => $item['admin_fee'] ?? 0,
-            'nominal'   => $item['nominal'] ?? null,
+            'nominal' => $item['nominal'] ?? null,
         ];
 
         if ($isAreaBased) {
@@ -339,33 +428,72 @@ class PosController extends Controller
         // ---- Non-area (per piece / lembar / rim) — behavior lama dipertahankan ----
         $basePrice = $product->base_price;
 
+        $providerCost = null;
         if ($itemType === 'ppob') {
-            // Modal PPOB = nominal yang dikirim ke pelanggan/distributor
-            // Keuntungan = admin_fee = total_harga - nominal
-            $basePrice = $item['nominal'] ?? 0;
+            // Nominal adalah nilai pulsa customer. HPP PPOB adalah biaya
+            // aktual yang dipotong provider dan dapat berubah setiap saat.
+            $providerCost = $this->resolveProviderCost($item, $product);
+
+            if ($providerCost <= 0) {
+                throw ValidationException::withMessages([
+                    "cart.{$index}.provider_cost" => 'Modal aktual provider harus lebih besar dari Rp0.',
+                ]);
+            }
+
+            $basePrice = $providerCost;
+            $metadata['provider_cost'] = $providerCost;
         } elseif ($itemType === 'jasa' && $product->base_price <= 0) {
             // Estimasi biaya vendor untuk jasa non-area tanpa HPP master
             $basePrice = $item['price'] / 1.3;
         }
 
+        $sellingPrice = $itemType === 'ppob'
+            ? (float) $item['price']
+            : (float) $product->selling_price;
         $subtotalBase = $basePrice * $quantity;
-        $subtotalPrice = $item['price'] * $quantity;
+        $subtotalPrice = $sellingPrice * $quantity;
         $profit = $subtotalPrice - $subtotalBase;
 
-        return $this->buildComputedItem(
+        $computedItem = $this->buildComputedItem(
             $item,
             $product,
             $itemType,
             $unit,
             $quantity,
             $basePrice,
-            $item['price'],
+            $sellingPrice,
             $subtotalBase,
             $subtotalPrice,
             $profit,
             $metadata,
             false
         );
+
+        $computedItem['provider_cost'] = $providerCost;
+
+        return $computedItem;
+    }
+
+    private function resolveProviderCost(array $item, Product $product): float
+    {
+        $requestedCost = $item['provider_cost'] ?? null;
+
+        if ($requestedCost !== null && $requestedCost !== '') {
+            return round(max(0, (float) $requestedCost), 2);
+        }
+
+        $nominal = round((float) ($item['nominal'] ?? 0), 2);
+        $latestMatchingCost = TransactionItem::query()
+            ->where('product_id', $product->id)
+            ->where('type', 'ppob')
+            ->whereNotNull('provider_cost')
+            ->latest('id')
+            ->get(['provider_cost', 'metadata'])
+            ->first(function (TransactionItem $transactionItem) use ($nominal) {
+                return abs((float) data_get($transactionItem->metadata, 'nominal') - $nominal) < 0.01;
+            });
+
+        return round((float) ($latestMatchingCost?->provider_cost ?? $nominal), 2);
     }
 
     /**
@@ -419,13 +547,13 @@ class PosController extends Controller
         $profit = round($subtotalPrice - $subtotalBase, 2);
 
         $metadata = array_merge($metadata, [
-            'length'         => $length,
-            'width'          => $width,
+            'length' => $length,
+            'width' => $width,
             'area_per_piece' => $areaPerPiece,
-            'total_area'     => AreaPricingService::totalArea($areaPerPiece, $quantity),
-            'pricing_unit'   => 'm2',
-            'selling_rate'   => $sellingRate,
-            'base_rate'      => $baseRate,
+            'total_area' => AreaPricingService::totalArea($areaPerPiece, $quantity),
+            'pricing_unit' => 'm2',
+            'selling_rate' => $sellingRate,
+            'base_rate' => $baseRate,
         ]);
 
         return $this->buildComputedItem(
@@ -452,23 +580,25 @@ class PosController extends Controller
     private function buildComputedItem(array $item, ?Product $product, string $itemType, string $unit, float $quantity, float $basePrice, float $sellingPrice, float $subtotalBase, float $subtotalPrice, float $profit, array $metadata, bool $isAreaBased): array
     {
         return [
-            'product'         => $product,
-            'item_name'       => $item['name'] ?? '',
-            'item_type'       => $itemType,
-            'unit'            => $unit,
-            'quantity'        => $quantity,
-            'base_price'      => $basePrice,
-            'selling_price'   => $sellingPrice,
-            'subtotal_base'   => $subtotalBase,
-            'subtotal_price'  => $subtotalPrice,
-            'profit'          => $profit,
-            'metadata'        => $metadata,
-            'is_area_based'   => $isAreaBased,
+            'product' => $product,
+            'item_name' => $item['name'] ?? '',
+            'item_type' => $itemType,
+            'unit' => $unit,
+            'quantity' => $quantity,
+            'base_price' => $basePrice,
+            'selling_price' => $sellingPrice,
+            'subtotal_base' => $subtotalBase,
+            'provider_cost' => null,
+            'subtotal_price' => $subtotalPrice,
+            'profit' => $profit,
+            'metadata' => $metadata,
+            'is_area_based' => $isAreaBased,
             'print_vendor_id' => $item['print_vendor_id'] ?? null,
-            'digital_type'    => $item['digital_type'] ?? 'phone',
-            'account_number'  => $item['account_number'] ?? null,
-            'account_name'    => $item['account_name'] ?? null,
-            'nominal'         => $item['nominal'] ?? $item['price'] ?? 0,
+            'digital_type' => $item['digital_type'] ?? 'phone',
+            'account_number' => $item['account_number'] ?? null,
+            'account_name' => $item['account_name'] ?? null,
+            'nominal' => $item['nominal'] ?? $item['price'] ?? 0,
+            'provider_cost' => $item['provider_cost'] ?? null,
         ];
     }
 
@@ -498,7 +628,8 @@ class PosController extends Controller
         $query = $request->query('query');
         $type = $request->query('type'); // 'token' or 'phone'
 
-        $accounts = \App\Models\CustomerDigitalAccount::where('type', $type)
+        $accounts = CustomerDigitalAccount::where('type', $type)
+            ->with('customer:id,name,phone')
             ->where(function ($builder) use ($query) {
                 $builder->where('account_number', 'like', "%{$query}%")
                     ->orWhere('account_name', 'like', "%{$query}%");
