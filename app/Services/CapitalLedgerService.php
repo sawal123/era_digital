@@ -10,6 +10,7 @@ use App\Models\Purchase;
 use App\Models\StoreProfile;
 use App\Models\TransactionItem;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class CapitalLedgerService
@@ -20,16 +21,23 @@ class CapitalLedgerService
     {
         $accounts = collect();
 
-        $digitalAccount = CapitalAccount::firstOrCreate(
-            ['slug' => self::DIGITAL_ACCOUNT_SLUG],
-            [
-                'name' => 'Saldo Digital',
-                'type' => 'digital',
-                'current_balance' => 0,
-                'contributed_capital' => 0,
-            ]
-        );
-        $this->seedDigitalAccount($digitalAccount);
+        $digitalAccount = DB::transaction(function () {
+            $profile = StoreProfile::query()->lockForUpdate()->first();
+            $account = CapitalAccount::firstOrCreate(
+                ['slug' => self::DIGITAL_ACCOUNT_SLUG],
+                [
+                    'name' => 'Saldo Digital',
+                    'type' => 'digital',
+                    'current_balance' => 0,
+                    'contributed_capital' => 0,
+                ]
+            );
+            $account = CapitalAccount::query()->lockForUpdate()->findOrFail($account->id);
+            $this->seedDigitalAccount($account);
+            $this->reconcileDigitalCapitalLimit($account, $profile);
+
+            return $account;
+        });
         $accounts->push($digitalAccount->fresh());
 
         Category::query()
@@ -38,9 +46,9 @@ class CapitalLedgerService
             ->get()
             ->each(function (Category $category) use ($accounts) {
                 $account = CapitalAccount::firstOrCreate(
-                    ['slug' => 'category-'.$category->id],
+                    ['slug' => 'category-' . $category->id],
                     [
-                        'name' => 'Modal '.$category->name,
+                        'name' => 'Modal ' . $category->name,
                         'type' => 'inventory',
                         'current_balance' => 0,
                     ]
@@ -109,10 +117,10 @@ class CapitalLedgerService
             'contributed_capital' => (float) ($account?->contributed_capital ?? 0),
             'current_balance' => (float) ($account?->current_balance ?? 0),
             'total_profit' => (float) $digitalItemRows->sum(
-                fn (TransactionItem $item) => $profitCalculator->itemProfit($item)
+                fn(TransactionItem $item) => $profitCalculator->itemProfit($item)
             ),
             'total_usage' => (float) $digitalItemRows->sum(
-                fn (TransactionItem $item) => $profitCalculator->itemBase($item)
+                fn(TransactionItem $item) => $profitCalculator->itemBase($item)
             ),
             'transaction_count' => (int) TransactionItem::query()
                 ->whereIn('type', ['ppob', 'digital'])
@@ -139,7 +147,7 @@ class CapitalLedgerService
                 'entry_type' => 'restock',
                 'direction' => 'credit',
                 'amount' => (float) $purchase->total_price,
-                'description' => 'Restock: '.$purchase->product->name,
+                'description' => 'Restock: ' . $purchase->product->name,
             ]
         );
     }
@@ -162,20 +170,20 @@ class CapitalLedgerService
                 'entry_type' => 'usage',
                 'direction' => 'debit',
                 'amount' => (float) app(ProfitCalculationService::class)->itemBase($item),
-                'description' => 'Pemakaian modal: '.$item->item_name,
+                'description' => 'Pemakaian modal: ' . $item->item_name,
             ]
         );
     }
 
     public function syncDigitalBalance(float $oldBalance, float $newBalance, string $date): ?CapitalLedgerEntry
     {
+        $account = $this->ensureAccounts()->firstWhere('slug', self::DIGITAL_ACCOUNT_SLUG);
+        $this->validateDigitalCapitalLimit($account, $newBalance);
         $difference = round($newBalance - $oldBalance, 2);
 
         if (abs($difference) < 0.01) {
             return null;
         }
-
-        $account = $this->ensureAccounts()->firstWhere('slug', self::DIGITAL_ACCOUNT_SLUG);
 
         return $this->createEntry($account, [
             'entry_date' => $date,
@@ -199,6 +207,14 @@ class CapitalLedgerService
         }
 
         $reverseDelta = -$entry->signed_amount;
+        if ($entry->account->slug === self::DIGITAL_ACCOUNT_SLUG) {
+            $newBalance = round((float) $entry->account->current_balance + $reverseDelta, 2);
+            if ($newBalance > max(0, (float) $entry->account->contributed_capital)) {
+                throw ValidationException::withMessages([
+                    'saldo_digital' => 'Pembatalan akan membuat saldo digital melebihi modal disetor. Sesuaikan saldo digital melalui Pengaturan Toko terlebih dahulu.',
+                ]);
+            }
+        }
         $this->adjustBalance($entry->account, $reverseDelta);
 
         if ($entry->account->slug === self::DIGITAL_ACCOUNT_SLUG) {
@@ -250,7 +266,7 @@ class CapitalLedgerService
             return null;
         }
 
-        return $this->ensureAccounts()->firstWhere('slug', 'category-'.$product->category_id);
+        return $this->ensureAccounts()->firstWhere('slug', 'category-' . $product->category_id);
     }
 
     private function seedDigitalAccount(CapitalAccount $account): void
@@ -282,13 +298,43 @@ class CapitalLedgerService
             ->whereIn('type', ['ppob', 'digital'])
             ->orderBy('id')
             ->get()
-            ->each(fn (TransactionItem $item) => $this->upsertReference($account, 'transaction_item', $item->id, [
+            ->each(fn(TransactionItem $item) => $this->upsertReference($account, 'transaction_item', $item->id, [
                 'entry_date' => $item->transaction?->created_at?->toDateString() ?: now()->toDateString(),
                 'entry_type' => 'usage',
                 'direction' => 'debit',
                 'amount' => (float) $item->subtotal_base,
-                'description' => 'Pemakaian modal: '.$item->item_name,
+                'description' => 'Pemakaian modal: ' . $item->item_name,
             ]));
+    }
+
+    private function validateDigitalCapitalLimit(CapitalAccount $account, float $balance): void
+    {
+        if ($balance > max(0, (float) $account->contributed_capital)) {
+            throw ValidationException::withMessages([
+                'saldo_digital' => 'Saldo digital tersedia tidak boleh melebihi modal disetor. Catat tambahan modal melalui Ledger Modal terlebih dahulu.',
+            ]);
+        }
+    }
+
+    private function reconcileDigitalCapitalLimit(CapitalAccount $account, ?StoreProfile $profile): void
+    {
+        $limit = max(0, (float) $account->contributed_capital);
+        $excess = round((float) $account->current_balance - $limit, 2);
+
+        if ($excess > 0) {
+            $this->createEntry($account, [
+                'entry_date' => now()->toDateString(),
+                'entry_type' => 'adjustment',
+                'direction' => 'debit',
+                'amount' => $excess,
+                'description' => 'Koreksi saldo digital yang melebihi modal disetor',
+                'reference_type' => 'system',
+            ]);
+        }
+
+        if ($profile && (float) $profile->saldo_digital > $limit) {
+            $profile->update(['saldo_digital' => $limit]);
+        }
     }
 
     private function seedInventoryAccount(CapitalAccount $account, int $categoryId): void
@@ -315,7 +361,7 @@ class CapitalLedgerService
                 'entry_type' => 'restock',
                 'direction' => 'credit',
                 'amount' => (float) $purchase->total_price,
-                'description' => 'Restock: '.$purchase->product->name,
+                'description' => 'Restock: ' . $purchase->product->name,
             ]);
         }
 
@@ -325,7 +371,7 @@ class CapitalLedgerService
                 'entry_type' => 'usage',
                 'direction' => 'debit',
                 'amount' => (float) $item->subtotal_base,
-                'description' => 'Pemakaian modal: '.$item->item_name,
+                'description' => 'Pemakaian modal: ' . $item->item_name,
             ]);
         }
 

@@ -21,7 +21,9 @@ Repository ini adalah aplikasi POS berbasis Laravel 13 dengan Inertia.js dan Vue
 2. Server menghitung subtotal harga jual, subtotal modal, dan profit per item.
 3. `Transaction` dan `TransactionItem` disimpan; transaksi menyimpan `total_price`, `total_base_price`, dan `total_profit`. Untuk PPOB, `TransactionItem.provider_cost` menyimpan snapshot biaya aktual provider pada saat transaksi.
 4. Penjualan barang fisik juga memperbarui stok dan membuat stock movement.
-5. Dashboard dan laporan mengambil nilai tersimpan tersebut, bukan menghitung ulang profit dari tampilan.
+5. Dashboard dan laporan memakai `ProfitCalculationService`: saat item dimuat, HPP/profit efektif dihitung dari snapshot item dan `provider_cost`; total tersimpan pada transaksi menjadi fallback bila item tidak tersedia. Frontend menampilkan hasil backend.
+
+Harga produk cetak berbasis luas dihitung melalui `AreaPricingService` dari dimensi, kuantitas, dan tarif master produk. `PosController` menghitung ulang total di server; total dari request tidak menjadi sumber kebenaran. Mutasi transaksi, stok, saldo provider, ledger, dan pembayaran awal dibungkus DB transaction.
 
 ## Alur customer dan akun digital
 
@@ -51,22 +53,35 @@ Nomor token listrik dan nomor handphone disimpan di `customer_digital_accounts` 
 
 - restock membuat entry kredit `restock`;
 - penjualan fisik dan PPOB membuat entry debit `usage` berdasarkan HPP/modal item;
-- perubahan saldo digital di Pengaturan Toko membuat entry `adjustment`;
+- perubahan saldo digital di Pengaturan Toko membuat entry `adjustment`, dengan saldo maksimal sebesar `contributed_capital`; penyesuaian tidak menambah modal disetor;
 - modal awal dan tambahan manual dicatat dari halaman `/capital` dan mengubah `contributed_capital`;
 - penjualan PPOB/digital mengurangi saldo berjalan berdasarkan HPP, tetapi tidak menambah modal disetor;
-- keuntungan digital dihitung dari akumulasi `TransactionItem.profit` untuk tipe `ppob`/`digital`;
+- keuntungan digital dihitung melalui `ProfitCalculationService::itemProfit()` untuk tipe `ppob`/`digital`, sehingga memakai HPP/provider cost efektif;
 - pada PPOB, nominal pulsa customer dipisahkan dari `provider_cost`; HPP, profit, dan pengurangan saldo provider memakai biaya aktual tersebut;
 - laporan dan dashboard menggunakan kalkulasi item yang sama; transaksi PPOB lama tanpa `provider_cost` memakai snapshot HPP lama sebagai fallback;
 - data lama disinkronkan saat akun pertama kali dibuat, lalu penyesuaian stok dicatat bila diperlukan.
 
-Entry otomatis tidak dapat dihapus dari UI. Entry manual dapat dihapus dan saldo akun dikembalikan secara atomik.
+Entry otomatis tidak dapat dihapus dari UI. `recordManual()`/`deleteManual()` mencatat atau membalik saldo akun, modal disetor digital, serta saldo profil untuk entry manual.
+
+Saat `ensureAccounts()` berjalan, akun digital dan profil toko dikunci dalam DB transaction. Saldo akun lama yang melebihi modal dikurangi melalui entry debit `adjustment` berketerangan `Koreksi saldo digital yang melebihi modal disetor`; profil toko yang melebihi batas juga diturunkan ke batas modal. Histori lama dan modal disetor dipertahankan. Pemanggilan berikutnya tidak membuat entry koreksi lagi jika saldo sudah memenuhi batas. Inisialisasi dan rekonsiliasi ini dapat terjadi saat halaman `/capital` atau `/pos` dibuka.
+
+`StoreProfile.saldo_digital` dipakai POS sebagai saldo provider. `PosController@index` memuat ulang profil setelah rekonsiliasi agar nilai lama tidak kembali disinkronkan ke ledger. Pembatalan transaksi yang akan mengembalikan saldo di atas modal ditolak sebelum entry pemakaian dihapus; pengguna perlu menyesuaikan saldo lebih dahulu. `ReportController` menjalankan pembatalan dalam DB transaction sehingga kegagalan membatalkan seluruh perubahan terkait.
+
+## Routing, UI, dan integrasi
+
+- `routes/web.php` memetakan halaman dan mutasi bisnis di bawah middleware `auth`/`verified`; `routes/settings.php` berisi pengaturan akun. Fortify menangani autentikasi dan fitur keamanan akun.
+- `HandleInertiaRequests` membagikan user, profil singkat toko, versi update, serta flash message. `resources/js/app.ts` menetapkan layout halaman; entry Vite ada di `vite.config.ts`.
+- `ReceivableController` menangani pelunasan dan `PaymentHistory`; `ExpenseAllocation` menghubungkan pengeluaran HPP pesanan ke transaksi/item agar biaya tidak dihitung ganda.
+- `UndanganController` meneruskan request ke API Undangan Cetak melalui Laravel HTTP client dan konfigurasi `services.undangan`; kredensial tidak ditulis dalam dokumentasi.
 
 ## Testing dan dependency
 
 - PHP minimum aplikasi: 8.3; dependency backend dikelola Composer.
 - Frontend memakai Vue 3, Inertia, Vite, TypeScript checking, ESLint, dan Prettier.
+- Dependency UI mencakup Tailwind CSS 4, Reka UI, Lucide, Flatpickr, dan Tiptap; versi/rentang dependency ada di `package.json`, resolusi instalasi ada di lockfile.
 - Test Laravel dijalankan melalui `php artisan test`; konfigurasi test memakai SQLite in-memory pada `phpunit.xml`.
 - Quality checks yang tersedia di `composer.json`: Pint, ESLint, Prettier, `vue-tsc`, dan test suite.
+- Feature test memakai `RefreshDatabase` dari `tests/Pest.php`. Test domain meliputi harga area, saldo/provider cost, ledger modal, stok/restock, alokasi pengeluaran, customer, dan laporan. Regression batas modal terdapat di `DigitalCapitalLimitTest`, `CapitalLedgerTest`, dan `DigitalProviderCostTest`.
 
 ## Konvensi perubahan
 

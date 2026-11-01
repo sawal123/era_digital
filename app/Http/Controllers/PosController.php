@@ -38,6 +38,7 @@ class PosController extends Controller
         ]);
         $ledger = app(CapitalLedgerService::class);
         $digitalAccount = $ledger->ensureAccounts()->firstWhere('slug', CapitalLedgerService::DIGITAL_ACCOUNT_SLUG);
+        $profile->refresh();
         if ($digitalAccount && abs((float) $digitalAccount->current_balance - (float) $profile->saldo_digital) >= 0.01) {
             $ledger->syncDigitalBalance(
                 (float) $digitalAccount->current_balance,

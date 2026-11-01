@@ -148,6 +148,38 @@ it('menolak transaksi PPOB jika saldo provider tidak mencukupi', function () {
         ->and((float) StoreProfile::first()->saldo_digital)->toBe(50000.0);
 });
 
+it('menolak pembatalan digital jika saldo yang sudah diisi ulang akan melebihi modal', function () {
+    $this->actingAs(User::factory()->create());
+    $product = digitalProviderProduct();
+    $profile = StoreProfile::create([
+        'store_name' => 'Era Digital',
+        'address' => 'Alamat test',
+        'phone' => '0800000000',
+        'saldo_digital' => 2600000,
+    ]);
+
+    $this->get('/pos')->assertOk();
+    $this->post('/pos', digitalProviderPayload($product))->assertRedirect();
+    $transaction = Transaction::firstOrFail();
+    $this->post('/settings/store', [
+        'store_name' => $profile->store_name,
+        'address' => $profile->address,
+        'phone' => $profile->phone,
+        'saldo_digital' => 2600000,
+    ])->assertSessionHasNoErrors()->assertRedirect();
+    $entryCount = CapitalLedgerEntry::count();
+
+    $this->delete('/reports/'.$transaction->id)->assertRedirect()
+        ->assertSessionHas('error', fn ($message) => str_contains($message, 'melebihi modal disetor'));
+
+    $account = CapitalAccount::where('slug', CapitalLedgerService::DIGITAL_ACCOUNT_SLUG)->firstOrFail();
+    expect($transaction->fresh())->not->toBeNull()
+        ->and($transaction->items()->count())->toBe(1)
+        ->and((float) $account->current_balance)->toBe(2600000.0)
+        ->and((float) $profile->fresh()->saldo_digital)->toBe(2600000.0)
+        ->and(CapitalLedgerEntry::count())->toBe($entryCount);
+});
+
 it('menolak penjualan digital saat saldo provider sudah habis', function () {
     $this->actingAs(User::factory()->create());
     $product = digitalProviderProduct();

@@ -25,6 +25,14 @@ Status yang digunakan: `TODO` → `IN PROGRESS` → `BLOCKED` / `REVIEW` → `DO
 | BUG-006 | Membatasi alokasi HPP pesanan agar tidak terhitung ganda atau melebihi HPP tersedia | DONE | High | - |
 | BUG-007 | Memblokir penjualan saldo digital saat saldo provider habis | DONE | High | - |
 | FEAT-003 | Menampilkan total terjual produk dan mencatat adjustment stok manual | DONE | Medium | - |
+| BUG-008 | Membatasi saldo digital tersedia terhadap modal disetor dan mengoreksi saldo lama melalui ledger | DONE | High | — |
+
+## BUG-008
+
+- Root cause: `syncDigitalBalance()` menerima penyesuaian tanpa batas `contributed_capital`; POS juga dapat menyinkronkan saldo profil yang terlalu besar ke ledger. Test lama mengizinkan saldo Rp2.500.000 dengan modal Rp2.000.000.
+- Perubahan: validasi service, rekonsiliasi saldo lama dengan entry penyesuaian, refresh profil POS, dan pengamanan pembatalan transaksi yang melampaui batas modal.
+- Reproduksi: 5 dari 8 regression case awal gagal pada kode lama; kasus saldo Rp18.258.210 dengan modal Rp3.100.000 direproduksi pada database test.
+- Validasi: full Pest `159 passed`, `2 skipped`, `708 assertions`; syntax PHP dan `git diff --check` lulus. Pint terarah lulus untuk controller/test; service masih memiliki temuan format lokal sebelum tugas yang dipertahankan. Detail: [BUG-008](bugs/2026-11-01-digital-capital-limit.md).
 
 ## UI-009
 

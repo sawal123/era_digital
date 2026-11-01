@@ -127,7 +127,7 @@ it('penjualan fisik otomatis mengurangi modal persediaan', function () {
         ->and(CapitalLedgerEntry::where('reference_type', 'transaction_item')->count())->toBe(1);
 });
 
-it('penambahan saldo digital tercatat sebagai penyesuaian ledger', function () {
+it('perubahan saldo digital dalam batas modal tercatat sebagai penyesuaian ledger', function () {
     StoreProfile::create([
         'store_name' => 'Era Digital',
         'address' => 'Alamat test',
@@ -137,11 +137,11 @@ it('penambahan saldo digital tercatat sebagai penyesuaian ledger', function () {
 
     $service = app(CapitalLedgerService::class);
     $service->ensureAccounts();
-    $service->syncDigitalBalance(2000000, 2500000, '2026-10-20');
+    $service->syncDigitalBalance(2000000, 1500000, '2026-10-20');
 
     $account = CapitalAccount::where('slug', 'saldo-digital')->firstOrFail();
 
-    expect((float) $account->current_balance)->toBe(2500000.0)
+    expect((float) $account->current_balance)->toBe(1500000.0)
         ->and((float) $account->contributed_capital)->toBe(2000000.0)
         ->and(CapitalLedgerEntry::where('entry_type', 'adjustment')->count())->toBe(1);
 });
