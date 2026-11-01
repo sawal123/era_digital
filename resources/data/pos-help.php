@@ -111,6 +111,6 @@ return [
     'updates' => [
         'title' => 'Update Aplikasi',
         'path' => '/updates',
-        'content' => 'Menu Update Aplikasi menampilkan informasi versi, ringkasan perubahan, dan sorotan fitur dari konfigurasi update aplikasi. Modal informasi update tampil sekali per versi pada browser; tombol detail membuka halaman Update Aplikasi. Halaman ini memberi informasi perubahan, bukan tombol memasang software secara otomatis. Informasi versi aktual dibaca pada halaman tersebut; chatbot tidak boleh menebak nomor versi atau menjanjikan fitur yang belum ada di panduan.',
+        'content' => 'Menu Update Aplikasi membuka halaman Yang baru di Era Digital: ringkasan fitur terbaru, tanggal/versi, cara memulai bila tersedia, dan riwayat pembaruan sebelumnya. Seluruh riwayat lama tetap dapat dibaca; versi terbaru tidak ditampilkan dua kali. Pengumuman Asisten POS memiliki tombol Coba Bantuan POS untuk membuka chat tanpa membuat pertanyaan otomatis. Modal pemberitahuan tampil sekali per versi pada browser; tombol Lihat semua pembaruan membuka halaman ini. Membuka halaman update atau menutup pemberitahuan menandainya telah dibaca di browser tersebut. Halaman ini memberi informasi perubahan, bukan tombol memasang software secara otomatis. Informasi versi aktual dibaca pada halaman tersebut; chatbot tidak boleh menebak nomor versi atau menjanjikan fitur yang belum ada di panduan.',
     ],
 ];

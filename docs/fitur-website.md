@@ -314,3 +314,12 @@ Fitur yang tersedia:
   melakukan perubahan data.
 - Jika layanan tidak tersedia atau batas pemakaian tercapai, chat menampilkan
   pesan yang sesuai; halaman POS tetap dapat digunakan.
+
+## 18. Informasi pembaruan
+
+- Buka **Update Aplikasi** untuk melihat ringkasan terbaru dan riwayat versi
+  sebelumnya. Pembaruan lama tetap tersedia di bagian riwayat.
+- Pengumuman Asisten POS dilengkapi panduan tiga langkah dan tombol
+  **Coba Bantuan POS** untuk membuka chatbot langsung.
+- Pemberitahuan update muncul sekali per versi pada browser. Membuka halaman
+  update atau menutup pemberitahuan menandainya telah dibaca.

@@ -13,6 +13,7 @@ Status yang digunakan: `TODO` → `IN PROGRESS` → `BLOCKED` / `REVIEW` → `DO
 | UI-007 | Merapikan Ledger Modal agar saldo digital tidak tampil ganda | DONE | Medium | - |
 | UI-008 | Menambahkan filter riwayat ledger modal | DONE | Medium | - |
 | UI-009 | Menambahkan modal dan halaman informasi update aplikasi | DONE | Low | - |
+| UI-010 | Merapikan halaman/notifikasi update dan mengumumkan chatbot dengan mempertahankan riwayat lama | DONE | Medium | [feature/pos-ai-chatbot](https://github.com/sawal123/era_digital/tree/feature/pos-ai-chatbot) |
 | AUDIT-001 | Audit dan penguatan integritas data stok, piutang, ledger, dan customer | DONE | High | - |
 | DOC-001 | Menetapkan instruksi kerja AI coding agent dan dokumentasi arsitektur repository | DONE | Medium | — |
 | BUG-001 | Verifikasi dan perbaikan perhitungan laba untuk pengeluaran belanja/restock | DONE | High | — |
@@ -27,6 +28,19 @@ Status yang digunakan: `TODO` → `IN PROGRESS` → `BLOCKED` / `REVIEW` → `DO
 | FEAT-003 | Menampilkan total terjual produk dan mencatat adjustment stok manual | DONE | Medium | - |
 | FEAT-004 | Chatbot AI OpenAI sebagai pemandu fitur khusus POS | DONE | High | [feature/pos-ai-chatbot](https://github.com/sawal123/era_digital/tree/feature/pos-ai-chatbot) |
 | BUG-008 | Membatasi saldo digital tersedia terhadap modal disetor dan mengoreksi saldo lama melalui ledger | DONE | High | — |
+
+## UI-010
+
+- Temuan: halaman menampilkan versi terbaru dua kali; konfigurasi belum
+  mengumumkan chatbot kepada pengguna.
+- Perubahan: ringkasan terbaru dengan panduan singkat dan tombol pembuka chat,
+  riwayat versi sebelumnya tanpa duplikasi, serta notifikasi yang lebih ringkas.
+  Versi `2026.11.01` ditambahkan; record `2026.10.29` dipertahankan utuh.
+- Validasi: full Pest **202 passed, 2 skipped, 944 assertions**; Pint,
+  ESLint halaman/komponen, Prettier terarah, dan build Vite lulus.
+- Keterbatasan: TypeScript global masih gagal pada halaman Undangan existing;
+  tidak ada error yang dilaporkan pada file Vue yang diubah. Validasi visual
+  browser belum dapat dilakukan karena host browser tidak tersedia.
 
 ## FEAT-004
 

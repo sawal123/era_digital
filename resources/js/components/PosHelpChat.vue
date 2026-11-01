@@ -9,7 +9,14 @@ import {
     Send,
     Sparkles,
 } from 'lucide-vue-next';
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import {
+    computed,
+    nextTick,
+    onBeforeUnmount,
+    onMounted,
+    ref,
+    watch,
+} from 'vue';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -201,7 +208,16 @@ watch(open, (isOpen) => {
     }
 });
 
-onBeforeUnmount(() => abortController?.abort());
+const openFromUpdate = () => {
+    open.value = true;
+};
+
+onMounted(() => window.addEventListener('open-pos-help', openFromUpdate));
+
+onBeforeUnmount(() => {
+    abortController?.abort();
+    window.removeEventListener('open-pos-help', openFromUpdate);
+});
 </script>
 
 <template>

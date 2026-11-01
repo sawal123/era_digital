@@ -1,1 +1,0 @@
-import{Ct as e,Lt as t,Pt as n,Qt as r,Y as i,Zt as a,yt as o}from"./app-Bu-KtRNt.js";var s=e({__name:`CardDescription`,props:{class:{type:[Boolean,null,String,Object,Array]}},setup(e){let s=e;return(e,c)=>(n(),o(`p`,{"data-slot":`card-description`,class:r(a(i)(`text-muted-foreground text-sm`,s.class))},[t(e.$slots,`default`)],2))}});export{s as t};

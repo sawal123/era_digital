@@ -73,6 +73,7 @@ Saat `ensureAccounts()` berjalan, akun digital dan profil toko dikunci dalam DB 
 - `HandleInertiaRequests` membagikan user, profil singkat toko, versi update, serta flash message. `resources/js/app.ts` menetapkan layout halaman; entry Vite ada di `vite.config.ts`.
 - `ReceivableController` menangani pelunasan dan `PaymentHistory`; `ExpenseAllocation` menghubungkan pengeluaran HPP pesanan ke transaksi/item agar biaya tidak dihitung ganda.
 - `UndanganController` meneruskan request ke API Undangan Cetak melalui Laravel HTTP client dan konfigurasi `services.undangan`; kredensial tidak ditulis dalam dokumentasi.
+- `config/updates.php` menyimpan `latest` dan `history`; halaman Updates memisahkan sorotan terbaru dari versi sebelumnya tanpa menghapus record riwayat. Metadata opsional `action`/`getting_started` menyediakan tombol mencoba fitur dan panduan singkat. Aksi `open-chat` memakai event UI `open-pos-help` yang ditangani widget chatbot; tidak mengirim pertanyaan otomatis. Notifikasi memakai penanda localStorage per versi pada browser.
 
 ## Chatbot bantuan POS
 

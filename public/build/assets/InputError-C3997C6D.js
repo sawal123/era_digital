@@ -1,1 +1,0 @@
-import{Ct as e,Pt as t,Wt as n,dt as r,gt as i,tn as a,yt as o}from"./app-Bu-KtRNt.js";var s={class:`text-sm text-red-600 dark:text-red-500`},c=e({__name:`InputError`,props:{message:{}},setup(e){return(c,l)=>n((t(),o(`div`,null,[i(`p`,s,a(e.message),1)],512)),[[r,e.message]])}});export{c as t};

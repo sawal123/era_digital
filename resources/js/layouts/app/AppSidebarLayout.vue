@@ -35,6 +35,7 @@ import {
     Handshake,
     MailOpen,
     Landmark,
+    MessageCircle,
     Sparkles,
 } from 'lucide-vue-next';
 
@@ -64,6 +65,7 @@ type UpdateSummary = {
     title: string;
     summary: string;
     highlights: string[];
+    action?: { type: 'open-chat'; label: string };
 };
 const latestUpdate = computed(
     () => page.props.latestUpdate as UpdateSummary | null,
@@ -192,7 +194,9 @@ onMounted(() => {
     // Request initial cart state on load
     window.dispatchEvent(new CustomEvent('request-cart-sync'));
 
-    if (
+    if (latestUpdate.value && currentPath.value.startsWith('/updates')) {
+        markUpdateAsSeen();
+    } else if (
         latestUpdate.value &&
         !currentPath.value.startsWith('/updates') &&
         !window.localStorage.getItem(updateSeenStorageKey.value)
@@ -227,40 +231,51 @@ onUnmounted(() => {
         "
     >
         <DialogContent
-            class="overflow-hidden border-indigo-500/30 bg-card p-0 text-foreground sm:max-w-lg"
+            class="max-h-[calc(100dvh-2rem)] gap-0 overflow-y-auto rounded-2xl border-indigo-500/20 bg-card p-0 text-foreground sm:max-w-lg"
         >
             <div
-                class="h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-400"
+                class="h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-400"
             ></div>
-            <div class="p-6">
-                <DialogHeader>
-                    <div
-                        class="mb-3 flex size-12 items-center justify-center rounded-2xl bg-indigo-500/10 text-indigo-500"
-                    >
-                        <Sparkles class="size-6" />
+            <div class="p-5 sm:p-6">
+                <DialogHeader class="text-left">
+                    <div class="mb-3 flex items-center gap-3">
+                        <div
+                            class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
+                        >
+                            <MessageCircle
+                                v-if="latestUpdate.action?.type === 'open-chat'"
+                                class="size-6"
+                                aria-hidden="true"
+                            />
+                            <Sparkles
+                                v-else
+                                class="size-6"
+                                aria-hidden="true"
+                            />
+                        </div>
+                        <div class="space-y-1">
+                            <p
+                                class="text-xs font-semibold text-indigo-600 dark:text-indigo-400"
+                            >
+                                Pembaruan terbaru · v{{ latestUpdate.version }}
+                            </p>
+                            <p class="text-xs text-muted-foreground">
+                                {{ latestUpdate.date }}
+                            </p>
+                        </div>
                     </div>
-                    <DialogTitle class="text-xl font-black"
-                        >Update aplikasi tersedia</DialogTitle
+                    <DialogTitle
+                        class="text-xl leading-7 font-semibold tracking-tight"
+                        >{{ latestUpdate.title }}</DialogTitle
                     >
                     <DialogDescription class="leading-6">
-                        {{ latestUpdate.title }} — versi
-                        {{ latestUpdate.version }}
+                        {{ latestUpdate.summary }}
                     </DialogDescription>
                 </DialogHeader>
 
-                <div class="mt-5 space-y-4">
-                    <div
-                        class="flex items-center gap-2 text-xs font-semibold text-muted-foreground"
-                    >
-                        <span
-                            class="rounded-full bg-indigo-500/10 px-2.5 py-1 text-indigo-600 dark:text-indigo-400"
-                        >
-                            v{{ latestUpdate.version }}
-                        </span>
-                        <span>{{ latestUpdate.date }}</span>
-                    </div>
-                    <p class="text-sm leading-6 text-muted-foreground">
-                        {{ latestUpdate.summary }}
+                <div class="mt-5 rounded-xl bg-muted/40 p-4">
+                    <p class="mb-3 text-xs font-semibold text-foreground">
+                        Yang baru untuk Anda
                     </p>
                     <ul class="space-y-2.5">
                         <li
@@ -285,15 +300,15 @@ onUnmounted(() => {
                         variant="ghost"
                         @click="markUpdateAsSeen"
                     >
-                        Nanti
+                        Tutup
                     </Button>
                     <Button
                         type="button"
-                        class="bg-indigo-600 text-white hover:bg-indigo-700"
+                        class="rounded-xl bg-indigo-600 text-white hover:bg-indigo-500"
                         @click="openUpdateDetails"
                     >
-                        Lihat Detail Update
-                        <ArrowRight class="size-4" />
+                        Lihat semua pembaruan
+                        <ArrowRight class="size-4" aria-hidden="true" />
                     </Button>
                 </DialogFooter>
             </div>
