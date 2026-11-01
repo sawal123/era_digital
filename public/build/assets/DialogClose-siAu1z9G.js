@@ -1,0 +1,1 @@
+import{Ct as e,I as t,Lt as n,Pt as r,Ut as i,Zt as a,_t as o,kt as s}from"./app-Bu-KtRNt.js";var c=e({__name:`DialogClose`,props:{asChild:{type:Boolean},as:{}},setup(e){let c=e;return(e,l)=>(r(),o(a(t),s({"data-slot":`dialog-close`},c),{default:i(()=>[n(e.$slots,`default`)]),_:3},16))}});export{c as t};

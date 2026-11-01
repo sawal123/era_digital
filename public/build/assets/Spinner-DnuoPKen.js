@@ -1,0 +1,1 @@
+import{Ct as e,Pt as t,Qt as n,Y as r,Zt as i,_t as a,x as o}from"./app-Bu-KtRNt.js";var s=e({__name:`Spinner`,props:{class:{type:[Boolean,null,String,Object,Array]}},setup(e){let s=e;return(e,c)=>(t(),a(i(o),{role:`status`,"aria-label":`Loading`,class:n(i(r)(`size-4 animate-spin`,s.class))},null,8,[`class`]))}});export{s as t};

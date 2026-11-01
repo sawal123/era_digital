@@ -48,6 +48,8 @@ yang benar-benar ditemukan; tandai asumsi atau informasi yang belum diverifikasi
   serta keterbatasan atau tindak lanjut yang masih diperlukan.
 - Perbarui `docs/ARCHITECTURE.md` bila alur inti atau aturan domain berubah.
   Jangan membuat dokumentasi terpisah berlebihan untuk perubahan kecil.
+- Jika perilaku/menu POS berubah, sinkronkan panduan chatbot di
+  `resources/data/pos-help.php` dan test terkait agar bantuan tidak tertinggal.
 
 ## Konvensi dan pemeriksaan
 

@@ -25,7 +25,20 @@ Status yang digunakan: `TODO` → `IN PROGRESS` → `BLOCKED` / `REVIEW` → `DO
 | BUG-006 | Membatasi alokasi HPP pesanan agar tidak terhitung ganda atau melebihi HPP tersedia | DONE | High | - |
 | BUG-007 | Memblokir penjualan saldo digital saat saldo provider habis | DONE | High | - |
 | FEAT-003 | Menampilkan total terjual produk dan mencatat adjustment stok manual | DONE | Medium | - |
+| FEAT-004 | Chatbot AI OpenAI sebagai pemandu fitur khusus POS | DONE | High | [feature/pos-ai-chatbot](https://github.com/sawal123/era_digital/tree/feature/pos-ai-chatbot) |
 | BUG-008 | Membatasi saldo digital tersedia terhadap modal disetor dan mengoreksi saldo lama melalui ledger | DONE | High | — |
+
+## FEAT-004
+
+- Rencana dan hasil eksekusi: [PLAN-CHATBOT-AI.md](PLAN-CHATBOT-AI.md).
+- Branch: `feature/pos-ai-chatbot`; commit fitur memakai ID `FEAT-004`.
+- Cakupan: bantuan fitur, konteks halaman, riwayat terbatas, pembatasan topik,
+  autentikasi, serta batas pemakaian; tidak mengubah transaksi bisnis.
+- Validasi: full Pest **199 passed, 2 skipped, 907 assertions**; 6/6 smoke case
+  API asli lulus; Pint, ESLint komponen, Prettier terarah, dan build lulus.
+- Keterbatasan: TypeScript global masih gagal pada file Undangan existing;
+  verifikasi visual terhenti karena URL Chrome tidak dapat dipastikan oleh
+  Computer Use. Detail dan konfigurasi ada pada rencana implementasi.
 
 ## BUG-008
 

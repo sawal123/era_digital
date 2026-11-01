@@ -295,3 +295,22 @@ Fitur yang tersedia:
 - Gunakan customer sekali beli jika pelanggan hanya membutuhkan invoice tanpa perlu masuk ke master customer.
 - Gunakan fitur penerima invoice pada Laporan Penjualan jika transaksi umum perlu dicetak ulang atas nama pelanggan.
 - Nonaktifkan produk, metode pembayaran, atau mitra yang sudah memiliki riwayat transaksi daripada menghapusnya.
+
+## 17. Bantuan POS dengan AI
+
+- Setelah login, klik tombol **Bantuan POS** di pojok kanan bawah.
+- Tanyakan fungsi menu, langkah penggunaan, atau istilah seperti modal,
+  keuntungan, HPP, dan piutang. Contoh pertanyaan tersedia di awal chat.
+- Chat memakai konteks halaman dan mendukung pertanyaan lanjutan. Tautan
+  di bawah jawaban dapat digunakan untuk membuka menu terkait.
+- Pertanyaan di luar aplikasi ditolak; fitur yang belum dijelaskan tidak
+  boleh dikarang. Chat memberi panduan dan tidak menjalankan transaksi atau
+  membaca nominal usaha pengguna.
+- Gunakan **Percakapan baru** untuk menghapus riwayat chat sesi pengguna.
+  Riwayat dibatasi 5 pasangan pesan; batas awal pertanyaan 10/menit dan
+  100/hari per pengguna.
+- Pesan diproses oleh OpenAI. Jangan masukkan password, OTP, API key, atau
+  data pribadi yang tidak diperlukan. Periksa kembali panduan AI sebelum
+  melakukan perubahan data.
+- Jika layanan tidak tersedia atau batas pemakaian tercapai, chat menampilkan
+  pesan yang sesuai; halaman POS tetap dapat digunakan.
