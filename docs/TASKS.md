@@ -28,6 +28,23 @@ Status yang digunakan: `TODO` → `IN PROGRESS` → `BLOCKED` / `REVIEW` → `DO
 | FEAT-003 | Menampilkan total terjual produk dan mencatat adjustment stok manual | DONE | Medium | - |
 | FEAT-004 | Chatbot AI OpenAI sebagai pemandu fitur khusus POS | DONE | High | [feature/pos-ai-chatbot](https://github.com/sawal123/era_digital/tree/feature/pos-ai-chatbot) |
 | BUG-008 | Membatasi saldo digital tersedia terhadap modal disetor dan mengoreksi saldo lama melalui ledger | DONE | High | — |
+| HELP-001 | Melengkapi panduan AI POS Kasir dan menyeragamkan istilah Modal Aktual Mitra | DONE | High | [4cca6d9](https://github.com/sawal123/era_digital/commit/4cca6d9) |
+| UI-011 | Halaman akses API key eksternal untuk Undangan Cetak dan panduan chatbot | DONE | Medium | [4cca6d9](https://github.com/sawal123/era_digital/commit/4cca6d9) |
+
+## UI-011
+
+- Penyebab: halaman katalog tetap dirender saat key kosong/ditolak; error hanya menjadi banner dan penolakan endpoint jenis diabaikan.
+- Perubahan: key kosong atau respons HTTP 401/403 merender halaman kebutuhan API key dengan animasi SVG/CSS, dukungan reduced motion, coba ulang, dashboard, dan pembuka chatbot. Panduan Undangan Cetak ditambah penjelasan akses eksternal serta pengelolaan katalog.
+- Validasi: 65 test terarah lulus (428 assertion), ESLint/Prettier halaman baru dan Pint test/panduan lulus, build Vite serta diff check lulus. Artefak build diperbarui mengikuti pola repository.
+- Keterbatasan: pemeriksaan tipe melaporkan 81 error existing di `Undangan/Index.vue`, tanpa error pada halaman baru. Temuan Pint controller identik dengan empat jenis temuan pada versi awal. Pratinjau browser dan API asli belum diuji. Rincian: [UI-011](bugs/2026-11-02-undangan-api-access.md).
+
+## HELP-001
+
+- Temuan awal: panduan kasir/PPOB masih ringkas, belum memakai label Modal Aktual Mitra dan belum menjelaskan contoh margin, saran biaya, pencadangan saldo keranjang, customer sekali beli, serta langkah menangani gagal simpan. Label dan peringatan POS masih menyebut satu merek mitra.
+- Cakupan: riset pertanyaan pengguna berdasarkan source dan FAQ POS publik, perluasan panduan AI, label UI generik, serta regression test. Formula dan mutasi finansial tidak diubah.
+- Perubahan: 56 contoh pertanyaan dalam 9 topik, definisi/ilustrasi modal aktual dan margin, saldo keranjang, pembayaran, customer, cetak, serta penanganan kendala. Label/peringatan/ringkasan memakai Modal Aktual Mitra dan widget menawarkan pertanyaan modal/DP. Artefak build diperbarui mengikuti pola repository.
+- Validasi: 95 test terarah lulus (527 assertion); pemeriksaan akhir chatbot 51 test lulus (294 assertion). Pint, Prettier terarah, ESLint widget, build Vite, dan diff check lulus.
+- Keterbatasan: 101 error ESLint POS identik dengan versi awal; TypeScript gagal pada file Undangan yang tidak diubah. Jawaban model asli dan visual browser belum diuji; HTTP fake memverifikasi materi/kontrak/sumber, bukan kualitas semantik AI. Riset dan rincian: [HELP-001](bugs/2026-11-02-panduan-ai-pos-kasir.md).
 
 ## UI-010
 

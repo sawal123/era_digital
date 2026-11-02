@@ -39,6 +39,10 @@ class UndanganController extends Controller
      */
     public function index(Request $request)
     {
+        if (blank($this->apiKey)) {
+            return Inertia::render('Undangan/ApiKeyRequired');
+        }
+
         $allData = [];
         $apiError = null;
         $page = 1;
@@ -47,6 +51,10 @@ class UndanganController extends Controller
 
         do {
             $response = $this->client()->get('/undangan-cetak', ['per_page' => 100, 'page' => $page]);
+
+            if (in_array($response->status(), [401, 403], true)) {
+                return Inertia::render('Undangan/ApiKeyRequired');
+            }
 
             if ($response->failed()) {
                 $body = $response->json();
@@ -71,6 +79,10 @@ class UndanganController extends Controller
         // Ambil daftar jenis undangan dari API sumber
         $jenisUndangan = [];
         $jenisResponse = $this->client()->get('/jenis-undangan');
+
+        if (in_array($jenisResponse->status(), [401, 403], true)) {
+            return Inertia::render('Undangan/ApiKeyRequired');
+        }
 
         if ($jenisResponse->successful()) {
             $jenisUndangan = $jenisResponse->json()['data'] ?? [];

@@ -274,6 +274,78 @@ it('mengarahkan seluruh sumber panduan ke route GET aplikasi yang dilindungi aut
     }
 });
 
+it('mengirim panduan kasir terperinci dan mengembalikan tautan topik yang sesuai', function (string $question, string $source, array $facts) {
+    fakePosHelp(posHelpResponse([
+        'answer' => 'Berikut panduan penggunaan POS Kasir sesuai pertanyaan Anda.',
+        'source_ids' => [$source],
+    ]));
+
+    $this->postJson('/help/chat', ['message' => $question, 'page' => '/pos'])
+        ->assertOk()
+        ->assertJsonPath('messages.1.status', 'answered')
+        ->assertJsonPath('messages.1.sources.0.href', '/pos');
+
+    Http::assertSent(function (ClientRequest $request) use ($source, $question, $facts) {
+        $instructions = $request['instructions'];
+        $guide = app(PosChatbotService::class)->knowledge();
+        $article = $guide[$source];
+
+        expect($article['questions'])->toContain($question);
+        foreach ($facts as $fact) {
+            expect($article['content'])->toContain($fact);
+        }
+
+        return str_contains($instructions, json_encode($article, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES))
+            && str_contains($instructions, 'Halaman saat ini: POS Kasir dan pembayaran.');
+    });
+})->with([
+    'modal aktual dan contoh margin' => ['Apa itu Modal Aktual Mitra?', 'digital_cost', ['biaya yang benar-benar dipotong', 'Rp98.000', 'Rp5.000']],
+    'saran modal bukan harga pasti' => ['Kenapa Modal Aktual Mitra terisi otomatis?', 'digital_cost', ['produk dan nominal yang sama', 'nominal pembelian', 'periksa ulang']],
+    'saldo di keranjang' => ['Kenapa saldo digital berkurang sebelum transaksi disimpan?', 'digital_balance', ['dicadangkan', 'belum mengubah saldo tersimpan', 'hapus item']],
+    'saldo dan modal disetor' => ['Bagaimana mengisi saldo digital yang habis?', 'digital_balance', ['Ledger Modal', 'Pengaturan Toko', 'modal disetor']],
+    'keranjang campuran dan jumlah' => ['Bisa mencampur barang, cetak, dan pulsa dalam satu nota?', 'pos_cart', ['satu keranjang', 'bilangan bulat', 'baris baru']],
+    'customer sekali beli' => ['Bagaimana membuat invoice atas nama pembeli tanpa menambah customer?', 'pos_customers', ['Customer Sekali Beli / Invoice', 'nama wajib', 'tidak membuat master customer']],
+    'pembayaran sebagian' => ['Bagaimana mencatat DP atau piutang di kasir?', 'pos_payments', ['Tunai', 'Rp40.000', 'Rp60.000', 'Catatan Piutang']],
+    'pembayaran non tunai' => ['Apakah memilih QRIS berarti pembayaran sudah diverifikasi?', 'pos_payments', ['dicatat lunas', 'tidak memverifikasi', 'satu metode']],
+    'ukuran cetak' => ['Ukuran spanduk diisi meter atau sentimeter?', 'printing', ['100 cm = 1 m', 'bilangan bulat minimal 1', 'Rp100.000']],
+    'gagal simpan dan transaksi ganda' => ['Apa yang harus diperiksa jika transaksi gagal disimpan?', 'pos_troubleshooting', ['Laporan', 'jangan langsung mengulang', 'pesan kesalahan']],
+]);
+
+it('menjelaskan modal aktual dengan istilah mitra yang tidak terikat merek', function () {
+    $knowledge = app(PosChatbotService::class)->knowledge();
+    $guide = json_encode($knowledge, JSON_UNESCAPED_UNICODE);
+
+    expect($guide)->toContain('Modal Aktual Mitra')
+        ->not->toContain('Shopee');
+});
+
+it('memberi panduan kebutuhan API key eksternal pada halaman undangan cetak', function () {
+    fakePosHelp(posHelpResponse([
+        'answer' => 'Hubungi pengelola aplikasi untuk memeriksa akses layanan eksternal, lalu pilih Coba Lagi.',
+        'source_ids' => ['invitations'],
+    ]));
+
+    $this->postJson('/help/chat', [
+        'message' => 'Kenapa Undangan Cetak membutuhkan API KEY dari Eksternal?',
+        'page' => '/undangan',
+    ])->assertOk()
+        ->assertJsonPath('messages.1.sources.0.href', '/undangan')
+        ->assertJsonPath('messages.1.sources.0.title', 'Undangan Cetak');
+
+    Http::assertSent(function (ClientRequest $request) {
+        $content = app(PosChatbotService::class)->knowledge()['invitations']['content'];
+
+        expect($content)->toContain('Halaman ini membutuhkan API KEY dari Eksternal')
+            ->toContain('Coba Lagi')
+            ->toContain('pengelola aplikasi')
+            ->toContain('berbeda dari API key chatbot')
+            ->toContain('Jangan kirim API key');
+
+        return str_contains($request['instructions'], $content)
+            && str_contains($request['instructions'], 'Halaman saat ini: Undangan Cetak.');
+    });
+});
+
 it('dapat menjalankan pemeriksaan scope melalui command tanpa mencetak key', function () {
     Http::swap(new Factory);
     Http::preventStrayRequests();
