@@ -28,8 +28,8 @@ Status yang digunakan: `TODO` → `IN PROGRESS` → `BLOCKED` / `REVIEW` → `DO
 | FEAT-003 | Menampilkan total terjual produk dan mencatat adjustment stok manual | DONE | Medium | - |
 | FEAT-004 | Chatbot AI OpenAI sebagai pemandu fitur khusus POS | DONE | High | [feature/pos-ai-chatbot](https://github.com/sawal123/era_digital/tree/feature/pos-ai-chatbot) |
 | BUG-008 | Membatasi saldo digital tersedia terhadap modal disetor dan mengoreksi saldo lama melalui ledger | DONE | High | — |
-| HELP-001 | Melengkapi panduan AI POS Kasir dan menyeragamkan istilah Modal Aktual Mitra | DONE | High | — |
-| UI-011 | Halaman akses API key eksternal untuk Undangan Cetak dan panduan chatbot | DONE | Medium | — |
+| HELP-001 | Melengkapi panduan AI POS Kasir dan menyeragamkan istilah Modal Aktual Mitra | DONE | High | [4cca6d9](https://github.com/sawal123/era_digital/commit/4cca6d9) |
+| UI-011 | Halaman akses API key eksternal untuk Undangan Cetak dan panduan chatbot | DONE | Medium | [4cca6d9](https://github.com/sawal123/era_digital/commit/4cca6d9) |
 
 ## UI-011
 
