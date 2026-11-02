@@ -1,11 +1,12 @@
 <?php
 
-use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CapitalLedgerController;
+use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\PaymentMethodController;
+use App\Http\Controllers\PosChatbotController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\PrintVendorController;
 use App\Http\Controllers\ProductController;
@@ -25,6 +26,15 @@ Route::inertia('/', 'Welcome', [
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/updates', [UpdateController::class, 'index'])->name('updates.index');
+
+    Route::get('/help/chat', [PosChatbotController::class, 'show'])->name('help.chat.show');
+    Route::post('/help/chat', [PosChatbotController::class, 'store'])
+        ->middleware('throttle:pos-chatbot')
+        ->block(35, 3)
+        ->name('help.chat.store');
+    Route::delete('/help/chat', [PosChatbotController::class, 'destroy'])
+        ->block(35, 3)
+        ->name('help.chat.destroy');
 
     // POS Routes
     Route::get('/pos', [PosController::class, 'index'])->name('pos.index');
@@ -84,4 +94,4 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('settings.store.update');
 });
 
-require __DIR__ . '/settings.php';
+require __DIR__.'/settings.php';

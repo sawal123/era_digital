@@ -40,4 +40,9 @@ return [
         'api_key' => env('UNDANGAN_API_KEY', env('API_KEY')),
     ],
 
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY'),
+        'model' => env('OPENAI_MODEL', 'gpt-4.1-mini'),
+    ],
+
 ];

@@ -73,6 +73,41 @@ Saat `ensureAccounts()` berjalan, akun digital dan profil toko dikunci dalam DB 
 - `HandleInertiaRequests` membagikan user, profil singkat toko, versi update, serta flash message. `resources/js/app.ts` menetapkan layout halaman; entry Vite ada di `vite.config.ts`.
 - `ReceivableController` menangani pelunasan dan `PaymentHistory`; `ExpenseAllocation` menghubungkan pengeluaran HPP pesanan ke transaksi/item agar biaya tidak dihitung ganda.
 - `UndanganController` meneruskan request ke API Undangan Cetak melalui Laravel HTTP client dan konfigurasi `services.undangan`; kredensial tidak ditulis dalam dokumentasi.
+- `config/updates.php` menyimpan `latest` dan `history`; halaman Updates memisahkan sorotan terbaru dari versi sebelumnya tanpa menghapus record riwayat. Metadata opsional `action`/`getting_started` menyediakan tombol mencoba fitur dan panduan singkat. Aksi `open-chat` memakai event UI `open-pos-help` yang ditangani widget chatbot; tidak mengirim pertanyaan otomatis. Notifikasi memakai penanda localStorage per versi pada browser.
+
+## Chatbot bantuan POS
+
+`PosHelpChat.vue` dipasang pada `AppSidebarLayout` dan berkomunikasi lewat JSON
+ke `GET`, `POST`, dan `DELETE /help/chat`. Endpoint berada di kelompok
+middleware `auth`/`verified` existing. `PosChatbotRequest` memvalidasi pesan
+maksimal 1.000 karakter dan menolak role/riwayat yang dikirim client.
+
+`PosChatbotController` mengambil riwayat dari session berdasarkan ID user,
+menyimpan maksimal 5 pasangan pesan, dan menyediakan reset percakapan.
+POST/DELETE memakai session lock. Limiter `pos-chatbot` pada
+`AppServiceProvider` membatasi POST 10/menit dan 100/hari per user secara
+default; limit dapat diubah melalui `config/chatbot.php` dan environment.
+
+`PosChatbotService` memakai panduan statis terkurasi
+`resources/data/pos-help.php`, konteks judul halaman dari path allowlist, serta
+riwayat terbatas untuk memanggil OpenAI Responses API. Tidak ada query data
+transaksi/customer atau tool yang dapat mengubah data. API key/model diambil
+dari `services.openai`; hanya key yang dikonfigurasi di server digunakan untuk
+autentikasi. Payload memakai `store: false` dan Structured Outputs untuk
+`status`, `answer`, dan `source_ids`.
+
+Backend memvalidasi schema, panjang jawaban, dan ID sumber. Penolakan, fitur
+yang tidak diketahui, serta jawaban tanpa sumber diganti dengan pesan tetap;
+URL sumber selalu dibuat dari panduan server. Upaya eksplisit mengambil
+rahasia/mengganti instruksi ditolak sebelum request provider. Jawaban dirender
+sebagai teks Vue dan tidak diperlakukan sebagai HTML. Error API/timeout
+diubah menjadi HTTP 503 dengan pesan aman tanpa body error atau kredensial.
+
+Panduan harus diperbarui saat fitur berubah. Jalankan
+`php artisan pos-chatbot:check` untuk smoke test koneksi dan enam kasus scope
+dengan pertanyaan generik; command ini memakai kuota API asli. Feature test
+`PosChatbotTest` memakai HTTP fake dan tidak memerlukan kuota. Detail keputusan,
+konfigurasi, dan hasil validasi ada di `docs/PLAN-CHATBOT-AI.md`.
 
 ## Testing dan dependency
 
