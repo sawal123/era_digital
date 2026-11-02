@@ -1,0 +1,1 @@
+import{$t as e,It as t,S as n,Tt as r,Z as i,en as a,yt as o}from"./app-C779TMl3.js";var s=r({__name:`Spinner`,props:{class:{type:[Boolean,null,String,Object,Array]}},setup(r){let s=r;return(r,c)=>(t(),o(e(n),{role:`status`,"aria-label":`Loading`,class:a(e(i)(`size-4 animate-spin`,s.class))},null,8,[`class`]))}});export{s as t};

@@ -53,6 +53,8 @@ const canSend = computed(
 const currentPath = computed(() => page.url.split(/[?#]/)[0]);
 const examples = [
     'Bagaimana cara membuat transaksi?',
+    'Apa itu Modal Aktual Mitra?',
+    'Bagaimana mencatat DP atau piutang?',
     'Bagaimana menambah modal digital?',
     'Apa perbedaan omzet dan keuntungan?',
 ];

@@ -296,7 +296,7 @@ class PosController extends Controller
                         }
                     }
 
-                    // Saldo provider berkurang sesuai biaya aktual Mitra Shopee,
+                    // Saldo provider berkurang sesuai biaya aktual mitra,
                     // bukan nominal pulsa yang diterima customer.
                     $profile = StoreProfile::query()->lockForUpdate()->first();
                     if ($profile) {

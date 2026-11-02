@@ -783,8 +783,8 @@ const beliSaldoDigital = () => {
 
     if (providerCost <= 0) {
         showNotification(
-            'Masukkan modal aktual Mitra Shopee terlebih dahulu.',
-            'Modal Provider Kosong',
+            'Masukkan Modal Aktual Mitra terlebih dahulu.',
+            'Modal Aktual Mitra Kosong',
             'warning',
         );
         return;
@@ -2516,8 +2516,7 @@ const formatRupiah = (angka) => {
                                         <div class="space-y-1.5">
                                             <Label
                                                 class="text-xs font-semibold text-foreground"
-                                                >Modal Aktual Mitra
-                                                Shopee</Label
+                                                >Modal Aktual Mitra</Label
                                             >
                                             <div class="relative">
                                                 <span
@@ -2549,8 +2548,9 @@ const formatRupiah = (angka) => {
                                                 v-else
                                                 class="text-[10px] text-amber-600 dark:text-amber-400"
                                             >
-                                                Isi sesuai saldo yang
-                                                benar-benar dipotong provider.
+                                                Isi biaya yang benar-benar
+                                                dipotong mitra/provider, bukan
+                                                nominal yang dibayar pembeli.
                                             </p>
                                         </div>
 
@@ -2575,7 +2575,7 @@ const formatRupiah = (angka) => {
                                                     >
                                                 </p>
                                                 <p>
-                                                    Modal Provider:
+                                                    Modal Aktual Mitra:
                                                     <span
                                                         class="font-mono font-semibold text-foreground"
                                                         >Rp
